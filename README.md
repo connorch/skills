@@ -6,4 +6,4 @@ A collection of agent skills that extend capabilities across planning, developme
 
 These skills help you write, refactor, and fix code.
 
-- **code-trust-pragma** — Annotate files with trust pragmas to indicate code quality and reliability for better AI context selection.
+- **code-trust-pragma** — Use top-line `@airef` pragmas to control how AI models reference files when selecting implementation examples.
