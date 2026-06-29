@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>QA UX Report Showcase Example</title>
+  <style>
+    :root {
+      --ink: #17202a;
+      --muted: #5b646a;
+      --paper: #f7f2e9;
+      --panel: #fffdf8;
+      --line: #d7cfbf;
+      --good: #2f6f55;
+      --bad: #b9433b;
+      --blue: #315f7d;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: "Avenir Next", Helvetica, sans-serif;
+      line-height: 1.45;
+    }
+
+    header, main {
+      width: min(1120px, calc(100vw - 32px));
+      margin: 0 auto;
+    }
+
+    header { padding: 36px 0 20px; }
+
+    h1 {
+      margin: 0 0 12px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(38px, 6vw, 72px);
+      line-height: 0.98;
+      letter-spacing: 0;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin: 22px 0;
+    }
+
+    .metric, .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    .metric {
+      min-height: 110px;
+      padding: 18px;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 32px;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .card {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(320px, 1.05fr);
+      gap: 18px;
+      margin: 18px 0;
+      padding: 20px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .badge.fail { background: var(--bad); }
+    .badge.pass { background: var(--good); }
+
+    dl {
+      display: grid;
+      grid-template-columns: 130px minmax(0, 1fr);
+      gap: 12px;
+      margin: 16px 0 0;
+    }
+
+    dt { color: var(--muted); font-weight: 800; }
+    dd { margin: 0; }
+
+    figure {
+      margin: 0;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    figure img,
+    figure svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    figcaption {
+      padding: 12px 14px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      font-size: 14px;
+    }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 5px;
+      background: #ece5d8;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.95em;
+    }
+
+    @media (max-width: 860px) {
+      .summary, .card { grid-template-columns: 1fr; }
+      dl { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>QA UX visual handoff</h1>
+    <p>Use this structure for <code>qa-failures.html</code>,
+      <code>qa-successes.html</code>, or an optional <code>qa-index.html</code>.
+      Replace placeholder counts, text, and screenshots with real QA evidence.</p>
+
+    <section class="summary" aria-label="Run summary">
+      <div class="metric"><strong>2</strong><span>failed scenarios</span></div>
+      <div class="metric"><strong>8</strong><span>passed scenarios</span></div>
+      <div class="metric"><strong>11</strong><span>screenshots</span></div>
+      <div class="metric"><strong>2</strong><span>viewports</span></div>
+    </section>
+  </header>
+
+  <main>
+    <article class="card">
+      <section>
+        <span class="badge fail">P1 failed</span>
+        <h2>ISSUE-002: Checkout payment failure has no recovery guidance</h2>
+        <dl>
+          <dt>Source step</dt>
+          <dd>Critical Happy Path / Checkout / Step 5</dd>
+          <dt>Expected</dt>
+          <dd>User sees field-level recovery guidance.</dd>
+          <dt>Actual</dt>
+          <dd>Only a generic banner appeared.</dd>
+          <dt>Evidence</dt>
+          <dd><code>screenshots/014-checkout-payment-desktop-fail.png</code></dd>
+        </dl>
+      </section>
+      <figure>
+        <svg viewBox="0 0 960 540" role="img"
+          aria-label="Placeholder checkout payment failure screenshot">
+          <rect width="960" height="540" fill="#fbf5ef"/>
+          <rect x="48" y="44" width="864" height="452" rx="18" fill="#fff"
+            stroke="#d7cfbf" stroke-width="3"/>
+          <text x="92" y="118" fill="#17202a" font-family="Avenir Next, Helvetica, sans-serif"
+            font-size="38" font-weight="800">Checkout</text>
+          <rect x="92" y="170" width="360" height="56" rx="10" fill="#fff"
+            stroke="#b9c3be" stroke-width="3"/>
+          <rect x="92" y="252" width="360" height="56" rx="10" fill="#fff"
+            stroke="#b9433b" stroke-width="4"/>
+          <rect x="92" y="334" width="360" height="56" rx="10" fill="#b9433b"/>
+          <text x="120" y="370" fill="#fff" font-family="Avenir Next, Helvetica, sans-serif"
+            font-size="22" font-weight="800">Could not process payment</text>
+          <rect x="560" y="170" width="260" height="180" rx="14" fill="#f2e6dc"
+            stroke="#d7cfbf" stroke-width="2"/>
+          <text x="590" y="224" fill="#17202a" font-family="Avenir Next, Helvetica, sans-serif"
+            font-size="26" font-weight="800">Failure evidence</text>
+          <text x="590" y="270" fill="#5b646a" font-family="Avenir Next, Helvetica, sans-serif"
+            font-size="20">Generic banner only</text>
+        </svg>
+        <figcaption>Before-state screenshot path:
+          <code>screenshots/014-checkout-payment-desktop-fail.png</code></figcaption>
+      </figure>
+    </article>
+
+    <article class="card">
+      <section>
+        <span class="badge pass">Fix pass</span>
+        <h2>Checkout payment recovery verified</h2>
+        <dl>
+          <dt>Source step</dt>
+          <dd>Final comprehensive rerun / Checkout / Step 5</dd>
+          <dt>Verified</dt>
+          <dd>Field-level copy, retry action, and alternate payment action visible.</dd>
+          <dt>Viewport</dt>
+          <dd>Desktop and mobile</dd>
+          <dt>Evidence</dt>
+          <dd><code>screenshots/021-checkout-payment-mobile-fixed-pass.png</code></dd>
+        </dl>
+      </section>
+      <figure>
+        <svg viewBox="0 0 960 540" role="img"
+          aria-label="Placeholder checkout recovery success screenshot">
+          <rect width="960" height="540" fill="#edf3ee"/>
+          <rect x="48" y="44" width="864" height="452" rx="18" fill="#fff"
+            stroke="#cbd8cd" stroke-width="3"/>
+          <text x="92" y="118" fill="#12312f" font-family="Avenir Next, Helvetica, sans-serif"
+            font-size="38" font-weight="800">Checkout</text>
+          <rect x="92" y="170" width="360" height="56" rx="10" fill="#fff"
+            stroke="#9db9ad" stroke-width="3"/>
+          <rect x="92" y="252" width="360" height="56" rx="10" fill="#fff"
+            stroke="#c55243" stroke-width="4"/>
+          <text x="92" y="338" fill="#9e382f" font-family="Avenir Next, Helvetica, sans-serif"
+            font-size="20" font-weight="800">Card declined. Retry or update.</text>
+          <rect x="92" y="374" width="168" height="52" rx="10" fill="#12312f"/>
+          <text x="128" y="407" fill="#fff" font-family="Avenir Next, Helvetica, sans-serif"
+            font-size="20" font-weight="800">Retry</text>
+          <rect x="280" y="374" width="210" height="52" rx="10" fill="#e4eee8"
+            stroke="#cbd8cd" stroke-width="2"/>
+          <text x="310" y="407" fill="#12312f" font-family="Avenir Next, Helvetica, sans-serif"
+            font-size="20" font-weight="800">Change card</text>
+          <rect x="560" y="170" width="260" height="180" rx="14" fill="#e4eee8"
+            stroke="#cbd8cd" stroke-width="2"/>
+          <text x="590" y="224" fill="#12312f" font-family="Avenir Next, Helvetica, sans-serif"
+            font-size="26" font-weight="800">Success evidence</text>
+          <text x="590" y="270" fill="#51605b" font-family="Avenir Next, Helvetica, sans-serif"
+            font-size="20">Recovery controls visible</text>
+        </svg>
+        <figcaption>After-state screenshot path:
+          <code>screenshots/021-checkout-payment-mobile-fixed-pass.png</code></figcaption>
+      </figure>
+    </article>
+  </main>
+</body>
+</html>
