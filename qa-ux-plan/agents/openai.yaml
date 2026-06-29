@@ -1,0 +1,4 @@
+interface:
+  display_name: "QA UX Plan"
+  short_description: "Generate QA UX verification plans from branch diffs"
+  default_prompt: "Use $qa-ux-plan to generate an end-to-end QA UX verification plan for the current branch."
