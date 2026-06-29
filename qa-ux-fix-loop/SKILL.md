@@ -28,6 +28,10 @@ sequentially in the main thread and clearly label each role's output.
    - If the input appears to be output from `$qa-ux-plan`, read
      `references/qa-ux-plan-output.md` and use that mapping to normalize the
      plan before execution.
+   - Create or choose an artifact directory before browser testing starts.
+     Prefer `.context/qa-ux-artifacts/` when working in a repo.
+   - Prepare a screenshot capture plan from the QA guide's steps, expected
+     assertions, responsive checks, and likely failure points.
    - Inspect repo instructions, app startup steps, browser automation guidance,
      and changed files relevant to the QA plan.
    - If the repo includes browser automation instructions, read and follow them
@@ -37,6 +41,13 @@ sequentially in the main thread and clearly label each role's output.
 2. **Baseline QA pass**
    - Execute the QA plan end to end before fixing anything, unless setup is
      blocked.
+   - Take screenshots at every important browser-visible step:
+     - app ready/setup complete
+     - start of each user flow or scenario
+     - each assertion point where visible UI proves success or failure
+     - every unexpected state, error, layout defect, or blocked step
+     - before and after each fix verification for UI issues
+     - final comprehensive rerun completion
    - Record every issue in a durable issue log with:
      - title, severity, affected flow, repro steps, expected behavior, actual
        behavior, environment, evidence, and suspected surface area
@@ -104,8 +115,48 @@ sequentially in the main thread and clearly label each role's output.
 7. **Final comprehensive rerun**
    - After all logged issues pass, rerun the original QA guide from the start.
    - Record new findings, then repeat the loop for those findings.
+   - Regenerate the required HTML reports from the latest evidence before
+     finishing:
+     - `qa-failures.html` for failed, blocked, out-of-scope, accepted known
+       issue, and initially failed-then-fixed findings.
+     - `qa-successes.html` for scenarios that passed with browser-visible
+       evidence.
+   - Optionally generate `qa-index.html` when it helps navigate a larger run.
    - Finish only when the full rerun passes or remaining items are explicitly
      blocked, out of scope, or accepted as known issues.
+
+## HTML Report Artifacts
+
+Always produce two HTML reports when browser automation was part of the QA run.
+Prefer writing them under `.context/qa-ux-artifacts/` with screenshots in
+`.context/qa-ux-artifacts/screenshots/`.
+
+- **`qa-failures.html`:** Track every failed browser automation scenario,
+  blocked setup item, accepted known issue, out-of-scope finding, and issue that
+  failed before being fixed. Include screenshots, expected vs actual behavior,
+  failed step, severity, status, suspected surface area, fix summary when
+  available, and links to before/after evidence.
+- **`qa-successes.html`:** Track only scenarios that passed with concrete
+  browser-visible evidence. Include plan section, scenario name, verified steps,
+  viewport/device, screenshot links, relevant console/network observations, and
+  final result.
+- **`qa-index.html` (optional):** Use as a navigation page for large runs. Link
+  to both required reports, summarize counts, and list artifact paths.
+
+Use external screenshot files instead of base64 by default so users can inspect
+images directly. Name screenshots with a sortable prefix, plan step, viewport
+when relevant, and status, for example:
+
+```text
+.context/qa-ux-artifacts/screenshots/
+  001-smoke-dashboard-desktop-pass.png
+  014-checkout-payment-desktop-fail.png
+  021-checkout-payment-mobile-fixed-pass.png
+```
+
+Use `references/html-showcase-example.html` as the visual structure to follow
+when building the reports. Adapt the styling to the project when useful, but
+preserve the evidence-first content model.
 
 ## Issue Log Format
 
@@ -120,6 +171,10 @@ workspace-local file such as `.context/qa-ux-fix-loop.md` when working in a repo
 - Environment:
 - App URL:
 - Browser automation guidance:
+- Artifact directory:
+- Failure report:
+- Success report:
+- Optional index:
 
 ## Issues
 
@@ -131,6 +186,7 @@ workspace-local file such as `.context/qa-ux-fix-loop.md` when working in a repo
 - Expected:
 - Actual:
 - Evidence:
+- Screenshots:
 - Suspected surface:
 - Required evaluators:
 - Success criteria:
@@ -151,6 +207,12 @@ workspace-local file such as `.context/qa-ux-fix-loop.md` when working in a repo
 - Do not mark an issue fixed based only on code inspection when the behavior can
   be tested.
 - Do not mark UX signoff complete without browser-visible evidence for UI bugs.
+- Do not complete a browser-based QA run without current `qa-failures.html` and
+  `qa-successes.html` reports.
+- Do not bury failed visual evidence only in chat. Link each failed browser step
+  from the failure report and issue log.
+- Do not list a scenario in the success report unless a screenshot, DOM
+  assertion, trace, or equivalent browser observation proves the checked state.
 - Do not mark code signoff complete without reviewing the actual diff.
 - Capture exact commands run and the relevant pass/fail result.
 - If a tool cannot be run, state why and use the next strongest verification
@@ -162,6 +224,7 @@ Report:
 
 - source QA plan used
 - issues found and final status
+- HTML report paths and screenshot artifact directory
 - files changed
 - verification commands and browser checks performed
 - remaining risks, blocked items, or accepted out-of-scope findings
