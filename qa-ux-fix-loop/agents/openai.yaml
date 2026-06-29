@@ -1,0 +1,4 @@
+interface:
+  display_name: "QA UX Fix Loop"
+  short_description: "Execute QA UX plans and drive fixes to signoff"
+  default_prompt: "Use $qa-ux-fix-loop to execute this $qa-ux-plan output, record issues, fix them serially, and verify each fix with evaluator signoff."
