@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="data:,">
-  <title>QA UX Report Showcase Example</title>
+  <title>QA UX Fix Loop Report Example</title>
   <style>
     :root {
       --ink: #17202a;
@@ -14,6 +14,7 @@
       --line: #d7cfbf;
       --good: #2f6f55;
       --bad: #b9433b;
+      --warn: #a8661f;
       --blue: #315f7d;
     }
 
@@ -27,7 +28,8 @@
       line-height: 1.45;
     }
 
-    header, main {
+    header,
+    main {
       width: min(1120px, calc(100vw - 32px));
       margin: 0 auto;
     }
@@ -42,6 +44,18 @@
       letter-spacing: 0;
     }
 
+    h2,
+    h3 {
+      margin: 0;
+      line-height: 1.12;
+      letter-spacing: 0;
+    }
+
+    h2 { font-size: 28px; }
+    h3 { font-size: 20px; }
+
+    p { margin: 8px 0 0; }
+
     .summary {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -49,7 +63,8 @@
       margin: 22px 0;
     }
 
-    .metric, .card {
+    .metric,
+    .scenario {
       border: 1px solid var(--line);
       border-radius: 8px;
       background: var(--panel);
@@ -65,17 +80,25 @@
       font-size: 32px;
     }
 
-    .metric span {
+    .metric span,
+    dt,
+    figcaption {
       color: var(--muted);
       font-weight: 700;
     }
 
-    .card {
-      display: grid;
-      grid-template-columns: minmax(0, 0.95fr) minmax(320px, 1.05fr);
-      gap: 18px;
+    .scenario {
       margin: 18px 0;
       padding: 20px;
+    }
+
+    .scenario-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 18px;
     }
 
     .badge {
@@ -93,16 +116,54 @@
 
     .badge.fail { background: var(--bad); }
     .badge.pass { background: var(--good); }
+    .badge.fix { background: var(--blue); }
+    .badge.warn { background: var(--warn); }
+
+    .details,
+    .timeline,
+    .evidence-grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .details {
+      grid-template-columns: minmax(0, 0.85fr) minmax(320px, 1.15fr);
+      align-items: start;
+    }
 
     dl {
       display: grid;
       grid-template-columns: 130px minmax(0, 1fr);
-      gap: 12px;
-      margin: 16px 0 0;
+      gap: 10px 12px;
+      margin: 14px 0 0;
     }
 
-    dt { color: var(--muted); font-weight: 800; }
     dd { margin: 0; }
+
+    .timeline {
+      margin-top: 18px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .event {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: #fffaf0;
+    }
+
+    .event h3 {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .evidence-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin-top: 16px;
+    }
 
     figure {
       margin: 0;
@@ -121,7 +182,6 @@
 
     figcaption {
       padding: 12px 14px;
-      color: var(--muted);
       border-top: 1px solid var(--line);
       font-size: 14px;
     }
@@ -135,115 +195,201 @@
     }
 
     @media (max-width: 860px) {
-      .summary, .card { grid-template-columns: 1fr; }
+      .summary,
+      .details,
+      .timeline,
+      .evidence-grid {
+        grid-template-columns: 1fr;
+      }
+
       dl { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
   <header>
-    <h1>QA UX visual handoff</h1>
-    <p>Use this structure for <code>qa-failures.html</code>,
-      <code>qa-successes.html</code>, or an optional <code>qa-index.html</code>.
-      Replace placeholder counts, text, and screenshots with real QA evidence.</p>
+    <h1>QA UX fix loop report</h1>
+    <p>Use this structure for the single required artifact,
+      <code>qa-ux-report.html</code>. Every e2e scenario gets one durable section
+      that is updated across loop #1, loop #2, and later full reruns.</p>
 
     <section class="summary" aria-label="Run summary">
-      <div class="metric"><strong>2</strong><span>failed scenarios</span></div>
-      <div class="metric"><strong>8</strong><span>passed scenarios</span></div>
-      <div class="metric"><strong>11</strong><span>screenshots</span></div>
-      <div class="metric"><strong>2</strong><span>viewports</span></div>
+      <div class="metric"><strong>2</strong><span>full e2e loops</span></div>
+      <div class="metric"><strong>7</strong><span>scenarios passing now</span></div>
+      <div class="metric"><strong>1</strong><span>fixed scenario</span></div>
+      <div class="metric"><strong>0</strong><span>open blockers</span></div>
     </section>
   </header>
 
   <main>
-    <article class="card">
-      <section>
-        <span class="badge fail">P1 failed</span>
-        <h2>ISSUE-002: Checkout payment failure has no recovery guidance</h2>
-        <dl>
-          <dt>Source step</dt>
-          <dd>Critical Happy Path / Checkout / Step 5</dd>
-          <dt>Expected</dt>
-          <dd>User sees field-level recovery guidance.</dd>
-          <dt>Actual</dt>
-          <dd>Only a generic banner appeared.</dd>
-          <dt>Evidence</dt>
-          <dd><code>screenshots/014-checkout-payment-desktop-fail.png</code></dd>
-        </dl>
+    <article class="scenario" id="scenario-001">
+      <div class="scenario-header">
+        <div>
+          <span class="badge pass">Initially successful</span>
+          <h2>SCENARIO-001: Dashboard smoke path</h2>
+          <p>This scenario passed in loop #1 and stayed successful in loop #2.</p>
+        </div>
+        <code>Current status: passed</code>
+      </div>
+
+      <section class="details" aria-label="Dashboard smoke path details">
+        <div>
+          <h3>Scenario details</h3>
+          <dl>
+            <dt>Source step</dt>
+            <dd>Critical Happy Path / Dashboard / Steps 1-3</dd>
+            <dt>Environment</dt>
+            <dd>Local app, desktop viewport</dd>
+            <dt>First pass</dt>
+            <dd>Loop #1 success</dd>
+            <dt>Latest pass</dt>
+            <dd>Loop #2 success</dd>
+          </dl>
+        </div>
+
+        <figure>
+          <svg viewBox="0 0 960 540" role="img"
+            aria-label="Placeholder dashboard success screenshot">
+            <rect width="960" height="540" fill="#edf3ee"/>
+            <rect x="48" y="44" width="864" height="452" rx="18" fill="#fff"
+              stroke="#cbd8cd" stroke-width="3"/>
+            <text x="92" y="118" fill="#12312f" font-family="Avenir Next, Helvetica, sans-serif"
+              font-size="38" font-weight="800">Dashboard</text>
+            <rect x="92" y="170" width="230" height="128" rx="14" fill="#e4eee8"
+              stroke="#cbd8cd" stroke-width="2"/>
+            <rect x="362" y="170" width="230" height="128" rx="14" fill="#e4eee8"
+              stroke="#cbd8cd" stroke-width="2"/>
+            <rect x="632" y="170" width="230" height="128" rx="14" fill="#e4eee8"
+              stroke="#cbd8cd" stroke-width="2"/>
+            <rect x="92" y="338" width="770" height="86" rx="14" fill="#fff"
+              stroke="#cbd8cd" stroke-width="2"/>
+            <text x="126" y="386" fill="#2f6f55" font-family="Avenir Next, Helvetica, sans-serif"
+              font-size="24" font-weight="800">All expected widgets are visible</text>
+          </svg>
+          <figcaption>Loop #2 success evidence:
+            <code>screenshots/008-loop-02-dashboard-desktop-pass.png</code></figcaption>
+        </figure>
       </section>
-      <figure>
-        <svg viewBox="0 0 960 540" role="img"
-          aria-label="Placeholder checkout payment failure screenshot">
-          <rect width="960" height="540" fill="#fbf5ef"/>
-          <rect x="48" y="44" width="864" height="452" rx="18" fill="#fff"
-            stroke="#d7cfbf" stroke-width="3"/>
-          <text x="92" y="118" fill="#17202a" font-family="Avenir Next, Helvetica, sans-serif"
-            font-size="38" font-weight="800">Checkout</text>
-          <rect x="92" y="170" width="360" height="56" rx="10" fill="#fff"
-            stroke="#b9c3be" stroke-width="3"/>
-          <rect x="92" y="252" width="360" height="56" rx="10" fill="#fff"
-            stroke="#b9433b" stroke-width="4"/>
-          <rect x="92" y="334" width="360" height="56" rx="10" fill="#b9433b"/>
-          <text x="120" y="370" fill="#fff" font-family="Avenir Next, Helvetica, sans-serif"
-            font-size="22" font-weight="800">Could not process payment</text>
-          <rect x="560" y="170" width="260" height="180" rx="14" fill="#f2e6dc"
-            stroke="#d7cfbf" stroke-width="2"/>
-          <text x="590" y="224" fill="#17202a" font-family="Avenir Next, Helvetica, sans-serif"
-            font-size="26" font-weight="800">Failure evidence</text>
-          <text x="590" y="270" fill="#5b646a" font-family="Avenir Next, Helvetica, sans-serif"
-            font-size="20">Generic banner only</text>
-        </svg>
-        <figcaption>Before-state screenshot path:
-          <code>screenshots/014-checkout-payment-desktop-fail.png</code></figcaption>
-      </figure>
+
+      <section class="timeline" aria-label="Dashboard smoke path loop timeline">
+        <div class="event">
+          <h3><span class="badge pass">Loop #1 pass</span></h3>
+          <p>Initial e2e pass verified the dashboard loaded, metrics were
+            visible, and no console errors appeared.</p>
+          <p>Evidence: <code>screenshots/001-loop-01-dashboard-desktop-pass.png</code></p>
+        </div>
+        <div class="event">
+          <h3><span class="badge pass">Loop #2 pass</span></h3>
+          <p>Final rerun verified the same scenario after unrelated fixes.</p>
+          <p>Evidence: <code>screenshots/008-loop-02-dashboard-desktop-pass.png</code></p>
+        </div>
+      </section>
     </article>
 
-    <article class="card">
-      <section>
-        <span class="badge pass">Fix pass</span>
-        <h2>Checkout payment recovery verified</h2>
-        <dl>
-          <dt>Source step</dt>
-          <dd>Final comprehensive rerun / Checkout / Step 5</dd>
-          <dt>Verified</dt>
-          <dd>Field-level copy, retry action, and alternate payment action visible.</dd>
-          <dt>Viewport</dt>
-          <dd>Desktop and mobile</dd>
-          <dt>Evidence</dt>
-          <dd><code>screenshots/021-checkout-payment-mobile-fixed-pass.png</code></dd>
-        </dl>
+    <article class="scenario" id="scenario-002">
+      <div class="scenario-header">
+        <div>
+          <span class="badge fix">Failed then fixed</span>
+          <h2>SCENARIO-002: Checkout payment recovery</h2>
+          <p>This scenario failed in loop #1, was fixed in an isolated commit, and
+            passed in loop #2.</p>
+        </div>
+        <code>Fix commit: a1b2c3d</code>
+      </div>
+
+      <section class="details" aria-label="Checkout payment recovery details">
+        <div>
+          <h3>Fix lifecycle</h3>
+          <dl>
+            <dt>Source step</dt>
+            <dd>Critical Happy Path / Checkout / Step 5</dd>
+            <dt>Severity</dt>
+            <dd>P1</dd>
+            <dt>Expected</dt>
+            <dd>User sees field-level recovery guidance.</dd>
+            <dt>Actual</dt>
+            <dd>Only a generic banner appeared.</dd>
+            <dt>Fix summary</dt>
+            <dd>Added field-level decline copy, retry action, and alternate
+              payment action.</dd>
+            <dt>Verified by</dt>
+            <dd><code>npm test</code>, browser rerun, UX evaluator signoff</dd>
+          </dl>
+        </div>
+
+        <section class="timeline" aria-label="Checkout loop timeline">
+          <div class="event">
+            <h3><span class="badge fail">Loop #1 issue</span></h3>
+            <p>Payment decline path lacked actionable recovery guidance.</p>
+            <p>Evidence: <code>screenshots/014-loop-01-checkout-payment-desktop-fail.png</code></p>
+          </div>
+          <div class="event">
+            <h3><span class="badge pass">Loop #2 fixed</span></h3>
+            <p>Recovery copy and actions were visible on desktop and mobile.</p>
+            <p>Evidence: <code>screenshots/021-loop-02-checkout-payment-mobile-fixed-pass.png</code></p>
+          </div>
+        </section>
       </section>
-      <figure>
-        <svg viewBox="0 0 960 540" role="img"
-          aria-label="Placeholder checkout recovery success screenshot">
-          <rect width="960" height="540" fill="#edf3ee"/>
-          <rect x="48" y="44" width="864" height="452" rx="18" fill="#fff"
-            stroke="#cbd8cd" stroke-width="3"/>
-          <text x="92" y="118" fill="#12312f" font-family="Avenir Next, Helvetica, sans-serif"
-            font-size="38" font-weight="800">Checkout</text>
-          <rect x="92" y="170" width="360" height="56" rx="10" fill="#fff"
-            stroke="#9db9ad" stroke-width="3"/>
-          <rect x="92" y="252" width="360" height="56" rx="10" fill="#fff"
-            stroke="#c55243" stroke-width="4"/>
-          <text x="92" y="338" fill="#9e382f" font-family="Avenir Next, Helvetica, sans-serif"
-            font-size="20" font-weight="800">Card declined. Retry or update.</text>
-          <rect x="92" y="374" width="168" height="52" rx="10" fill="#12312f"/>
-          <text x="128" y="407" fill="#fff" font-family="Avenir Next, Helvetica, sans-serif"
-            font-size="20" font-weight="800">Retry</text>
-          <rect x="280" y="374" width="210" height="52" rx="10" fill="#e4eee8"
-            stroke="#cbd8cd" stroke-width="2"/>
-          <text x="310" y="407" fill="#12312f" font-family="Avenir Next, Helvetica, sans-serif"
-            font-size="20" font-weight="800">Change card</text>
-          <rect x="560" y="170" width="260" height="180" rx="14" fill="#e4eee8"
-            stroke="#cbd8cd" stroke-width="2"/>
-          <text x="590" y="224" fill="#12312f" font-family="Avenir Next, Helvetica, sans-serif"
-            font-size="26" font-weight="800">Success evidence</text>
-          <text x="590" y="270" fill="#51605b" font-family="Avenir Next, Helvetica, sans-serif"
-            font-size="20">Recovery controls visible</text>
-        </svg>
-        <figcaption>After-state screenshot path:
-          <code>screenshots/021-checkout-payment-mobile-fixed-pass.png</code></figcaption>
-      </figure>
+
+      <section class="evidence-grid" aria-label="Checkout before and after evidence">
+        <figure>
+          <svg viewBox="0 0 960 540" role="img"
+            aria-label="Placeholder checkout payment failure screenshot">
+            <rect width="960" height="540" fill="#fbf5ef"/>
+            <rect x="48" y="44" width="864" height="452" rx="18" fill="#fff"
+              stroke="#d7cfbf" stroke-width="3"/>
+            <text x="92" y="118" fill="#17202a" font-family="Avenir Next, Helvetica, sans-serif"
+              font-size="38" font-weight="800">Checkout</text>
+            <rect x="92" y="170" width="360" height="56" rx="10" fill="#fff"
+              stroke="#b9c3be" stroke-width="3"/>
+            <rect x="92" y="252" width="360" height="56" rx="10" fill="#fff"
+              stroke="#b9433b" stroke-width="4"/>
+            <rect x="92" y="334" width="360" height="56" rx="10" fill="#b9433b"/>
+            <text x="120" y="370" fill="#fff" font-family="Avenir Next, Helvetica, sans-serif"
+              font-size="22" font-weight="800">Could not process payment</text>
+            <rect x="560" y="170" width="260" height="180" rx="14" fill="#f2e6dc"
+              stroke="#d7cfbf" stroke-width="2"/>
+            <text x="590" y="224" fill="#17202a" font-family="Avenir Next, Helvetica, sans-serif"
+              font-size="26" font-weight="800">Issue state</text>
+            <text x="590" y="270" fill="#5b646a" font-family="Avenir Next, Helvetica, sans-serif"
+              font-size="20">Generic banner only</text>
+          </svg>
+          <figcaption>Loop #1 issue-state screenshot:
+            <code>screenshots/014-loop-01-checkout-payment-desktop-fail.png</code></figcaption>
+        </figure>
+
+        <figure>
+          <svg viewBox="0 0 960 540" role="img"
+            aria-label="Placeholder checkout recovery success screenshot">
+            <rect width="960" height="540" fill="#edf3ee"/>
+            <rect x="48" y="44" width="864" height="452" rx="18" fill="#fff"
+              stroke="#cbd8cd" stroke-width="3"/>
+            <text x="92" y="118" fill="#12312f" font-family="Avenir Next, Helvetica, sans-serif"
+              font-size="38" font-weight="800">Checkout</text>
+            <rect x="92" y="170" width="360" height="56" rx="10" fill="#fff"
+              stroke="#9db9ad" stroke-width="3"/>
+            <rect x="92" y="252" width="360" height="56" rx="10" fill="#fff"
+              stroke="#c55243" stroke-width="4"/>
+            <text x="92" y="338" fill="#9e382f" font-family="Avenir Next, Helvetica, sans-serif"
+              font-size="20" font-weight="800">Card declined. Retry or update.</text>
+            <rect x="92" y="374" width="168" height="52" rx="10" fill="#12312f"/>
+            <text x="128" y="407" fill="#fff" font-family="Avenir Next, Helvetica, sans-serif"
+              font-size="20" font-weight="800">Retry</text>
+            <rect x="280" y="374" width="210" height="52" rx="10" fill="#e4eee8"
+              stroke="#cbd8cd" stroke-width="2"/>
+            <text x="310" y="407" fill="#12312f" font-family="Avenir Next, Helvetica, sans-serif"
+              font-size="20" font-weight="800">Change card</text>
+            <rect x="560" y="170" width="260" height="180" rx="14" fill="#e4eee8"
+              stroke="#cbd8cd" stroke-width="2"/>
+            <text x="590" y="224" fill="#12312f" font-family="Avenir Next, Helvetica, sans-serif"
+              font-size="26" font-weight="800">Success state</text>
+            <text x="590" y="270" fill="#51605b" font-family="Avenir Next, Helvetica, sans-serif"
+              font-size="20">Recovery controls visible</text>
+          </svg>
+          <figcaption>Loop #2 success-state screenshot:
+            <code>screenshots/021-loop-02-checkout-payment-mobile-fixed-pass.png</code></figcaption>
+        </figure>
+      </section>
     </article>
   </main>
 </body>
