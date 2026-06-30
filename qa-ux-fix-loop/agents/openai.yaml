@@ -1,4 +1,4 @@
 interface:
   display_name: "QA UX Fix Loop"
-  short_description: "Execute QA UX plans and drive fixes to signoff"
-  default_prompt: "Use $qa-ux-fix-loop to execute this $qa-ux-plan output, record issues, fix them serially, and verify each fix with evaluator signoff."
+  short_description: "Execute QA UX plans and document fixes in one report"
+  default_prompt: "Use $qa-ux-fix-loop to execute this $qa-ux-plan output, record each e2e scenario in one qa-ux-report.html artifact, fix issues with isolated commits, and verify each fix with evaluator signoff."

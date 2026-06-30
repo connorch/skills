@@ -115,48 +115,78 @@ sequentially in the main thread and clearly label each role's output.
 7. **Final comprehensive rerun**
    - After all logged issues pass, rerun the original QA guide from the start.
    - Record new findings, then repeat the loop for those findings.
-   - Regenerate the required HTML reports from the latest evidence before
-     finishing:
-     - `qa-failures.html` for failed, blocked, out-of-scope, accepted known
-       issue, and initially failed-then-fixed findings.
-     - `qa-successes.html` for scenarios that passed with browser-visible
-       evidence.
-   - Optionally generate `qa-index.html` when it helps navigate a larger run.
+   - Update the single required HTML report, `qa-ux-report.html`, from the
+     latest evidence before finishing. Do not create separate success and
+     failure reports.
+   - The report must show which full e2e loop number found each issue or
+     success state. Loop #1 is the first complete e2e pass, loop #2 is the
+     next complete pass after fixes, and so on.
+   - When a later loop changes the outcome for a scenario, update that
+     scenario's existing report section with the new evidence instead of
+     creating a duplicate section elsewhere.
    - Finish only when the full rerun passes or remaining items are explicitly
      blocked, out of scope, or accepted as known issues.
 
 ## HTML Report Artifacts
 
-Always produce two HTML reports when browser automation was part of the QA run.
+Always produce one HTML report when browser automation was part of the QA run.
 Prefer writing them under `.context/qa-ux-artifacts/` with screenshots in
 `.context/qa-ux-artifacts/screenshots/`.
 
-- **`qa-failures.html`:** Track every failed browser automation scenario,
-  blocked setup item, accepted known issue, out-of-scope finding, and issue that
-  failed before being fixed. Include screenshots, expected vs actual behavior,
-  failed step, severity, status, suspected surface area, fix summary when
-  available, and links to before/after evidence.
-- **`qa-successes.html`:** Track only scenarios that passed with concrete
-  browser-visible evidence. Include plan section, scenario name, verified steps,
-  viewport/device, screenshot links, relevant console/network observations, and
-  final result.
-- **`qa-index.html` (optional):** Use as a navigation page for large runs. Link
-  to both required reports, summarize counts, and list artifact paths.
+- **`qa-ux-report.html`:** The single source of truth for the full fix-loop
+  run. Track every e2e scenario, including scenarios that passed initially,
+  scenarios that failed and were fixed, blocked setup items, accepted known
+  issues, and out-of-scope findings. The top summary should make the current
+  state obvious without requiring another document.
+- Create one section per stable e2e scenario. Use a durable scenario ID, such as
+  `SCENARIO-001: Checkout payment recovery`, and keep updating that same section
+  across loops.
+- Each scenario section must contain the full lifecycle for that scenario:
+  - source plan section, scenario name, viewport/device, environment, and current
+    status
+  - per-loop timeline entries showing loop number, date/time when useful,
+    result, evidence paths, and whether the scenario stayed successful, newly
+    failed, remained failing, or was fixed
+  - if the scenario passed on loop #1, state that it was initially successful
+    and include the success evidence
+  - if the scenario failed, include severity, failed step, expected vs actual
+    behavior, suspected surface area, issue-state screenshot, and repro evidence
+  - after a fix, include the fix summary, files changed when useful, isolated
+    fix commit hash, evaluator signoff, commands run, and success-state
+    screenshot
+  - if the same scenario fails again in a later loop, append that loop's issue
+    state, fix evidence, and new isolated fix commit hash in the same section
+- Keep screenshot links external instead of base64 by default so users can
+  inspect images directly.
 
-Use external screenshot files instead of base64 by default so users can inspect
-images directly. Name screenshots with a sortable prefix, plan step, viewport
+Name screenshots with a sortable prefix, loop number, scenario slug, viewport
 when relevant, and status, for example:
 
 ```text
 .context/qa-ux-artifacts/screenshots/
-  001-smoke-dashboard-desktop-pass.png
-  014-checkout-payment-desktop-fail.png
-  021-checkout-payment-mobile-fixed-pass.png
+  001-loop-01-smoke-dashboard-desktop-pass.png
+  014-loop-01-checkout-payment-desktop-fail.png
+  021-loop-02-checkout-payment-mobile-fixed-pass.png
 ```
 
 Use `references/html-showcase-example.html` as the visual structure to follow
-when building the reports. Adapt the styling to the project when useful, but
+when building the report. Adapt the styling to the project when useful, but
 preserve the evidence-first content model.
+
+## Fix Commits
+
+Each fix must be committed independently before moving to the next issue unless
+the user explicitly forbids commits. Keep each commit scoped to one root cause or
+one tightly coupled e2e scenario. Do not batch unrelated fixes into one commit.
+
+After each isolated fix commit:
+
+- record the commit hash in the issue log
+- record the same commit hash in the matching `qa-ux-report.html` scenario
+  section
+- link the commit to the loop number where the issue was found and the loop
+  number where the fix was verified
+- if a fix cannot be committed, record why in the issue log and report section
 
 ## Issue Log Format
 
@@ -172,9 +202,51 @@ workspace-local file such as `.context/qa-ux-fix-loop.md` when working in a repo
 - App URL:
 - Browser automation guidance:
 - Artifact directory:
-- Failure report:
-- Success report:
-- Optional index:
+- HTML report: .context/qa-ux-artifacts/qa-ux-report.html
+
+## E2E Loops
+
+### Loop 1: <date/time or run label>
+- Scope:
+- Result summary:
+- Evidence added:
+
+### Loop 2: <date/time or run label>
+- Scope:
+- Result summary:
+- Evidence added:
+
+## Test Scenarios
+
+### SCENARIO-001: <scenario name>
+- Source plan section:
+- Current status: initially-passed | failed-then-fixed | still-failing | blocked | out-of-scope | accepted-known-issue
+- First observed in loop:
+- Last verified in loop:
+- Environment:
+- Viewports/devices:
+- Loop evidence:
+  - Loop 1:
+    - Result:
+    - Evidence:
+    - Screenshots:
+  - Loop 2:
+    - Result:
+    - Evidence:
+    - Screenshots:
+- Issue state:
+  - Severity:
+  - Failed step:
+  - Expected:
+  - Actual:
+  - Suspected surface:
+- Fix lifecycle:
+  - Fix summary:
+  - Isolated fix commit:
+  - Files changed:
+  - Verification commands:
+  - Evaluator signoff:
+- Follow-ups:
 
 ## Issues
 
@@ -191,6 +263,7 @@ workspace-local file such as `.context/qa-ux-fix-loop.md` when working in a repo
 - Required evaluators:
 - Success criteria:
 - Fix summary:
+- Isolated fix commit:
 - Verification evidence:
 - Follow-ups:
 ```
@@ -207,12 +280,17 @@ workspace-local file such as `.context/qa-ux-fix-loop.md` when working in a repo
 - Do not mark an issue fixed based only on code inspection when the behavior can
   be tested.
 - Do not mark UX signoff complete without browser-visible evidence for UI bugs.
-- Do not complete a browser-based QA run without current `qa-failures.html` and
-  `qa-successes.html` reports.
+- Do not complete a browser-based QA run without a current `qa-ux-report.html`
+  report.
 - Do not bury failed visual evidence only in chat. Link each failed browser step
-  from the failure report and issue log.
-- Do not list a scenario in the success report unless a screenshot, DOM
-  assertion, trace, or equivalent browser observation proves the checked state.
+  from the report and issue log.
+- Do not list a scenario as successful unless a screenshot, DOM assertion,
+  trace, or equivalent browser observation proves the checked state.
+- Do not split QA evidence into separate success and failure documents.
+- Do not leave an issue-state section without the corresponding fix evidence
+  once the fix has been verified.
+- Do not omit the isolated fix commit hash from a fixed scenario unless a commit
+  was impossible or explicitly disallowed, and then record why.
 - Do not mark code signoff complete without reviewing the actual diff.
 - Capture exact commands run and the relevant pass/fail result.
 - If a tool cannot be run, state why and use the next strongest verification
@@ -224,7 +302,8 @@ Report:
 
 - source QA plan used
 - issues found and final status
-- HTML report paths and screenshot artifact directory
+- HTML report path and screenshot artifact directory
+- isolated fix commits
 - files changed
 - verification commands and browser checks performed
 - remaining risks, blocked items, or accepted out-of-scope findings
