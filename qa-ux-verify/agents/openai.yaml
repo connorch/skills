@@ -1,0 +1,4 @@
+interface:
+  display_name: "QA UX Verify"
+  short_description: "Verify QA UX plans with browser evidence"
+  default_prompt: "Use $qa-ux-verify to execute this $qa-ux-plan output with browser automation and generate a single qa-ux-report.html evidence report without fixing issues."
