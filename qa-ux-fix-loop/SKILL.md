@@ -158,6 +158,14 @@ Prefer writing them under `.context/qa-ux-artifacts/` with screenshots in
     state, fix evidence, and new isolated fix commit hash in the same section
 - Keep screenshot links external instead of base64 by default so users can
   inspect images directly.
+- In the generated HTML report, make every visible screenshot preview clickable
+  by wrapping it in a link to the same PNG file, for example:
+  ```html
+  <a class="screenshot-link" href="screenshots/001-loop-01-smoke-dashboard-desktop-pass.png">
+    <img src="screenshots/001-loop-01-smoke-dashboard-desktop-pass.png" alt="Loop #1 dashboard pass screenshot">
+  </a>
+  ```
+  Opening the link should navigate to the standalone PNG/fullscreen browser view.
 
 Name screenshots with a sortable prefix, loop number, scenario slug, viewport
 when relevant, and status, for example:

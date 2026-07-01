@@ -180,6 +180,17 @@
       height: auto;
     }
 
+    .screenshot-link {
+      display: block;
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .screenshot-link:focus-visible {
+      outline: 3px solid var(--blue);
+      outline-offset: -3px;
+    }
+
     figcaption {
       padding: 12px 14px;
       border-top: 1px solid var(--line);
@@ -248,24 +259,27 @@
         </div>
 
         <figure>
-          <svg viewBox="0 0 960 540" role="img"
-            aria-label="Placeholder dashboard success screenshot">
-            <rect width="960" height="540" fill="#edf3ee"/>
-            <rect x="48" y="44" width="864" height="452" rx="18" fill="#fff"
-              stroke="#cbd8cd" stroke-width="3"/>
-            <text x="92" y="118" fill="#12312f" font-family="Avenir Next, Helvetica, sans-serif"
-              font-size="38" font-weight="800">Dashboard</text>
-            <rect x="92" y="170" width="230" height="128" rx="14" fill="#e4eee8"
-              stroke="#cbd8cd" stroke-width="2"/>
-            <rect x="362" y="170" width="230" height="128" rx="14" fill="#e4eee8"
-              stroke="#cbd8cd" stroke-width="2"/>
-            <rect x="632" y="170" width="230" height="128" rx="14" fill="#e4eee8"
-              stroke="#cbd8cd" stroke-width="2"/>
-            <rect x="92" y="338" width="770" height="86" rx="14" fill="#fff"
-              stroke="#cbd8cd" stroke-width="2"/>
-            <text x="126" y="386" fill="#2f6f55" font-family="Avenir Next, Helvetica, sans-serif"
-              font-size="24" font-weight="800">All expected widgets are visible</text>
-          </svg>
+          <a class="screenshot-link" href="screenshots/008-loop-02-dashboard-desktop-pass.png"
+            aria-label="Open loop #2 dashboard success screenshot PNG">
+            <svg viewBox="0 0 960 540" role="img"
+              aria-label="Placeholder dashboard success screenshot">
+              <rect width="960" height="540" fill="#edf3ee"/>
+              <rect x="48" y="44" width="864" height="452" rx="18" fill="#fff"
+                stroke="#cbd8cd" stroke-width="3"/>
+              <text x="92" y="118" fill="#12312f" font-family="Avenir Next, Helvetica, sans-serif"
+                font-size="38" font-weight="800">Dashboard</text>
+              <rect x="92" y="170" width="230" height="128" rx="14" fill="#e4eee8"
+                stroke="#cbd8cd" stroke-width="2"/>
+              <rect x="362" y="170" width="230" height="128" rx="14" fill="#e4eee8"
+                stroke="#cbd8cd" stroke-width="2"/>
+              <rect x="632" y="170" width="230" height="128" rx="14" fill="#e4eee8"
+                stroke="#cbd8cd" stroke-width="2"/>
+              <rect x="92" y="338" width="770" height="86" rx="14" fill="#fff"
+                stroke="#cbd8cd" stroke-width="2"/>
+              <text x="126" y="386" fill="#2f6f55" font-family="Avenir Next, Helvetica, sans-serif"
+                font-size="24" font-weight="800">All expected widgets are visible</text>
+            </svg>
+          </a>
           <figcaption>Loop #2 success evidence:
             <code>screenshots/008-loop-02-dashboard-desktop-pass.png</code></figcaption>
         </figure>
@@ -333,59 +347,65 @@
 
       <section class="evidence-grid" aria-label="Checkout before and after evidence">
         <figure>
-          <svg viewBox="0 0 960 540" role="img"
-            aria-label="Placeholder checkout payment failure screenshot">
-            <rect width="960" height="540" fill="#fbf5ef"/>
-            <rect x="48" y="44" width="864" height="452" rx="18" fill="#fff"
-              stroke="#d7cfbf" stroke-width="3"/>
-            <text x="92" y="118" fill="#17202a" font-family="Avenir Next, Helvetica, sans-serif"
-              font-size="38" font-weight="800">Checkout</text>
-            <rect x="92" y="170" width="360" height="56" rx="10" fill="#fff"
-              stroke="#b9c3be" stroke-width="3"/>
-            <rect x="92" y="252" width="360" height="56" rx="10" fill="#fff"
-              stroke="#b9433b" stroke-width="4"/>
-            <rect x="92" y="334" width="360" height="56" rx="10" fill="#b9433b"/>
-            <text x="120" y="370" fill="#fff" font-family="Avenir Next, Helvetica, sans-serif"
-              font-size="22" font-weight="800">Could not process payment</text>
-            <rect x="560" y="170" width="260" height="180" rx="14" fill="#f2e6dc"
-              stroke="#d7cfbf" stroke-width="2"/>
-            <text x="590" y="224" fill="#17202a" font-family="Avenir Next, Helvetica, sans-serif"
-              font-size="26" font-weight="800">Issue state</text>
-            <text x="590" y="270" fill="#5b646a" font-family="Avenir Next, Helvetica, sans-serif"
-              font-size="20">Generic banner only</text>
-          </svg>
+          <a class="screenshot-link" href="screenshots/014-loop-01-checkout-payment-desktop-fail.png"
+            aria-label="Open loop #1 checkout payment failure screenshot PNG">
+            <svg viewBox="0 0 960 540" role="img"
+              aria-label="Placeholder checkout payment failure screenshot">
+              <rect width="960" height="540" fill="#fbf5ef"/>
+              <rect x="48" y="44" width="864" height="452" rx="18" fill="#fff"
+                stroke="#d7cfbf" stroke-width="3"/>
+              <text x="92" y="118" fill="#17202a" font-family="Avenir Next, Helvetica, sans-serif"
+                font-size="38" font-weight="800">Checkout</text>
+              <rect x="92" y="170" width="360" height="56" rx="10" fill="#fff"
+                stroke="#b9c3be" stroke-width="3"/>
+              <rect x="92" y="252" width="360" height="56" rx="10" fill="#fff"
+                stroke="#b9433b" stroke-width="4"/>
+              <rect x="92" y="334" width="360" height="56" rx="10" fill="#b9433b"/>
+              <text x="120" y="370" fill="#fff" font-family="Avenir Next, Helvetica, sans-serif"
+                font-size="22" font-weight="800">Could not process payment</text>
+              <rect x="560" y="170" width="260" height="180" rx="14" fill="#f2e6dc"
+                stroke="#d7cfbf" stroke-width="2"/>
+              <text x="590" y="224" fill="#17202a" font-family="Avenir Next, Helvetica, sans-serif"
+                font-size="26" font-weight="800">Issue state</text>
+              <text x="590" y="270" fill="#5b646a" font-family="Avenir Next, Helvetica, sans-serif"
+                font-size="20">Generic banner only</text>
+            </svg>
+          </a>
           <figcaption>Loop #1 issue-state screenshot:
             <code>screenshots/014-loop-01-checkout-payment-desktop-fail.png</code></figcaption>
         </figure>
 
         <figure>
-          <svg viewBox="0 0 960 540" role="img"
-            aria-label="Placeholder checkout recovery success screenshot">
-            <rect width="960" height="540" fill="#edf3ee"/>
-            <rect x="48" y="44" width="864" height="452" rx="18" fill="#fff"
-              stroke="#cbd8cd" stroke-width="3"/>
-            <text x="92" y="118" fill="#12312f" font-family="Avenir Next, Helvetica, sans-serif"
-              font-size="38" font-weight="800">Checkout</text>
-            <rect x="92" y="170" width="360" height="56" rx="10" fill="#fff"
-              stroke="#9db9ad" stroke-width="3"/>
-            <rect x="92" y="252" width="360" height="56" rx="10" fill="#fff"
-              stroke="#c55243" stroke-width="4"/>
-            <text x="92" y="338" fill="#9e382f" font-family="Avenir Next, Helvetica, sans-serif"
-              font-size="20" font-weight="800">Card declined. Retry or update.</text>
-            <rect x="92" y="374" width="168" height="52" rx="10" fill="#12312f"/>
-            <text x="128" y="407" fill="#fff" font-family="Avenir Next, Helvetica, sans-serif"
-              font-size="20" font-weight="800">Retry</text>
-            <rect x="280" y="374" width="210" height="52" rx="10" fill="#e4eee8"
-              stroke="#cbd8cd" stroke-width="2"/>
-            <text x="310" y="407" fill="#12312f" font-family="Avenir Next, Helvetica, sans-serif"
-              font-size="20" font-weight="800">Change card</text>
-            <rect x="560" y="170" width="260" height="180" rx="14" fill="#e4eee8"
-              stroke="#cbd8cd" stroke-width="2"/>
-            <text x="590" y="224" fill="#12312f" font-family="Avenir Next, Helvetica, sans-serif"
-              font-size="26" font-weight="800">Success state</text>
-            <text x="590" y="270" fill="#51605b" font-family="Avenir Next, Helvetica, sans-serif"
-              font-size="20">Recovery controls visible</text>
-          </svg>
+          <a class="screenshot-link" href="screenshots/021-loop-02-checkout-payment-mobile-fixed-pass.png"
+            aria-label="Open loop #2 checkout recovery success screenshot PNG">
+            <svg viewBox="0 0 960 540" role="img"
+              aria-label="Placeholder checkout recovery success screenshot">
+              <rect width="960" height="540" fill="#edf3ee"/>
+              <rect x="48" y="44" width="864" height="452" rx="18" fill="#fff"
+                stroke="#cbd8cd" stroke-width="3"/>
+              <text x="92" y="118" fill="#12312f" font-family="Avenir Next, Helvetica, sans-serif"
+                font-size="38" font-weight="800">Checkout</text>
+              <rect x="92" y="170" width="360" height="56" rx="10" fill="#fff"
+                stroke="#9db9ad" stroke-width="3"/>
+              <rect x="92" y="252" width="360" height="56" rx="10" fill="#fff"
+                stroke="#c55243" stroke-width="4"/>
+              <text x="92" y="338" fill="#9e382f" font-family="Avenir Next, Helvetica, sans-serif"
+                font-size="20" font-weight="800">Card declined. Retry or update.</text>
+              <rect x="92" y="374" width="168" height="52" rx="10" fill="#12312f"/>
+              <text x="128" y="407" fill="#fff" font-family="Avenir Next, Helvetica, sans-serif"
+                font-size="20" font-weight="800">Retry</text>
+              <rect x="280" y="374" width="210" height="52" rx="10" fill="#e4eee8"
+                stroke="#cbd8cd" stroke-width="2"/>
+              <text x="310" y="407" fill="#12312f" font-family="Avenir Next, Helvetica, sans-serif"
+                font-size="20" font-weight="800">Change card</text>
+              <rect x="560" y="170" width="260" height="180" rx="14" fill="#e4eee8"
+                stroke="#cbd8cd" stroke-width="2"/>
+              <text x="590" y="224" fill="#12312f" font-family="Avenir Next, Helvetica, sans-serif"
+                font-size="26" font-weight="800">Success state</text>
+              <text x="590" y="270" fill="#51605b" font-family="Avenir Next, Helvetica, sans-serif"
+                font-size="20">Recovery controls visible</text>
+            </svg>
+          </a>
           <figcaption>Loop #2 success-state screenshot:
             <code>screenshots/021-loop-02-checkout-payment-mobile-fixed-pass.png</code></figcaption>
         </figure>
