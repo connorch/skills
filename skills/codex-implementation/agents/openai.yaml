@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex Implementation"
+  short_description: "Delegate bounded implementation to Codex"
+  default_prompt: "Use $codex-implementation to have Codex implement a bounded change and report back."

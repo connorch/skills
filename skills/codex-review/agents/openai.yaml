@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex Review"
+  short_description: "Ask Codex for independent code review"
+  default_prompt: "Use $codex-review to get an independent Codex review of the current branch."
