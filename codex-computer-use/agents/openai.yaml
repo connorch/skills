@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex Computer Use"
+  short_description: "Use Codex for app and UI verification"
+  default_prompt: "Use $codex-computer-use to have Codex verify a local app flow with computer use."
