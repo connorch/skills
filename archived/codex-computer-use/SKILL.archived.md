@@ -1,6 +1,6 @@
 ---
 name: codex-computer-use
-description: Ask Codex CLI (gpt-5.5) to run local app verification that needs computer use, browser automation, simulators, screenshots, app launching, or independent runtime inspection. This is how gpt-5.5 is invoked for computer-use work. Use when the user asks Claude to test a flow, verify UI behavior, inspect a running app, capture screenshots, or report confirmation and feedback about implemented behavior that benefits from computer use functionality.
+description: Runs Codex CLI as a separate local verification agent for computer-use checks, screenshots, simulators, browsers, and app runtime inspection. Use when verifying local app UI behavior, visual state, playback, desktop/browser flows, or artifacts that need independent computer-use interaction.
 ---
 
 # Codex Computer Use
@@ -48,6 +48,9 @@ Tell Codex:
 - What screenshots, videos, logs, or terminal output to save in the artifact directory.
 - The success criteria and any known edge cases to inspect.
 - To avoid destructive actions, production data changes, purchases, sends, or account mutations unless explicitly authorized.
+- After launching an app, wait briefly for the window/accessibility tree to settle; retry failed computer-use reads/actions with short backoff before declaring the tool blocked.
+- If computer-use accessibility/click/key actions fail and Codex uses screenshots, AppleScript, CLI, APIs, app scripting, or any other substitute mechanism, it must report the result as degraded/partial verification, not a full computer-use pass.
+- To write a durable interim report in the artifact directory before long waits, polling loops, or diagnostics; do not rely only on `codex exec -o` for final output.
 - To report observed behavior, artifacts created, errors encountered, and confidence level.
 
 ## Example Prompt
@@ -69,6 +72,7 @@ Success criteria:
 Artifacts:
 - Save screenshots and any useful logs under the artifact directory.
 - Include artifact paths in the final report.
+- Write/update an interim report before any long wait, polling loop, or diagnostic branch.
 
 Safety:
 - Do not use real accounts or perform destructive actions.
@@ -77,6 +81,7 @@ Safety:
 Report:
 - What you observed
 - Whether the flow passed
+- Whether verification used real computer-use UI interaction, or a fallback/substitute mechanism; if fallback was used, label the result degraded/partial and explain why.
 - Screenshot/video/log artifact paths
 - Any defects, uncertainty, or blocked steps
 ```
@@ -84,3 +89,4 @@ Report:
 ## Reporting Back
 
 Do not simply forward Codex's report. Inspect the artifacts that matter and summarize what was actually observed. If Codex says the flow passed, include what it tested and any gaps it did not cover.
+If Codex used any fallback instead of computer-use UI interaction, call that out as degraded/partial verification in your summary.
