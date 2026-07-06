@@ -39,10 +39,14 @@ Use this when you have a specific question, a risky area to probe, or context Co
 ARTIFACT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/codex-review.XXXXXX")"
 REPORT="$ARTIFACT_DIR/report.md"
 
+# Collect the diff first — scope it to avoid blowing up the prompt on large commits.
+# Examples: git show HEAD, git diff main...HEAD, git diff --cached, git diff HEAD
+DIFF="$(git show HEAD)"
+
 codex -C "$PWD" review - > "$REPORT" << EOF
 Review the changes introduced by commit $(git rev-parse --short HEAD).
 
-$(git show HEAD)
+$DIFF
 
 Focus on: <your specific concern here — auth boundaries, error handling, migration safety, etc.>
 
@@ -51,7 +55,7 @@ If there are no substantive findings, say so.
 EOF
 ```
 
-Swap `git show HEAD` for `git diff main...HEAD`, `git diff --cached`, or any other diff source. For uncommitted changes use `git diff HEAD`.
+Scope the diff to keep the prompt manageable. For large commits, use `git show HEAD --stat` to orient first, then scope to specific files with `git show HEAD -- path/to/file`. For uncommitted changes use `git diff HEAD`.
 
 Choose this when: you have a specific concern (e.g. "is the auth check missing on this new endpoint?"), you're providing extra context Codex can't see (requirements, prior bugs, risk areas), or you want to scope the review to a subset of the changes.
 
