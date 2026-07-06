@@ -27,6 +27,16 @@ You can also install multiple specific skills in one command:
 skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation codex-computer-use
 ```
 
+Install the current local checkout with Conductor's agent targeting:
+
+```sh
+pnpm conductor:run
+```
+
+This installs `codex-*` skills for Claude Code only, installs the remaining live
+skills for both Claude Code and Codex, and uses the local `skills/` directory
+rather than the repository's remote branch.
+
 ## Development
 
 These skills help you plan, verify, write, refactor, and fix code.

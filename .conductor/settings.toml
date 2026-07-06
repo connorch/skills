@@ -1,0 +1,10 @@
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+[scripts]
+run_mode = "nonconcurrent"
+
+[scripts.run.install-skills]
+available_in = [ "local" ]
+command = "pnpm conductor:run"
+default = true
+icon = "package"

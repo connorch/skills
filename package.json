@@ -1,0 +1,9 @@
+{
+  "name": "skills",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "conductor:run": "node scripts/conductor-run.mjs",
+    "test": "node --test"
+  }
+}
