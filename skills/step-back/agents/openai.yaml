@@ -1,0 +1,4 @@
+interface:
+  display_name: "Step Back"
+  short_description: "Step-back review of a branch after a batch of point fixes"
+  default_prompt: "Use $step-back to take a step back and check whether the fixes on this branch left dead code, misplaced abstractions, redundant guards, stale docs, or unhardened new mechanisms."

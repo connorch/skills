@@ -1,4 +1,0 @@
-interface:
-  display_name: "Settle Churn"
-  short_description: "Step-back review of a branch after a batch of point fixes"
-  default_prompt: "Use $settle-churn to take a step back and check whether the fixes on this branch left dead code, misplaced abstractions, redundant guards, stale docs, or unhardened new mechanisms."

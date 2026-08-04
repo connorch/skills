@@ -1,5 +1,5 @@
 ---
-name: settle-churn
+name: step-back
 description: >-
   Step-back review of a branch that absorbed a series of individually applied
   point fixes (review findings, bug reports, PR feedback), looking for damage
@@ -10,13 +10,12 @@ description: >-
   sequential review fixes on one branch. Not a bug hunt and not a style pass.
 ---
 
-# Settle Churn
+# Step Back
 
 A branch has absorbed a series of point fixes, each applied and committed on its
 own. Every fix was locally correct, but nobody has read the result as a whole.
-Settling the churn means taking that step back: view the full branch diff at a
-higher level, confirm
-the final state has the right overall shape, and fix what does not.
+Stepping back means viewing the full branch diff at a higher level, confirming
+the final state has the right overall shape, and fixing what does not.
 
 The unit under review is the **end state**, not the sequence of fixes that
 produced it.
@@ -87,7 +86,7 @@ Settle post-review churn on the launcher path
 - Correct "three guarded spots" in docs/probes.md; there are now two
 ```
 
-If verification fails because of a settle-churn fix, fix it before reporting.
+If verification fails because of a step-back fix, fix it before reporting.
 If the failure predates the branch, report it and leave it.
 
 **5. Report** in exactly two sections:
