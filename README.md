@@ -21,12 +21,13 @@ skills add connorch/skills --skill qa-ux-fix-loop
 skills add connorch/skills --skill qa-ux-verify
 skills add connorch/skills --skill codex-review
 skills add connorch/skills --skill codex-implementation
+skills add connorch/skills --skill settle-churn
 ```
 
 You can also install multiple specific skills in one command:
 
 ```sh
-skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation
+skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation settle-churn
 ```
 
 Install the current local checkout with Conductor's agent targeting:
@@ -48,6 +49,7 @@ These skills help you plan, verify, write, refactor, and fix code.
 - **qa-ux-fix-loop** — Execute QA UX plans, record issues, fix them serially, and require evaluator signoff.
 - **codex-review** — Ask Codex CLI for an independent review of uncommitted changes, branch diffs, commits, or specific implementations.
 - **codex-implementation** — Delegate bounded code changes to Codex CLI, then inspect the resulting diff and verification.
+- **settle-churn** — Step-back review of a branch after a batch of point fixes, finding and fixing the damage the iteration itself caused.
 
 ## Archived Skills
 
