@@ -1,6 +1,6 @@
 # The Five Lenses
 
-Detailed checklists for step 2 of the settle-churn workflow. Each lens names
+Detailed checklists for step 2 of the step-back workflow. Each lens names
 what to look for, the required verification, and the legitimate keeps that look
 like findings but are not.
 
