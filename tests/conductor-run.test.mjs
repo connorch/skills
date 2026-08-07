@@ -21,9 +21,9 @@ test("plans local skill installs with codex skills Claude-only and other skills 
   const commands = dryRun();
 
   assert.deepEqual(commands, [
-    `skills add ${repoRoot} -g -a claude-code -s codex-computer-use codex-implementation codex-review -y`,
-    "rm -rf ~/.agents/skills/codex-computer-use ~/.agents/skills/codex-implementation ~/.agents/skills/codex-review",
-    "skills remove -g -a codex -s codex-computer-use codex-implementation codex-review -y",
-    `skills add ${repoRoot} -g -a claude-code -a codex -s qa-ux-fix-loop qa-ux-plan qa-ux-verify -y`,
+    `skills add ${repoRoot} -g -a claude-code -s codex-implementation codex-review -y`,
+    "rm -rf ~/.agents/skills/codex-implementation ~/.agents/skills/codex-review",
+    "skills remove -g -a codex -s codex-implementation codex-review -y",
+    `skills add ${repoRoot} -g -a claude-code -a codex -s qa-ux-fix-loop qa-ux-plan qa-ux-verify step-back -y`,
   ]);
 });

@@ -12,19 +12,22 @@ skills add connorch/skills --all
 
 Install specific skills by name:
 
+Skill names match the live directories under `skills/`.
+When adding or removing live skills, update these examples and the development list in the same change.
+
 ```sh
 skills add connorch/skills --skill qa-ux-plan
 skills add connorch/skills --skill qa-ux-fix-loop
 skills add connorch/skills --skill qa-ux-verify
 skills add connorch/skills --skill codex-review
 skills add connorch/skills --skill codex-implementation
-skills add connorch/skills --skill codex-computer-use
+skills add connorch/skills --skill step-back
 ```
 
 You can also install multiple specific skills in one command:
 
 ```sh
-skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation codex-computer-use
+skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation step-back
 ```
 
 Install the current local checkout with Conductor's agent targeting:
@@ -46,12 +49,13 @@ These skills help you plan, verify, write, refactor, and fix code.
 - **qa-ux-fix-loop** — Execute QA UX plans, record issues, fix them serially, and require evaluator signoff.
 - **codex-review** — Ask Codex CLI for an independent review of uncommitted changes, branch diffs, commits, or specific implementations.
 - **codex-implementation** — Delegate bounded code changes to Codex CLI, then inspect the resulting diff and verification.
-- **codex-computer-use** — Ask Codex CLI to verify local app and UI flows with browser automation, screenshots, simulators, or app launching.
+- **step-back** — Step-back review of a branch after a batch of point fixes, finding and fixing the damage the iteration itself caused.
 
 ## Archived Skills
 
 Archived skills live under `archived/<skill-name>/` and do not use the live
-`SKILL.md` filename. To restore one, move it back to the repository root and
+`SKILL.md` filename. To restore one, move it back under `skills/<skill-name>/` and
 rename `SKILL.archived.md` to `SKILL.md`.
 
 - **code-trust-pragma** — Archived because it is no longer part of the live skill set.
+- **codex-computer-use** — Archived because it is no longer part of the live skill set.
