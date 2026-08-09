@@ -1,2 +1,6 @@
 # QA/test artifacts from running the skills (screenshots, reports, etc.)
 output/
+
+# Personal, untracked skills - keep the directory, ignore its contents
+local-skills/*
+!local-skills/.gitkeep
