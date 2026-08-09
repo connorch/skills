@@ -2,5 +2,5 @@
 output/
 
 # Personal, untracked skills - keep the directory, ignore its contents
-local-skills/*
-!local-skills/.gitkeep
+skills-local/*
+!skills-local/.gitkeep
