@@ -26,6 +26,16 @@ random slug, so uploading never overwrites anything and URLs are permanent.
 Content types are inferred from the file extension, so images and videos
 render inline in browsers.
 
+## File naming
+
+The filename survives into the permanent URL, so rename files before
+uploading: lowercase kebab-case, describe the content and its context, keep
+the real extension. Characters outside `a-z A-Z 0-9 . _ -` are replaced with
+`-` server-side.
+
+- `pr-142-upload-flow-after.png`, not `Screenshot 2026-08-11 at 3.14.15 PM.png`
+- `ci-typecheck-failure.log`, not `output.log`
+
 ## Embedding on GitHub
 
 - Images: `![description](url)` renders inline in PRs, issues, and comments.
