@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "wovn-files",
+  // Personal account (connorchev@gmail.com), NOT walton-ai - wovn.org lives here
+  "account_id": "290536f56594ac82bc4bacde9af0e082",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-11",
+  "routes": [{ "pattern": "files.wovn.org", "custom_domain": true }],
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "wovn-files" }],
+  "observability": { "enabled": true }
+}

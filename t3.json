@@ -1,4 +1,11 @@
 {
   "$schema": "https://t3.codes/schema/t3.json",
-  "iconPath": "assets/icon.png"
+  "iconPath": "assets/icon.png",
+  "scripts": [
+    {
+      "name": "install-skills",
+      "command": "pnpm conductor:run",
+      "icon": "configure"
+    }
+  ]
 }
