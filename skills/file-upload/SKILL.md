@@ -1,6 +1,6 @@
 ---
 name: file-upload
-description: Upload any local file - a screenshot, screen recording, log, document, markdown file, config, build artifact, or archive - to Connor's public file host at files.wovn.org and return a permanent public URL. Use whenever a public link to a local file is needed, including for GitHub pull requests, issues, and messages, for sharing a doc or config with another person or agent, or whenever the user says "upload it", "host this", "put this somewhere I can link", or "use the file skill".
+description: Upload any local file - a screenshot, screen recording, log, document, markdown file, config, build artifact, or archive - to Connor's file host and return a permanent URL. Public uploads go to files.wovn.org for embedding in GitHub pull requests, issues, and messages or sharing with other people and agents; private uploads go to private.wovn.org (readable only by Connor) for plans, internal notes, and anything not meant to be public. Use whenever a link to a local file is needed, whenever the user says "upload it", "host this", "put this somewhere I can link", or "use the file skill", or when the user asks to upload or host something privately or internally.
 metadata:
   harness: [claude, codex]
   platform: [darwin, linux]
@@ -44,6 +44,22 @@ the real extension. Characters outside `a-z A-Z 0-9 . _ -` are replaced with
 
 - `pr-142-upload-flow-after.png`, not `Screenshot 2026-08-11 at 3.14.15 PM.png`
 - `ci-typecheck-failure.log`, not `output.log`
+
+## Private uploads
+
+`wovn put --private <file>` uploads to `https://private.wovn.org`, gated by
+Cloudflare Access: only Connor can read the URLs (browser login as
+connorchev@gmail.com, or the CLI's service token). Use it for plans, internal
+notes, and anything that should not be public. Never embed private URLs in
+public PRs or issues - other people cannot open them.
+
+To read a private file back (for example a previously uploaded plan):
+
+```sh
+. ~/.config/wovn-files/access.env
+curl -sS -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+  -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" "$url"
+```
 
 ## Embedding on GitHub
 
