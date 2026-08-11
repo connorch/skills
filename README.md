@@ -22,12 +22,13 @@ skills add connorch/skills --skill qa-ux-verify
 skills add connorch/skills --skill codex-review
 skills add connorch/skills --skill codex-implementation
 skills add connorch/skills --skill step-back
+skills add connorch/skills --skill babysit-pr
 ```
 
 You can also install multiple specific skills in one command:
 
 ```sh
-skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation step-back
+skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation step-back babysit-pr
 ```
 
 Install the current local checkout with Conductor's agent targeting:
@@ -50,6 +51,7 @@ These skills help you plan, verify, write, refactor, and fix code.
 - **codex-review** — Ask Codex CLI for an independent review of uncommitted changes, branch diffs, commits, or specific implementations.
 - **codex-implementation** — Delegate bounded code changes to Codex CLI, then inspect the resulting diff and verification.
 - **step-back** — Step-back review of a branch after a batch of point fixes, finding and fixing the damage the iteration itself caused.
+- **babysit-pr** — Monitor a pull request through review and CI, verifying bot findings, fixing real failures, and dismissing false positives with reasons. Adapted from a skill by [Theo Browne](https://youtu.be/e1snsuY4lTI).
 
 ## Archived Skills
 
