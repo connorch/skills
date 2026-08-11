@@ -32,7 +32,8 @@ pnpm run deploy
 ## The wovn CLI
 
 `../bin/wovn` wraps the host for agents and humans: `wovn put <file...>`
-uploads and prints URLs, `wovn rotate` rotates the token. It is installed by
+uploads and prints URLs, `wovn read <url-or-path>` prints a hosted file
+(handling private auth), `wovn rotate` rotates the token. It is installed by
 copy: `cp ../bin/wovn ~/.local/bin/wovn` (re-run after editing the script).
 
 ## Token rotation

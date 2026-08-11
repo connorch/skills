@@ -66,7 +66,9 @@ connorchev@gmail.com, or the CLI's service token). Use it for plans, internal
 notes, and anything that should not be public. Never embed private URLs in
 public PRs or issues - other people cannot open them.
 
-To read a private file back (for example a previously uploaded plan):
+To read a private file back (for example a previously uploaded plan), use
+`wovn read <url>`; a bare path like `docs/plan.html` also works and reads
+from the private host. Without the CLI, curl with the service token creds:
 
 ```sh
 . ~/.config/wovn-files/access.env
