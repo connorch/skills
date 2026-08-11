@@ -62,7 +62,7 @@ Re-upload to the same `--at` path to update the document in place; the URL
 stays stable across iterations. Use a new path only for a genuinely new
 document. Only Connor can open private.wovn.org URLs (browser login or the
 CLI's service token); never embed them in public PRs or issues. To read one
-back, use the read-back snippet in the file-upload skill.
+back, run `wovn read <url>`.
 
 If `wovn` or its Access credentials are missing, tell the user instead of
 guessing. Never claim the document is hosted before the upload succeeds. Do

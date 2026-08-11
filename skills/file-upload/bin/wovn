@@ -3,6 +3,7 @@
 #
 #   wovn put [--private] [--name <filename>] <file...>   upload to immutable URLs, one printed per line
 #   wovn put [--private] --at <remote-path> <file>       write to a stable path, overwriting; URL never changes
+#   wovn read <url-or-path>                              print a hosted file to stdout; bare paths read the private host
 #   wovn rotate                                          rotate the upload token (file + Worker secret)
 #
 # --private uploads to private.wovn.org (Cloudflare Access-gated; only Connor
@@ -93,6 +94,32 @@ put() {
   done
 }
 
+read_cmd() {
+  [ $# -eq 1 ] || usage
+  target="$1"
+  case "$target" in
+  "$HOST"/*)
+    curl -sS --fail-with-body "$target"
+    return
+    ;;
+  "$PRIVATE_HOST"/*) ;;
+  http://* | https://*)
+    echo "wovn: not a wovn file host URL: $target" >&2
+    exit 1
+    ;;
+  *)
+    # Bare paths read from the private host; public URLs need no CLI anyway.
+    target="$PRIVATE_HOST/$target"
+    ;;
+  esac
+  [ -r "$ACCESS_ENV_FILE" ] || { echo "wovn: reading private files needs $ACCESS_ENV_FILE" >&2; exit 1; }
+  . "$ACCESS_ENV_FILE"
+  curl -sS --fail-with-body \
+    -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+    -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+    "$target"
+}
+
 rotate() {
   new="$(openssl rand -hex 32)"
   # Server first: if the secret update fails, the local token stays valid.
@@ -109,6 +136,10 @@ case "${1:-}" in
 put)
   shift
   put "$@"
+  ;;
+read)
+  shift
+  read_cmd "$@"
   ;;
 rotate)
   rotate
