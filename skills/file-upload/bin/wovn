@@ -1,0 +1,73 @@
+#!/bin/sh
+# wovn - CLI for the files.wovn.org file host (see skills/file-upload).
+#
+#   wovn put [--name <filename>] <file...>   upload files, print one permanent URL per line
+#   wovn rotate                              rotate the upload token (file + Worker secret)
+#
+# Token resolution: ~/.config/wovn-files/token.txt first (canonical on this
+# machine, survives rotation without a new shell), FILE_HOST_TOKEN env second
+# (for machines that only have the env var).
+set -eu
+
+HOST="https://files.wovn.org"
+TOKEN_FILE="$HOME/.config/wovn-files/token.txt"
+# Personal Cloudflare account (connorchev@gmail.com), where the wovn-files worker lives.
+ACCOUNT_ID="290536f56594ac82bc4bacde9af0e082"
+
+usage() {
+  sed -n 's/^#   //p' "$0" >&2
+  exit 1
+}
+
+token() {
+  if [ -r "$TOKEN_FILE" ]; then
+    cat "$TOKEN_FILE"
+  elif [ -n "${FILE_HOST_TOKEN:-}" ]; then
+    printf '%s' "$FILE_HOST_TOKEN"
+  else
+    echo "wovn: no token at $TOKEN_FILE and FILE_HOST_TOKEN is unset" >&2
+    exit 1
+  fi
+}
+
+put() {
+  name=""
+  if [ "${1:-}" = "--name" ]; then
+    [ $# -ge 3 ] || usage
+    name="$2"
+    shift 2
+    [ $# -eq 1 ] || { echo "wovn: --name only applies to a single file" >&2; exit 1; }
+  fi
+  [ $# -ge 1 ] || usage
+  tok="$(token)"
+  for file in "$@"; do
+    [ -r "$file" ] || { echo "wovn: cannot read $file" >&2; exit 1; }
+    upload_name="$(printf '%s' "${name:-$(basename "$file")}" | tr -c 'a-zA-Z0-9._-' '-')"
+    curl -sS --fail-with-body -T "$file" -H "Authorization: Bearer $tok" "$HOST/$upload_name"
+  done
+}
+
+rotate() {
+  new="$(openssl rand -hex 32)"
+  # Server first: if the secret update fails, the local token stays valid.
+  printf '%s' "$new" |
+    CLOUDFLARE_ACCOUNT_ID="$ACCOUNT_ID" npx -y wrangler secret put FILE_HOST_TOKEN --name wovn-files
+  umask 077
+  mkdir -p "$(dirname "$TOKEN_FILE")"
+  printf '%s\n' "$new" >"$TOKEN_FILE"
+  echo "wovn: token rotated ($TOKEN_FILE and the Worker secret are updated)"
+  echo "wovn: shells with a stale FILE_HOST_TOKEN env var need restarting; wovn itself reads the file"
+}
+
+case "${1:-}" in
+put)
+  shift
+  put "$@"
+  ;;
+rotate)
+  rotate
+  ;;
+*)
+  usage
+  ;;
+esac
