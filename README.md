@@ -54,7 +54,7 @@ These skills help you plan, verify, write, refactor, and fix code.
 - **codex-implementation** — Delegate bounded code changes to Codex CLI, then inspect the resulting diff and verification.
 - **step-back** — Step-back review of a branch after a batch of point fixes, finding and fixing the damage the iteration itself caused.
 - **babysit-pr** — Monitor a pull request through review and CI, verifying bot findings, fixing real failures, and dismissing false positives with reasons. Adapted from a skill by [Theo Browne](https://youtu.be/e1snsuY4lTI).
-- **html-communication** — Create self-contained HTML writeups (plans, specs, findings, UI mocks) and upload them to Postplan. Adapted from a skill by Theo Browne.
+- **html-communication** — Create self-contained HTML writeups (plans, specs, findings, UI mocks) and publish them privately to private.wovn.org with the wovn CLI. Adapted from a skill by Theo Browne.
 - **file-upload** — Upload any local file to the public file host at files.wovn.org and return a permanent public URL, backed by the Cloudflare Worker in `skills/file-upload/worker/`. Adapted from a skill by Theo Browne.
 
 ## Archived Skills

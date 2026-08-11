@@ -2,8 +2,11 @@
 
 Cloudflare Worker behind `https://files.wovn.org` (public) and
 `https://private.wovn.org` (private), the file host used by the `file-upload`
-skill. Authenticated `PUT`/`POST` uploads write to R2 and return the
-permanent URL; `GET` serves stored objects. Deployed on the personal
+skill. Authenticated uploads write to R2 and return the URL; `GET` serves
+stored objects. `POST` mints an immutable dated key (`yyyy/mm/<random>-<name>`);
+`PUT` writes to the exact request path and overwrites, giving stable URLs for
+living documents (the CLI maps `wovn put` to POST and `wovn put --at` to PUT).
+Stable objects are served with etag revalidation instead of immutable caching. Deployed on the personal
 Cloudflare account (connorchev@gmail.com), pinned via `account_id` in
 `wrangler.jsonc`.
 
