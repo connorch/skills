@@ -45,6 +45,21 @@ function isAuthorized(request: Request, token: string): boolean {
   return crypto.subtle.timingSafeEqual(a, b);
 }
 
+// Stable keys (PUT) use the request path verbatim, sanitized per segment.
+// The yyyy/mm/ namespace is reserved for generated immutable keys so a PUT
+// can never clobber one.
+const GENERATED_KEY_PREFIX = /^\d{4}\/\d{2}\//;
+
+function stableKey(pathname: string): string | null {
+  const key = decodeURIComponent(pathname)
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => segment.replace(/[^a-zA-Z0-9._-]/g, "-"))
+    .join("/");
+  if (!key || GENERATED_KEY_PREFIX.test(key)) return null;
+  return key;
+}
+
 function objectKey(pathname: string): string {
   const filename =
     decodeURIComponent(pathname)
@@ -130,18 +145,40 @@ async function upload(request: Request, env: Env, url: URL, bucket: R2Bucket): P
   }
   if (!request.body) return new Response("missing request body\n", { status: 400 });
 
-  const key = objectKey(url.pathname);
+  // POST mints an immutable dated key; PUT stores at the exact requested
+  // path and overwrites, so the URL stays stable across re-uploads.
+  let key: string;
+  let customMetadata: Record<string, string> | undefined;
+  if (request.method === "PUT") {
+    const stable = stableKey(url.pathname);
+    if (!stable) {
+      return new Response("PUT needs an explicit path outside the reserved yyyy/mm/ namespace\n", {
+        status: 400,
+      });
+    }
+    key = stable;
+    customMetadata = { stable: "true" };
+  } else {
+    key = objectKey(url.pathname);
+  }
+
   const contentType = contentTypeFor(key, request.headers.get("content-type"));
-  await bucket.put(key, request.body, { httpMetadata: { contentType } });
+  await bucket.put(key, request.body, { httpMetadata: { contentType }, customMetadata });
   return new Response(`https://${url.hostname}/${key}\n`, { status: 201 });
 }
 
 function objectHeaders(object: R2Object, isPrivate: boolean): HeadersInit {
+  // Private files must never land in shared caches. Public stable objects
+  // change in place, so they revalidate by etag; generated keys are immutable.
+  const stable = object.customMetadata?.stable === "true";
   return {
     "content-type": object.httpMetadata?.contentType ?? "application/octet-stream",
     "content-length": String(object.size),
-    // Private files must never land in shared caches; public URLs are immutable.
-    "cache-control": isPrivate ? "private, no-store" : "public, max-age=31536000, immutable",
+    "cache-control": isPrivate
+      ? "private, no-store"
+      : stable
+        ? "public, max-age=0, must-revalidate"
+        : "public, max-age=31536000, immutable",
     etag: object.httpEtag,
   };
 }

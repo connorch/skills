@@ -18,11 +18,12 @@ wovn put /path/to/screenshot.png
 wovn put --name pr-142-upload-flow-after.png "/tmp/Screenshot 2026-08-11 at 3.14.15 PM.png"
 ```
 
-If `wovn` is not on the PATH, fall back to curl with `FILE_HOST_TOKEN`:
+If `wovn` is not on the PATH, fall back to curl with `FILE_HOST_TOKEN`
+(`-X POST` matters: POST mints an immutable URL, PUT overwrites a stable path):
 
 ```sh
 file="/path/to/screenshot.png"
-curl -sS -T "$file" \
+curl -sS -X POST -T "$file" \
   -H "Authorization: Bearer $FILE_HOST_TOKEN" \
   "https://files.wovn.org/$(basename "$file" | tr ' ' '-')"
 ```
@@ -34,6 +35,18 @@ The response body is the URL, nothing else. Files are keyed by date plus a
 random slug, so uploading never overwrites anything and URLs are permanent.
 Content types are inferred from the file extension, so images and videos
 render inline in browsers.
+
+## Stable URLs
+
+`wovn put --at <remote-path> <file>` writes to that exact path instead of a
+generated key, and re-uploading to the same path overwrites in place - the URL
+never changes. Use it for living documents (plans, reports, mocks) that get
+updated across iterations; use plain `wovn put` for everything else. The
+`yyyy/mm/` namespace is reserved for immutable uploads and rejected.
+
+```sh
+wovn put --private --at docs/q3-roadmap.html /tmp/q3-roadmap.html
+```
 
 ## File naming
 

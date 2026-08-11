@@ -44,8 +44,8 @@ When the user asks for variants:
 - Render real styled variants, not descriptions.
 - Label them `A`, `B`, `C`... for easy selection.
 - Lay them out for direct comparison.
-- Keep one local file across iterations; every upload returns a fresh URL, so
-  always report the newest one as the current version.
+- Keep one file across iterations and publish to the same `--at` path so its
+  URL stays stable.
 
 ## Publish
 
@@ -55,13 +55,14 @@ separate permission or stop at the local file.
 
 1. Write the HTML file locally, named per the file-upload skill's naming
    convention (kebab-case, descriptive, `.html`).
-2. Run `wovn put --private <file path>`.
+2. Run `wovn put --private --at docs/<file name> <file path>`.
 3. Report the local path and the returned private.wovn.org URL.
 
-Uploads are immutable: updating a document means uploading again and reporting
-the new URL as current. Only Connor can open private.wovn.org URLs (browser
-login or the CLI's service token); never embed them in public PRs or issues.
-To read one back, use the read-back snippet in the file-upload skill.
+Re-upload to the same `--at` path to update the document in place; the URL
+stays stable across iterations. Use a new path only for a genuinely new
+document. Only Connor can open private.wovn.org URLs (browser login or the
+CLI's service token); never embed them in public PRs or issues. To read one
+back, use the read-back snippet in the file-upload skill.
 
 If `wovn` or its Access credentials are missing, tell the user instead of
 guessing. Never claim the document is hosted before the upload succeeds. Do

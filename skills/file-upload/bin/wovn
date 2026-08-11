@@ -1,7 +1,8 @@
 #!/bin/sh
 # wovn - CLI for the files.wovn.org file host (see skills/file-upload).
 #
-#   wovn put [--private] [--name <filename>] <file...>   upload files, print one permanent URL per line
+#   wovn put [--private] [--name <filename>] <file...>   upload to immutable URLs, one printed per line
+#   wovn put [--private] --at <remote-path> <file>       write to a stable path, overwriting; URL never changes
 #   wovn rotate                                          rotate the upload token (file + Worker secret)
 #
 # --private uploads to private.wovn.org (Cloudflare Access-gated; only Connor
@@ -37,6 +38,7 @@ token() {
 
 put() {
   name=""
+  at=""
   private=0
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -49,11 +51,18 @@ put() {
       name="$2"
       shift 2
       ;;
+    --at)
+      [ $# -ge 2 ] || usage
+      at="$2"
+      shift 2
+      ;;
     *) break ;;
     esac
   done
   [ $# -ge 1 ] || usage
   [ -z "$name" ] || [ $# -eq 1 ] || { echo "wovn: --name only applies to a single file" >&2; exit 1; }
+  [ -z "$at" ] || [ $# -eq 1 ] || { echo "wovn: --at only applies to a single file" >&2; exit 1; }
+  [ -z "$at" ] || [ -z "$name" ] || { echo "wovn: --at already names the file; drop --name" >&2; exit 1; }
 
   if [ "$private" = 1 ]; then
     # Access service token: file with CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET lines.
@@ -63,16 +72,23 @@ put() {
     tok="$(token)"
   fi
 
+  # POST mints an immutable dated key; PUT (--at) overwrites the exact path.
   for file in "$@"; do
     [ -r "$file" ] || { echo "wovn: cannot read $file" >&2; exit 1; }
-    upload_name="$(printf '%s' "${name:-$(basename "$file")}" | tr -c 'a-zA-Z0-9._-' '-')"
+    if [ -n "$at" ]; then
+      method="PUT"
+      path="$at"
+    else
+      method="POST"
+      path="$(printf '%s' "${name:-$(basename "$file")}" | tr -c 'a-zA-Z0-9._-' '-')"
+    fi
     if [ "$private" = 1 ]; then
-      curl -sS --fail-with-body -T "$file" \
+      curl -sS --fail-with-body -X "$method" -T "$file" \
         -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
         -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
-        "$PRIVATE_HOST/$upload_name"
+        "$PRIVATE_HOST/$path"
     else
-      curl -sS --fail-with-body -T "$file" -H "Authorization: Bearer $tok" "$HOST/$upload_name"
+      curl -sS --fail-with-body -X "$method" -T "$file" -H "Authorization: Bearer $tok" "$HOST/$path"
     fi
   done
 }
