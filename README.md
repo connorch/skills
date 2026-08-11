@@ -23,12 +23,15 @@ skills add connorch/skills --skill codex-review
 skills add connorch/skills --skill codex-implementation
 skills add connorch/skills --skill step-back
 skills add connorch/skills --skill babysit-pr
+skills add connorch/skills --skill html-communication
+skills add connorch/skills --skill postplan-read
+skills add connorch/skills --skill file-upload
 ```
 
 You can also install multiple specific skills in one command:
 
 ```sh
-skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation step-back babysit-pr
+skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation step-back babysit-pr html-communication postplan-read file-upload
 ```
 
 Install the current local checkout with Conductor's agent targeting:
@@ -52,6 +55,9 @@ These skills help you plan, verify, write, refactor, and fix code.
 - **codex-implementation** — Delegate bounded code changes to Codex CLI, then inspect the resulting diff and verification.
 - **step-back** — Step-back review of a branch after a batch of point fixes, finding and fixing the damage the iteration itself caused.
 - **babysit-pr** — Monitor a pull request through review and CI, verifying bot findings, fixing real failures, and dismissing false positives with reasons. Adapted from a skill by [Theo Browne](https://youtu.be/e1snsuY4lTI).
+- **html-communication** — Create self-contained HTML writeups (plans, specs, findings, UI mocks) and upload them to Postplan. Adapted from a skill by Theo Browne.
+- **postplan-read** — Fetch a postplan.dev upload's raw HTML with curl and continue the user's request from its contents. Adapted from a skill by Theo Browne.
+- **file-upload** — Upload any local file to the public file host at files.wovn.org and return a permanent public URL, backed by the Cloudflare Worker in `skills/file-upload/worker/`. Adapted from a skill by Theo Browne.
 
 ## Archived Skills
 

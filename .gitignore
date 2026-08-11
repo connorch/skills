@@ -4,3 +4,9 @@ output/
 # Personal, untracked skills - keep the directory, ignore its contents
 skills-local/*
 !skills-local/.gitkeep
+
+# file-upload worker build/dev artifacts
+skills/file-upload/worker/node_modules/
+skills/file-upload/worker/worker-configuration.d.ts
+skills/file-upload/worker/.dev.vars
+skills/file-upload/worker/.wrangler/
