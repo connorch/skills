@@ -45,6 +45,14 @@ the real extension. Characters outside `a-z A-Z 0-9 . _ -` are replaced with
 - `pr-142-upload-flow-after.png`, not `Screenshot 2026-08-11 at 3.14.15 PM.png`
 - `ci-typecheck-failure.log`, not `output.log`
 
+## Private uploads
+
+`wovn put --private <file>` uploads to `https://private.wovn.org`, gated by
+Cloudflare Access: only Connor can read the URLs (browser login as
+connorchev@gmail.com, or the CLI's service token). Use it for plans, internal
+notes, and anything that should not be public. Never embed private URLs in
+public PRs or issues - other people cannot open them.
+
 ## Embedding on GitHub
 
 - Images: `![description](url)` renders inline in PRs, issues, and comments.

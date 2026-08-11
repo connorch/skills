@@ -1,8 +1,11 @@
 #!/bin/sh
 # wovn - CLI for the files.wovn.org file host (see skills/file-upload).
 #
-#   wovn put [--name <filename>] <file...>   upload files, print one permanent URL per line
-#   wovn rotate                              rotate the upload token (file + Worker secret)
+#   wovn put [--private] [--name <filename>] <file...>   upload files, print one permanent URL per line
+#   wovn rotate                                          rotate the upload token (file + Worker secret)
+#
+# --private uploads to private.wovn.org (Cloudflare Access-gated; only Connor
+# can read) using the Access service token in ~/.config/wovn-files/access.env.
 #
 # Token resolution: ~/.config/wovn-files/token.txt first (canonical on this
 # machine, survives rotation without a new shell), FILE_HOST_TOKEN env second
@@ -10,7 +13,9 @@
 set -eu
 
 HOST="https://files.wovn.org"
+PRIVATE_HOST="https://private.wovn.org"
 TOKEN_FILE="$HOME/.config/wovn-files/token.txt"
+ACCESS_ENV_FILE="$HOME/.config/wovn-files/access.env"
 # Personal Cloudflare account (connorchev@gmail.com), where the wovn-files worker lives.
 ACCOUNT_ID="290536f56594ac82bc4bacde9af0e082"
 
@@ -32,18 +37,43 @@ token() {
 
 put() {
   name=""
-  if [ "${1:-}" = "--name" ]; then
-    [ $# -ge 3 ] || usage
-    name="$2"
-    shift 2
-    [ $# -eq 1 ] || { echo "wovn: --name only applies to a single file" >&2; exit 1; }
-  fi
+  private=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+    --private)
+      private=1
+      shift
+      ;;
+    --name)
+      [ $# -ge 2 ] || usage
+      name="$2"
+      shift 2
+      ;;
+    *) break ;;
+    esac
+  done
   [ $# -ge 1 ] || usage
-  tok="$(token)"
+  [ -z "$name" ] || [ $# -eq 1 ] || { echo "wovn: --name only applies to a single file" >&2; exit 1; }
+
+  if [ "$private" = 1 ]; then
+    # Access service token: file with CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET lines.
+    [ -r "$ACCESS_ENV_FILE" ] || { echo "wovn: --private needs $ACCESS_ENV_FILE" >&2; exit 1; }
+    . "$ACCESS_ENV_FILE"
+  else
+    tok="$(token)"
+  fi
+
   for file in "$@"; do
     [ -r "$file" ] || { echo "wovn: cannot read $file" >&2; exit 1; }
     upload_name="$(printf '%s' "${name:-$(basename "$file")}" | tr -c 'a-zA-Z0-9._-' '-')"
-    curl -sS --fail-with-body -T "$file" -H "Authorization: Bearer $tok" "$HOST/$upload_name"
+    if [ "$private" = 1 ]; then
+      curl -sS --fail-with-body -T "$file" \
+        -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+        -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+        "$PRIVATE_HOST/$upload_name"
+    else
+      curl -sS --fail-with-body -T "$file" -H "Authorization: Bearer $tok" "$HOST/$upload_name"
+    fi
   done
 }
 

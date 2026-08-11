@@ -1,10 +1,22 @@
 # wovn-files
 
-Cloudflare Worker behind `https://files.wovn.org`, the file host used by the
-`file-upload` skill. Authenticated `PUT`/`POST` uploads write to the
-`wovn-files` R2 bucket and return the permanent public URL; `GET` serves
-stored objects. Deployed on the personal Cloudflare account
-(connorchev@gmail.com), pinned via `account_id` in `wrangler.jsonc`.
+Cloudflare Worker behind `https://files.wovn.org` (public) and
+`https://private.wovn.org` (private), the file host used by the `file-upload`
+skill. Authenticated `PUT`/`POST` uploads write to R2 and return the
+permanent URL; `GET` serves stored objects. Deployed on the personal
+Cloudflare account (connorchev@gmail.com), pinned via `account_id` in
+`wrangler.jsonc`.
+
+## Private host
+
+`private.wovn.org` serves the `wovn-private` bucket and sits behind Cloudflare
+Access (Zero Trust app "wovn private files", team
+`connorchev.cloudflareaccess.com`). Two policies: connorchev@gmail.com via
+One-time PIN (browser), and the `wovn-cli` service token (CLI/agents, creds in
+`~/.config/wovn-files/access.env`). The worker additionally verifies the
+Access JWT itself (signature, issuer, audience, expiry), so a deleted or
+misconfigured Access app fails closed rather than exposing the bucket. Private
+responses are served `cache-control: private, no-store`.
 
 ## Develop and deploy
 
