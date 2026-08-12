@@ -5,10 +5,17 @@
  * Usage:
  *   ./find-unprocessed.ts [--recordings DIR] [--sources DIR] [--min-minutes N] [--all] [--json]
  *
- * A recording is a meeting candidate when its diarization found more than one
- * speaker and it ran longer than --min-minutes (default 2). That combination
- * excludes dictation (single speaker) and mic tests (short), which is what the
- * archive is mostly made of.
+ * A recording is a meeting candidate when it was captured with speaker
+ * separation on (`separateSpeakersEnabled`, always paired with
+ * `systemAudioEnabled` - both are set by choosing a call-recording mode) and it
+ * ran longer than --min-minutes (default 2). The flag records the intent to
+ * record a call, so it excludes dictation without depending on how well
+ * diarization happened to work; the duration floor drops mic tests and
+ * mode-setup experiments. Dictation is the bulk of the archive.
+ *
+ * `modeName` looks like the obvious signal and is not: the mode named "Meeting"
+ * only ever held sub-minute setup tests, real calls are recorded under other
+ * mode names, and the names are user-editable.
  *
  * "Already ingested" is decided by the `source:` frontmatter of the vault notes,
  * which points at the recording's meta.json. The recording id is the directory
@@ -34,9 +41,8 @@ interface Meta {
   rawResult?: string;
   datetime?: string;
   duration?: number;
-  modeName?: string;
   modelName?: string;
-  systemAudioEnabled?: boolean;
+  separateSpeakersEnabled?: boolean;
 }
 
 export interface Candidate {
@@ -120,12 +126,15 @@ async function main(): Promise<void> {
     const meta = await readMeta(path);
     if (!meta) continue;
 
+    const minutes = (meta.duration ?? 0) / 60000;
+    if (!meta.separateSpeakersEnabled || minutes < minMinutes) continue;
+
+    // Reported, not gated on: diarization can collapse a quiet participant into
+    // another id, so a low count is worth seeing but is not a reason to skip.
     const segments = (meta.segments ?? []).filter((s) => (s.text ?? "").trim());
     const speakers = new Set(
       segments.map((s) => s.speaker).filter((s): s is number => s !== null && s !== undefined),
     );
-    const minutes = (meta.duration ?? 0) / 60000;
-    if (speakers.size <= 1 || minutes < minMinutes) continue;
 
     const hits = ingested.get(id);
     candidates.push({
