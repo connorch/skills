@@ -8,7 +8,10 @@ stored objects. `POST` mints an immutable dated key (`yyyy/mm/<random>-<name>`);
 documents (the CLI maps `wovn put` to POST and `wovn put --at` to PUT). A
 `PUT` to an existing key is rejected with 409 unless the request carries the
 `x-wovn-force: 1` header (the CLI's `--force`), so paths are never clobbered
-by accident.
+by accident. `GET /?list` (optional `limit`, default 20, max 1000) returns
+recent objects as JSON, newest first; it requires the upload token on the
+public host (generated URLs are unguessable capability URLs, so the listing
+must not be open) and rides the Access check on the private host.
 Stable objects are served with etag revalidation instead of immutable caching. Deployed on the personal
 Cloudflare account (connorchev@gmail.com), pinned via `account_id` in
 `wrangler.jsonc`.
@@ -36,8 +39,9 @@ pnpm run deploy
 
 `../cli` is a TypeScript commander program that wraps the host for agents and
 humans: `wovn put <file...>` uploads and prints URLs (`--at` for stable paths,
-`--force` to replace), `wovn read <url-or-path>` prints a hosted file
-(handling private auth), `wovn rotate` rotates the token. Build and install:
+`--force` to replace), `wovn list` shows recent files on both hosts,
+`wovn read <url-or-path>` prints a hosted file (handling private auth),
+`wovn rotate` rotates the token. Build and install:
 `pnpm install && pnpm build` in `../cli`, then `cp ../cli/dist/wovn
 ~/.local/bin/wovn` (re-run after editing `../cli/src/wovn.ts`).
 

@@ -96,6 +96,63 @@ async function put(files: string[], opts: PutOptions): Promise<void> {
   }
 }
 
+interface ListEntry {
+  key: string;
+  size: number;
+  uploaded: string;
+}
+
+function formatSize(bytes: number): string {
+  let value = bytes;
+  let unit = "B";
+  for (const next of ["KB", "MB", "GB"]) {
+    if (value < 1024) break;
+    value /= 1024;
+    unit = next;
+  }
+  return unit === "B" ? `${value} B` : `${value.toFixed(1)} ${unit}`;
+}
+
+// ISO timestamp -> "yyyy-mm-dd hh:mm" in local time.
+function formatWhen(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+interface ListOptions {
+  public?: true;
+  private?: true;
+  limit: string;
+}
+
+async function list(opts: ListOptions): Promise<void> {
+  if (opts.public && opts.private) fail("--public and --private are mutually exclusive");
+  const limit = Number(opts.limit);
+  if (!Number.isInteger(limit) || limit < 1) fail("--limit must be a positive integer");
+
+  const hosts: { host: string; headers: Record<string, string> }[] = [];
+  if (!opts.private) hosts.push({ host: HOST, headers: { authorization: `Bearer ${token()}` } });
+  if (!opts.public) hosts.push({ host: PRIVATE_HOST, headers: accessHeaders("listing private files") });
+
+  const entries = (
+    await Promise.all(
+      hosts.map(async ({ host, headers }) => {
+        const res = await fetch(`${host}/?list&limit=${limit}`, { headers });
+        if (!res.ok) fail(`list failed for ${host} (${res.status}): ${(await res.text()).trim()}`);
+        const objects = (await res.json()) as ListEntry[];
+        return objects.map((entry) => ({ ...entry, url: `${host}/${entry.key}` }));
+      }),
+    )
+  ).flat();
+
+  // Merge both hosts newest-first; --limit caps the combined output.
+  entries.sort((a, b) => b.uploaded.localeCompare(a.uploaded));
+  for (const entry of entries.slice(0, limit)) {
+    console.log(`${formatWhen(entry.uploaded)}  ${formatSize(entry.size).padStart(9)}  ${entry.url}`);
+  }
+}
+
 async function read(target: string): Promise<void> {
   let url = target;
   let headers: Record<string, string> = {};
@@ -143,6 +200,14 @@ program
   .option("--at <remote-path>", "write to a stable path instead of a generated key; the URL never changes")
   .option("--force", "with --at, replace an existing object at that path")
   .action(put);
+
+program
+  .command("list")
+  .description("list recent files on both hosts, newest first")
+  .option("--public", "only list files.wovn.org")
+  .option("--private", "only list private.wovn.org")
+  .option("-n, --limit <count>", "max files to show", "20")
+  .action(list);
 
 program
   .command("read")

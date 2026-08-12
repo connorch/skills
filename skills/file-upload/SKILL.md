@@ -49,6 +49,19 @@ wovn put --private --at docs/q3-roadmap.html /tmp/q3-roadmap.html
 wovn put --private --at docs/q3-roadmap.html --force /tmp/q3-roadmap.html  # update in place
 ```
 
+## Listing recent files
+
+`wovn list` prints recent uploads across both hosts, newest first, one line
+per file (timestamp, size, URL). `--public` / `--private` restrict to one
+host; `-n <count>` changes the limit (default 20). Listing is authenticated
+on both hosts - public URLs are unguessable, so the listing itself is never
+open.
+
+```sh
+wovn list
+wovn list --private -n 50
+```
+
 ## File naming
 
 The filename survives into the permanent URL, so rename files before

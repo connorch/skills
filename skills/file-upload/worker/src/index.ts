@@ -4,6 +4,7 @@
 // stored objects. POST mints a collision-proof immutable key
 // (yyyy/mm/<random>-<filename>); PUT writes the exact request path and
 // refuses to overwrite an existing object unless the client forces it.
+// GET /?list returns recent objects as JSON, newest first (authenticated).
 //
 // The private host verifies the Access JWT itself (signature, issuer,
 // audience, expiry) rather than trusting that the Access app is configured,
@@ -164,6 +165,33 @@ async function upload(request: Request, env: Env, url: URL, bucket: R2Bucket): P
   return new Response(`https://${url.hostname}/${key}\n`, { status: 201 });
 }
 
+// GET /?list returns recent objects as JSON, newest first. Authenticated on
+// both hosts: the private host is already behind the Access check, and the
+// public listing requires the upload token - generated URLs are unguessable
+// capability URLs, so an open listing would enumerate them.
+async function list(request: Request, env: Env, url: URL, bucket: R2Bucket): Promise<Response> {
+  if (url.hostname !== PRIVATE_HOSTNAME) {
+    if (!env.FILE_HOST_TOKEN) return new Response("upload token not configured\n", { status: 503 });
+    if (!isAuthorized(request, env.FILE_HOST_TOKEN)) return new Response("unauthorized\n", { status: 401 });
+  }
+  const limit = Math.min(Math.max(Number(url.searchParams.get("limit")) || 20, 1), 1000);
+
+  // R2 lists lexicographically with no reverse option, so walk the whole
+  // bucket and sort by upload time; these are small personal buckets.
+  const objects: { key: string; size: number; uploaded: string }[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await bucket.list({ cursor, limit: 1000 });
+    for (const object of page.objects) {
+      objects.push({ key: object.key, size: object.size, uploaded: object.uploaded.toISOString() });
+    }
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+
+  objects.sort((a, b) => b.uploaded.localeCompare(a.uploaded));
+  return Response.json(objects.slice(0, limit), { headers: { "cache-control": "no-store" } });
+}
+
 function objectHeaders(object: R2Object, isPrivate: boolean): HeadersInit {
   // Private files must never land in shared caches. Public stable objects
   // change in place, so they revalidate by etag; generated keys are immutable.
@@ -213,6 +241,9 @@ export default {
     }
 
     if (request.method === "PUT" || request.method === "POST") return upload(request, env, url, bucket);
+    if (request.method === "GET" && url.pathname === "/" && url.searchParams.has("list")) {
+      return list(request, env, url, bucket);
+    }
     if (request.method === "GET" || request.method === "HEAD") return serve(request, url, bucket);
     return new Response("method not allowed\n", { status: 405 });
   },
