@@ -4,7 +4,6 @@ description: When the user asks for an HTML writeup of work (NOT as part of the 
 metadata:
   harness: [claude, codex]
   platform: [darwin, linux]
-  scope: fleet
   requires: "the wovn CLI on PATH (see the file-upload skill)"
 ---
 

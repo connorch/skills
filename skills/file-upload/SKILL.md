@@ -4,7 +4,6 @@ description: Upload any local file - a screenshot, screen recording, log, docume
 metadata:
   harness: [claude, codex]
   platform: [darwin, linux]
-  scope: fleet
   requires: "the wovn CLI on PATH, or FILE_HOST_TOKEN in the environment"
 ---
 

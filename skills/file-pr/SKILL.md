@@ -4,7 +4,6 @@ description: Use when the user asks to file, open, or create a PR.
 metadata:
   harness: [claude, codex]
   platform: [darwin, linux]
-  scope: fleet
 ---
 
 # File PR
