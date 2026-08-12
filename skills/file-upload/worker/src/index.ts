@@ -1,8 +1,10 @@
 // File host for files.wovn.org (public) and private.wovn.org (Cloudflare
 // Access-gated), used by the file-upload skill. PUT/POST an authenticated
 // file to any path; the response body is the permanent URL. GET serves
-// stored objects. Objects are keyed yyyy/mm/<random>-<filename>, so URLs
-// are collision-proof and immutable.
+// stored objects. POST mints a collision-proof immutable key
+// (yyyy/mm/<random>-<filename>); PUT writes the exact request path and
+// refuses to overwrite an existing object unless the client forces it.
+// GET /?list returns recent objects as JSON, newest first (authenticated).
 //
 // The private host verifies the Access JWT itself (signature, issuer,
 // audience, expiry) rather than trusting that the Access app is configured,
@@ -46,18 +48,13 @@ function isAuthorized(request: Request, token: string): boolean {
 }
 
 // Stable keys (PUT) use the request path verbatim, sanitized per segment.
-// The yyyy/mm/ namespace is reserved for generated immutable keys so a PUT
-// can never clobber one.
-const GENERATED_KEY_PREFIX = /^\d{4}\/\d{2}\//;
-
 function stableKey(pathname: string): string | null {
   const key = decodeURIComponent(pathname)
     .split("/")
     .filter(Boolean)
     .map((segment) => segment.replace(/[^a-zA-Z0-9._-]/g, "-"))
     .join("/");
-  if (!key || GENERATED_KEY_PREFIX.test(key)) return null;
-  return key;
+  return key || null;
 }
 
 function objectKey(pathname: string): string {
@@ -146,18 +143,19 @@ async function upload(request: Request, env: Env, url: URL, bucket: R2Bucket): P
   if (!request.body) return new Response("missing request body\n", { status: 400 });
 
   // POST mints an immutable dated key; PUT stores at the exact requested
-  // path and overwrites, so the URL stays stable across re-uploads.
+  // path, so the URL stays stable across re-uploads.
   let key: string;
   let customMetadata: Record<string, string> | undefined;
   if (request.method === "PUT") {
     const stable = stableKey(url.pathname);
-    if (!stable) {
-      return new Response("PUT needs an explicit path outside the reserved yyyy/mm/ namespace\n", {
-        status: 400,
-      });
-    }
+    if (!stable) return new Response("PUT needs an explicit path\n", { status: 400 });
     key = stable;
     customMetadata = { stable: "true" };
+    // Overwrites are opt-in (the CLI's --force sets the header). Enforced
+    // here, not just in the CLI, so no client can clobber a path by accident.
+    if (request.headers.get("x-wovn-force") !== "1" && (await bucket.head(key)) !== null) {
+      return new Response(`${key} already exists; pass --force to replace it\n`, { status: 409 });
+    }
   } else {
     key = objectKey(url.pathname);
   }
@@ -165,6 +163,33 @@ async function upload(request: Request, env: Env, url: URL, bucket: R2Bucket): P
   const contentType = contentTypeFor(key, request.headers.get("content-type"));
   await bucket.put(key, request.body, { httpMetadata: { contentType }, customMetadata });
   return new Response(`https://${url.hostname}/${key}\n`, { status: 201 });
+}
+
+// GET /?list returns recent objects as JSON, newest first. Authenticated on
+// both hosts: the private host is already behind the Access check, and the
+// public listing requires the upload token - generated URLs are unguessable
+// capability URLs, so an open listing would enumerate them.
+async function list(request: Request, env: Env, url: URL, bucket: R2Bucket): Promise<Response> {
+  if (url.hostname !== PRIVATE_HOSTNAME) {
+    if (!env.FILE_HOST_TOKEN) return new Response("upload token not configured\n", { status: 503 });
+    if (!isAuthorized(request, env.FILE_HOST_TOKEN)) return new Response("unauthorized\n", { status: 401 });
+  }
+  const limit = Math.min(Math.max(Number(url.searchParams.get("limit")) || 20, 1), 1000);
+
+  // R2 lists lexicographically with no reverse option, so walk the whole
+  // bucket and sort by upload time; these are small personal buckets.
+  const objects: { key: string; size: number; uploaded: string }[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await bucket.list({ cursor, limit: 1000 });
+    for (const object of page.objects) {
+      objects.push({ key: object.key, size: object.size, uploaded: object.uploaded.toISOString() });
+    }
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+
+  objects.sort((a, b) => b.uploaded.localeCompare(a.uploaded));
+  return Response.json(objects.slice(0, limit), { headers: { "cache-control": "no-store" } });
 }
 
 function objectHeaders(object: R2Object, isPrivate: boolean): HeadersInit {
@@ -216,6 +241,9 @@ export default {
     }
 
     if (request.method === "PUT" || request.method === "POST") return upload(request, env, url, bucket);
+    if (request.method === "GET" && url.pathname === "/" && url.searchParams.has("list")) {
+      return list(request, env, url, bucket);
+    }
     if (request.method === "GET" || request.method === "HEAD") return serve(request, url, bucket);
     return new Response("method not allowed\n", { status: 405 });
   },
