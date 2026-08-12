@@ -15,8 +15,9 @@ touch the vault. Key paths, conventions, and evidence patterns: [REFERENCE.md](R
 bun ~/.agents/skills/sb-ingest-superwhisper-meeting/scripts/find-unprocessed.ts
 ```
 
-Lists recordings with >1 diarized speaker and >=2 min that no vault note's `source:`
-frontmatter references. `--json` for machine output, `--all` to include already-ingested.
+Lists recordings made in a call-recording mode (`separateSpeakersEnabled: true`) that ran
+>=2 min and that no vault note's `source:` frontmatter references. `--json` for machine
+output, `--all` to include already-ingested.
 If nothing is new, report that and stop. Otherwise make the workdir:
 `mkdir -p /tmp/sb-ingest-superwhisper-meeting`.
 

@@ -18,8 +18,14 @@
   the recording. `speaker` numbering is arbitrary per file (may start at 0 or 1) and is
   NOT stable across recordings.
 - `result` / `rawResult` - flat transcript fallback when segments are missing.
-- Meeting heuristic: >1 distinct speaker id AND >=2 min. Dictation is single-speaker;
-  mic tests are short. `systemAudioEnabled: true` corroborates a call.
+- `separateSpeakersEnabled` / `systemAudioEnabled` - both true exactly when the recording
+  was made in a call-recording mode; false together for dictation.
+- Meeting heuristic: `separateSpeakersEnabled: true` AND >=2 min. The flag captures the
+  intent to record a call, so it holds even when diarization only finds one voice; the
+  duration floor drops mic tests and mode-setup experiments.
+- `modeName` is NOT a usable signal. The mode named "Meeting" only ever held sub-minute
+  setup tests, real calls are recorded under other mode names, and the names are
+  user-editable.
 
 ## config.json schema (input to transcript-to-md.ts)
 
