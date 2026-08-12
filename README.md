@@ -23,14 +23,17 @@ skills add connorch/skills --skill codex-review
 skills add connorch/skills --skill codex-implementation
 skills add connorch/skills --skill step-back
 skills add connorch/skills --skill babysit-pr
+skills add connorch/skills --skill file-pr
 skills add connorch/skills --skill html-communication
 skills add connorch/skills --skill file-upload
+skills add connorch/skills --skill sb-ingest
+skills add connorch/skills --skill sb-ingest-superwhisper-meeting
 ```
 
 You can also install multiple specific skills in one command:
 
 ```sh
-skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation step-back babysit-pr html-communication file-upload
+skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation step-back babysit-pr file-pr html-communication file-upload sb-ingest sb-ingest-superwhisper-meeting
 ```
 
 Install the current local checkout with Conductor's agent targeting:
@@ -56,6 +59,13 @@ These skills help you plan, verify, write, refactor, and fix code.
 - **babysit-pr** — Monitor a pull request through review and CI, verifying bot findings, fixing real failures, and dismissing false positives with reasons. Adapted from a skill by [Theo Browne](https://youtu.be/e1snsuY4lTI).
 - **html-communication** — Create self-contained HTML writeups (plans, specs, findings, UI mocks) and publish them privately to private.wovn.org with the wovn CLI. Adapted from a skill by Theo Browne.
 - **file-upload** — Upload any local file to the public file host at files.wovn.org and return a permanent public URL, backed by the Cloudflare Worker in `skills/file-upload/worker/`. Adapted from a skill by Theo Browne.
+
+## Second Brain
+
+These skills feed Connor's second-brain Obsidian vault.
+
+- **sb-ingest** — File any pasted content (conversation, email, notes, transcript, or a file path) verbatim into the vault's `Sources/` directory so the vault automation ingests it.
+- **sb-ingest-superwhisper-meeting** — Find unprocessed superwhisper meeting recordings, build speaker-separated transcripts, identify speakers via calendar and transcript evidence, and file them into `Sources/`.
 
 ## Archived Skills
 
