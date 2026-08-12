@@ -25,7 +25,10 @@ makes this one obsolete, stop monitoring, report it to the user, and ask before
 closing the PR unless closure was explicitly authorized.
 
 If a review bot leaves feedback you believe is not worth addressing, reply and
-resolve the comment. Format comments left on Connor's behalf as:
+resolve the comment. Resolving or dismissing a comment means marking its thread
+as resolved in GitHub (e.g. via the `resolveReviewThread` GraphQL mutation with
+`gh api graphql`), not just replying. Format comments left on Connor's behalf
+as:
 
 ```md
 [MODEL-SLUG] RESPONDING ON BEHALF OF CONNOR
