@@ -4,8 +4,11 @@ Cloudflare Worker behind `https://files.wovn.org` (public) and
 `https://private.wovn.org` (private), the file host used by the `file-upload`
 skill. Authenticated uploads write to R2 and return the URL; `GET` serves
 stored objects. `POST` mints an immutable dated key (`yyyy/mm/<random>-<name>`);
-`PUT` writes to the exact request path and overwrites, giving stable URLs for
-living documents (the CLI maps `wovn put` to POST and `wovn put --at` to PUT).
+`PUT` writes to the exact request path, giving stable URLs for living
+documents (the CLI maps `wovn put` to POST and `wovn put --at` to PUT). A
+`PUT` to an existing key is rejected with 409 unless the request carries the
+`x-wovn-force: 1` header (the CLI's `--force`), so paths are never clobbered
+by accident.
 Stable objects are served with etag revalidation instead of immutable caching. Deployed on the personal
 Cloudflare account (connorchev@gmail.com), pinned via `account_id` in
 `wrangler.jsonc`.
@@ -31,10 +34,12 @@ pnpm run deploy
 
 ## The wovn CLI
 
-`../bin/wovn` wraps the host for agents and humans: `wovn put <file...>`
-uploads and prints URLs, `wovn read <url-or-path>` prints a hosted file
-(handling private auth), `wovn rotate` rotates the token. It is installed by
-copy: `cp ../bin/wovn ~/.local/bin/wovn` (re-run after editing the script).
+`../cli` is a TypeScript commander program that wraps the host for agents and
+humans: `wovn put <file...>` uploads and prints URLs (`--at` for stable paths,
+`--force` to replace), `wovn read <url-or-path>` prints a hosted file
+(handling private auth), `wovn rotate` rotates the token. Build and install:
+`pnpm install && pnpm build` in `../cli`, then `cp ../cli/dist/wovn
+~/.local/bin/wovn` (re-run after editing `../cli/src/wovn.ts`).
 
 ## Token rotation
 

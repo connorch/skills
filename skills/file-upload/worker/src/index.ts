@@ -1,8 +1,9 @@
 // File host for files.wovn.org (public) and private.wovn.org (Cloudflare
 // Access-gated), used by the file-upload skill. PUT/POST an authenticated
 // file to any path; the response body is the permanent URL. GET serves
-// stored objects. Objects are keyed yyyy/mm/<random>-<filename>, so URLs
-// are collision-proof and immutable.
+// stored objects. POST mints a collision-proof immutable key
+// (yyyy/mm/<random>-<filename>); PUT writes the exact request path and
+// refuses to overwrite an existing object unless the client forces it.
 //
 // The private host verifies the Access JWT itself (signature, issuer,
 // audience, expiry) rather than trusting that the Access app is configured,
@@ -46,18 +47,13 @@ function isAuthorized(request: Request, token: string): boolean {
 }
 
 // Stable keys (PUT) use the request path verbatim, sanitized per segment.
-// The yyyy/mm/ namespace is reserved for generated immutable keys so a PUT
-// can never clobber one.
-const GENERATED_KEY_PREFIX = /^\d{4}\/\d{2}\//;
-
 function stableKey(pathname: string): string | null {
   const key = decodeURIComponent(pathname)
     .split("/")
     .filter(Boolean)
     .map((segment) => segment.replace(/[^a-zA-Z0-9._-]/g, "-"))
     .join("/");
-  if (!key || GENERATED_KEY_PREFIX.test(key)) return null;
-  return key;
+  return key || null;
 }
 
 function objectKey(pathname: string): string {
@@ -146,18 +142,19 @@ async function upload(request: Request, env: Env, url: URL, bucket: R2Bucket): P
   if (!request.body) return new Response("missing request body\n", { status: 400 });
 
   // POST mints an immutable dated key; PUT stores at the exact requested
-  // path and overwrites, so the URL stays stable across re-uploads.
+  // path, so the URL stays stable across re-uploads.
   let key: string;
   let customMetadata: Record<string, string> | undefined;
   if (request.method === "PUT") {
     const stable = stableKey(url.pathname);
-    if (!stable) {
-      return new Response("PUT needs an explicit path outside the reserved yyyy/mm/ namespace\n", {
-        status: 400,
-      });
-    }
+    if (!stable) return new Response("PUT needs an explicit path\n", { status: 400 });
     key = stable;
     customMetadata = { stable: "true" };
+    // Overwrites are opt-in (the CLI's --force sets the header). Enforced
+    // here, not just in the CLI, so no client can clobber a path by accident.
+    if (request.headers.get("x-wovn-force") !== "1" && (await bucket.head(key)) !== null) {
+      return new Response(`${key} already exists; pass --force to replace it\n`, { status: 409 });
+    }
   } else {
     key = objectKey(url.pathname);
   }

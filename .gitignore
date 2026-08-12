@@ -10,3 +10,7 @@ skills/file-upload/worker/node_modules/
 skills/file-upload/worker/worker-configuration.d.ts
 skills/file-upload/worker/.dev.vars
 skills/file-upload/worker/.wrangler/
+
+# file-upload CLI build artifacts
+skills/file-upload/cli/node_modules/
+skills/file-upload/cli/dist/

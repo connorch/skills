@@ -55,12 +55,13 @@ separate permission or stop at the local file.
 
 1. Write the HTML file locally, named per the file-upload skill's naming
    convention (kebab-case, descriptive, `.html`).
-2. Run `wovn put --private --at docs/<file name> <file path>`.
+2. Run `wovn put --private --at docs/<file name> <file path>` (add `--force`
+   when updating a document that is already published).
 3. Report the local path and the returned private.wovn.org URL.
 
-Re-upload to the same `--at` path to update the document in place; the URL
-stays stable across iterations. Use a new path only for a genuinely new
-document. Only Connor can open private.wovn.org URLs (browser login or the
+Re-upload to the same `--at` path with `--force` to update the document in
+place; the URL stays stable across iterations. Use a new path only for a
+genuinely new document. Only Connor can open private.wovn.org URLs (browser login or the
 CLI's service token); never embed them in public PRs or issues. To read one
 back, run `wovn read <url>`.
 

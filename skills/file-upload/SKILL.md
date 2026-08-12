@@ -39,13 +39,14 @@ render inline in browsers.
 ## Stable URLs
 
 `wovn put --at <remote-path> <file>` writes to that exact path instead of a
-generated key, and re-uploading to the same path overwrites in place - the URL
-never changes. Use it for living documents (plans, reports, mocks) that get
-updated across iterations; use plain `wovn put` for everything else. The
-`yyyy/mm/` namespace is reserved for immutable uploads and rejected.
+generated key - the URL never changes. If the path is already taken the upload
+is rejected; pass `--force` to replace it in place. Use it for living
+documents (plans, reports, mocks) that get updated across iterations; use
+plain `wovn put` for everything else.
 
 ```sh
 wovn put --private --at docs/q3-roadmap.html /tmp/q3-roadmap.html
+wovn put --private --at docs/q3-roadmap.html --force /tmp/q3-roadmap.html  # update in place
 ```
 
 ## File naming
@@ -89,5 +90,6 @@ The file host is a Cloudflare Worker whose source lives in `worker/` next to
 this file (R2 bucket `wovn-files`, token stored as a Worker secret). To change
 it, edit `worker/src/index.ts` and run `pnpm typecheck && pnpm run deploy` there.
 
-The `wovn` CLI source lives in `bin/wovn` and is installed by copy; after
-editing it, run `cp bin/wovn ~/.local/bin/wovn`.
+The `wovn` CLI is a TypeScript commander program in `cli/`; after editing
+`cli/src/wovn.ts`, run `pnpm install && pnpm typecheck && pnpm build` there
+and install the bundle with `cp dist/wovn ~/.local/bin/wovn`.

@@ -1,0 +1,16 @@
+{
+  "name": "wovn-cli",
+  "private": true,
+  "scripts": {
+    "build": "esbuild src/wovn.ts --bundle --platform=node --target=node20 --format=cjs --banner:js='#!/usr/bin/env node' --outfile=dist/wovn && chmod +x dist/wovn",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^14.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.2"
+  }
+}
