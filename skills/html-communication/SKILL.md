@@ -18,14 +18,14 @@ Do not use it for HTML that ships as part of a product.
 
 ## Document
 
-Create one self-contained HTML file, capped at 512 KB.
+Create one self-contained HTML file, capped at 1MB.
 
-- Write it like a spec, not a landing page: dense, scannable, no hero,
-  decorative chrome, marketing voice, or em dashes.
-- Default to true black (`#000`), white primary text, and dark gray only for
-  secondary surfaces or accents.
+- Write it like a spec, not a landing page: yes dense, yes scannable, no hero,
+  no decorative chrome, no marketing voice, and no em dashes.
+- Talk in ASD-STE100 Simplified Technical English, and use the ubiquitous language from `CONTEXT.md` if one exists.
 - Make it mobile-readable with a responsive viewport and no fixed-width layout.
 - Use semantic HTML, inline CSS, inline SVG, and HTTPS or data-URL images.
+- Use diagrams, charts, or visualizations when you think it will actually be useful to the user. Connor is a visual learner.
 - Use an inline classic script only when interactivity materially helps. Keep
   scripted pages useful without JavaScript; the sandbox blocks storage, fetch,
   workers, frames, forms, and popups.
@@ -35,6 +35,21 @@ Create one self-contained HTML file, capped at 512 KB.
 Never include external or module scripts, inline event handlers, `javascript:`
 URLs, forms, frames, embeds, objects, applets, meta refresh, linked stylesheets,
 secrets, private URLs, or local filesystem paths.
+
+### Palette
+
+This palette is a suggestion. Use unless you have a need or are asked to deviate.
+
+```
+--bg:        #121212   page background
+--surface:   #1E1E1E   cards, code blocks, table header rows. Go slightly lighter for each level of elevation.
+--text:      #E0E0E0   body copy and headings
+--muted:     #A0A0A0   labels, captions, metadata
+--border:    #2A2A2A   dividers and hairlines
+--accent:    #90CAF9   links and emphasis
+--success:   #A5D6A7   positive status indicator (passed, added, etc.)
+--danger:    #CF6679   negative status indicator (blocked, failed, removed, etc.)
+```
 
 ## UI Mocks
 
