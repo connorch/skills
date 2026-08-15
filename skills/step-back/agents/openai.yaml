@@ -1,4 +1,4 @@
 interface:
   display_name: "Step Back"
-  short_description: "Step-back review of a branch after a batch of point fixes"
-  default_prompt: "Use $step-back to take a step back and check whether the fixes on this branch left dead code, misplaced abstractions, redundant guards, stale docs, or unhardened new mechanisms."
+  short_description: "Verdict-first step-back review of a branch after iterative fixes"
+  default_prompt: "Use $step-back to step back from this branch: judge whether the big architecture calls are right, whether abstractions and shared logic sit in the right places, and whether the iteration left residue (dead code, redundant guards, stale docs, duplicated machinery, untested hot paths). Lead with the verdict; assess before fixing anything."
