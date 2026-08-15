@@ -1,10 +1,10 @@
 ---
 name: html-communication
-description: When the user asks for an HTML writeup of work (NOT as part of the codebase), use this skill to create it and always publish it privately with the file-upload skill's wovn CLI. Also useful for reading private.wovn.org URLs back.
+description: When the user asks for an HTML writeup of work (NOT as part of the codebase), use this skill to create it and always publish it privately with the wovn-file-hosting skill's wovn CLI. Also useful for reading private.wovn.org URLs back.
 metadata:
   harness: [claude, codex]
   platform: [darwin, linux]
-  requires: "the wovn CLI on PATH (see the file-upload skill)"
+  requires: "the wovn CLI on PATH (see the wovn-file-hosting skill)"
 ---
 
 # HTML Communication
@@ -52,7 +52,7 @@ Connor has given standing permission to upload every artifact created or updated
 with this skill. Upload is required, including in Auto mode. Do not ask for
 separate permission or stop at the local file.
 
-1. Write the HTML file locally, named per the file-upload skill's naming
+1. Write the HTML file locally, named per the wovn-file-hosting skill's naming
    convention (kebab-case, descriptive, `.html`).
 2. Run `wovn put --private --at docs/<file name> <file path>` (add `--force`
    when updating a document that is already published).

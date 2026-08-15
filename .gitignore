@@ -5,12 +5,12 @@ output/
 skills-local/*
 !skills-local/.gitkeep
 
-# file-upload worker build/dev artifacts
-skills/file-upload/worker/node_modules/
-skills/file-upload/worker/worker-configuration.d.ts
-skills/file-upload/worker/.dev.vars
-skills/file-upload/worker/.wrangler/
+# wovn-file-hosting worker build/dev artifacts
+skills/wovn-file-hosting/worker/node_modules/
+skills/wovn-file-hosting/worker/worker-configuration.d.ts
+skills/wovn-file-hosting/worker/.dev.vars
+skills/wovn-file-hosting/worker/.wrangler/
 
-# file-upload CLI build artifacts
-skills/file-upload/cli/node_modules/
-skills/file-upload/cli/dist/
+# wovn-file-hosting CLI build artifacts
+skills/wovn-file-hosting/cli/node_modules/
+skills/wovn-file-hosting/cli/dist/

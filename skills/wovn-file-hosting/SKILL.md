@@ -1,5 +1,5 @@
 ---
-name: file-upload
+name: wovn-file-hosting
 description: Upload any local file - a screenshot, screen recording, log, document, markdown file, config, build artifact, or archive - to Connor's file host and return a permanent URL. Public uploads go to files.wovn.org for embedding in GitHub pull requests, issues, and messages or sharing with other people and agents; private uploads go to private.wovn.org (readable only by Connor) for plans, internal notes, and anything not meant to be public. Use whenever a link to a local file is needed, whenever the user says "upload it", "host this", "put this somewhere I can link", or "use the file skill", or when the user asks to upload or host something privately or internally.
 metadata:
   harness: [claude, codex]
@@ -7,7 +7,7 @@ metadata:
   requires: "the wovn CLI on PATH, or FILE_HOST_TOKEN in the environment"
 ---
 
-# File upload
+# Wovn file hosting
 
 Upload files to `https://files.wovn.org` and return the permanent public URL
 from the response body. Prefer the `wovn` CLI:

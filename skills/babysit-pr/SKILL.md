@@ -36,7 +36,7 @@ as:
 [actual reply]
 ```
 
-Screenshots and videos help as well. Use the `file-upload` skill when needed.
+Screenshots and videos help as well. Use the `wovn-file-hosting` skill when needed.
 
 Do not let review feedback expand the PR beyond the user's original goal.
 Address real shortcomings, but avoid scope creep.
