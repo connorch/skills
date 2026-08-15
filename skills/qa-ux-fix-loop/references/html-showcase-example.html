@@ -7,25 +7,29 @@
   <title>QA UX Fix Loop Report Example</title>
   <style>
     :root {
-      --ink: #17202a;
-      --muted: #5b646a;
-      --paper: #f7f2e9;
-      --panel: #fffdf8;
-      --line: #d7cfbf;
-      --good: #2f6f55;
-      --bad: #b9433b;
-      --warn: #a8661f;
-      --blue: #315f7d;
+      --bg: #121212;
+      --surface: #1A1A1A;
+      --raised: #222222;
+      --text: #E0E0E0;
+      --muted: #A0A0A0;
+      --border: #2A2A2A;
+      --accent: #90CAF9;
+      --success: #A5D6A7;
+      --warning: #FFCC80;
+      --danger: #CF6679;
+      --sans: system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+      --mono: ui-monospace, "SF Mono", "SFMono-Regular", Consolas, monospace;
     }
 
     * { box-sizing: border-box; }
 
     body {
       margin: 0;
-      color: var(--ink);
-      background: var(--paper);
-      font-family: "Avenir Next", Helvetica, sans-serif;
-      line-height: 1.45;
+      color: var(--text);
+      background: var(--bg);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.5;
     }
 
     header,
@@ -37,22 +41,21 @@
     header { padding: 36px 0 20px; }
 
     h1 {
-      margin: 0 0 12px;
-      font-family: Georgia, "Times New Roman", serif;
-      font-size: clamp(38px, 6vw, 72px);
-      line-height: 0.98;
-      letter-spacing: 0;
+      margin: 0 0 10px;
+      font-size: 30px;
+      font-weight: 700;
+      line-height: 1.2;
     }
 
     h2,
     h3 {
       margin: 0;
-      line-height: 1.12;
-      letter-spacing: 0;
+      font-weight: 700;
+      line-height: 1.25;
     }
 
-    h2 { font-size: 28px; }
-    h3 { font-size: 20px; }
+    h2 { font-size: 19px; }
+    h3 { font-size: 15px; }
 
     p { margin: 8px 0 0; }
 
@@ -65,9 +68,9 @@
 
     .metric,
     .scenario {
-      border: 1px solid var(--line);
+      border: 1px solid var(--border);
       border-radius: 8px;
-      background: var(--panel);
+      background: var(--surface);
     }
 
     .metric {
@@ -77,14 +80,15 @@
 
     .metric strong {
       display: block;
-      font-size: 32px;
+      font-size: 26px;
+      font-weight: 700;
     }
 
     .metric span,
     dt,
     figcaption {
       color: var(--muted);
-      font-weight: 700;
+      font-weight: 600;
     }
 
     .scenario {
@@ -107,17 +111,17 @@
       min-height: 28px;
       padding: 4px 10px;
       border-radius: 999px;
-      color: #fff;
+      color: var(--bg);
       font-size: 12px;
-      font-weight: 900;
+      font-weight: 700;
       letter-spacing: 0.06em;
       text-transform: uppercase;
     }
 
-    .badge.fail { background: var(--bad); }
-    .badge.pass { background: var(--good); }
-    .badge.fix { background: var(--blue); }
-    .badge.warn { background: var(--warn); }
+    .badge.fail { background: var(--danger); }
+    .badge.pass { background: var(--success); }
+    .badge.fix { background: var(--accent); }
+    .badge.warn { background: var(--warning); }
 
     .details,
     .timeline,
@@ -146,10 +150,10 @@
     }
 
     .event {
-      border: 1px solid var(--line);
+      border: 1px solid var(--border);
       border-radius: 8px;
       padding: 14px;
-      background: #fffaf0;
+      background: var(--raised);
     }
 
     .event h3 {
@@ -168,9 +172,9 @@
     figure {
       margin: 0;
       overflow: hidden;
-      border: 1px solid var(--line);
+      border: 1px solid var(--border);
       border-radius: 8px;
-      background: #fff;
+      background: var(--surface);
     }
 
     figure img,
@@ -187,21 +191,21 @@
     }
 
     .screenshot-link:focus-visible {
-      outline: 3px solid var(--blue);
+      outline: 3px solid var(--accent);
       outline-offset: -3px;
     }
 
     figcaption {
       padding: 12px 14px;
-      border-top: 1px solid var(--line);
+      border-top: 1px solid var(--border);
       font-size: 14px;
     }
 
     code {
       padding: 2px 5px;
       border-radius: 5px;
-      background: #ece5d8;
-      font-family: "SFMono-Regular", Consolas, monospace;
+      background: var(--border);
+      font-family: var(--mono);
       font-size: 0.95em;
     }
 
@@ -263,21 +267,21 @@
             aria-label="Open loop #2 dashboard success screenshot PNG">
             <svg viewBox="0 0 960 540" role="img"
               aria-label="Placeholder dashboard success screenshot">
-              <rect width="960" height="540" fill="#edf3ee"/>
-              <rect x="48" y="44" width="864" height="452" rx="18" fill="#fff"
-                stroke="#cbd8cd" stroke-width="3"/>
-              <text x="92" y="118" fill="#12312f" font-family="Avenir Next, Helvetica, sans-serif"
-                font-size="38" font-weight="800">Dashboard</text>
-              <rect x="92" y="170" width="230" height="128" rx="14" fill="#e4eee8"
-                stroke="#cbd8cd" stroke-width="2"/>
-              <rect x="362" y="170" width="230" height="128" rx="14" fill="#e4eee8"
-                stroke="#cbd8cd" stroke-width="2"/>
-              <rect x="632" y="170" width="230" height="128" rx="14" fill="#e4eee8"
-                stroke="#cbd8cd" stroke-width="2"/>
-              <rect x="92" y="338" width="770" height="86" rx="14" fill="#fff"
-                stroke="#cbd8cd" stroke-width="2"/>
-              <text x="126" y="386" fill="#2f6f55" font-family="Avenir Next, Helvetica, sans-serif"
-                font-size="24" font-weight="800">All expected widgets are visible</text>
+              <rect width="960" height="540" fill="#121212"/>
+              <rect x="48" y="44" width="864" height="452" rx="18" fill="#1A1A1A"
+                stroke="#2A2A2A" stroke-width="3"/>
+              <text x="92" y="118" fill="#E0E0E0" font-family="system-ui, sans-serif"
+                font-size="34" font-weight="700">Dashboard</text>
+              <rect x="92" y="170" width="230" height="128" rx="14" fill="#222222"
+                stroke="#2A2A2A" stroke-width="2"/>
+              <rect x="362" y="170" width="230" height="128" rx="14" fill="#222222"
+                stroke="#2A2A2A" stroke-width="2"/>
+              <rect x="632" y="170" width="230" height="128" rx="14" fill="#222222"
+                stroke="#2A2A2A" stroke-width="2"/>
+              <rect x="92" y="338" width="770" height="86" rx="14" fill="#222222"
+                stroke="#2A2A2A" stroke-width="2"/>
+              <text x="126" y="386" fill="#A5D6A7" font-family="system-ui, sans-serif"
+                font-size="22" font-weight="700">All expected widgets are visible</text>
             </svg>
           </a>
           <figcaption>Loop #2 success evidence:
@@ -351,24 +355,24 @@
             aria-label="Open loop #1 checkout payment failure screenshot PNG">
             <svg viewBox="0 0 960 540" role="img"
               aria-label="Placeholder checkout payment failure screenshot">
-              <rect width="960" height="540" fill="#fbf5ef"/>
-              <rect x="48" y="44" width="864" height="452" rx="18" fill="#fff"
-                stroke="#d7cfbf" stroke-width="3"/>
-              <text x="92" y="118" fill="#17202a" font-family="Avenir Next, Helvetica, sans-serif"
-                font-size="38" font-weight="800">Checkout</text>
-              <rect x="92" y="170" width="360" height="56" rx="10" fill="#fff"
-                stroke="#b9c3be" stroke-width="3"/>
-              <rect x="92" y="252" width="360" height="56" rx="10" fill="#fff"
-                stroke="#b9433b" stroke-width="4"/>
-              <rect x="92" y="334" width="360" height="56" rx="10" fill="#b9433b"/>
-              <text x="120" y="370" fill="#fff" font-family="Avenir Next, Helvetica, sans-serif"
-                font-size="22" font-weight="800">Could not process payment</text>
-              <rect x="560" y="170" width="260" height="180" rx="14" fill="#f2e6dc"
-                stroke="#d7cfbf" stroke-width="2"/>
-              <text x="590" y="224" fill="#17202a" font-family="Avenir Next, Helvetica, sans-serif"
-                font-size="26" font-weight="800">Issue state</text>
-              <text x="590" y="270" fill="#5b646a" font-family="Avenir Next, Helvetica, sans-serif"
-                font-size="20">Generic banner only</text>
+              <rect width="960" height="540" fill="#121212"/>
+              <rect x="48" y="44" width="864" height="452" rx="18" fill="#1A1A1A"
+                stroke="#2A2A2A" stroke-width="3"/>
+              <text x="92" y="118" fill="#E0E0E0" font-family="system-ui, sans-serif"
+                font-size="34" font-weight="700">Checkout</text>
+              <rect x="92" y="170" width="360" height="56" rx="10" fill="#222222"
+                stroke="#2A2A2A" stroke-width="3"/>
+              <rect x="92" y="252" width="360" height="56" rx="10" fill="#222222"
+                stroke="#CF6679" stroke-width="4"/>
+              <rect x="92" y="334" width="360" height="56" rx="10" fill="#CF6679"/>
+              <text x="120" y="370" fill="#121212" font-family="system-ui, sans-serif"
+                font-size="20" font-weight="700">Could not process payment</text>
+              <rect x="560" y="170" width="260" height="180" rx="14" fill="#222222"
+                stroke="#2A2A2A" stroke-width="2"/>
+              <text x="590" y="224" fill="#E0E0E0" font-family="system-ui, sans-serif"
+                font-size="24" font-weight="700">Issue state</text>
+              <text x="590" y="270" fill="#A0A0A0" font-family="system-ui, sans-serif"
+                font-size="19">Generic banner only</text>
             </svg>
           </a>
           <figcaption>Loop #1 issue-state screenshot:
@@ -380,30 +384,30 @@
             aria-label="Open loop #2 checkout recovery success screenshot PNG">
             <svg viewBox="0 0 960 540" role="img"
               aria-label="Placeholder checkout recovery success screenshot">
-              <rect width="960" height="540" fill="#edf3ee"/>
-              <rect x="48" y="44" width="864" height="452" rx="18" fill="#fff"
-                stroke="#cbd8cd" stroke-width="3"/>
-              <text x="92" y="118" fill="#12312f" font-family="Avenir Next, Helvetica, sans-serif"
-                font-size="38" font-weight="800">Checkout</text>
-              <rect x="92" y="170" width="360" height="56" rx="10" fill="#fff"
-                stroke="#9db9ad" stroke-width="3"/>
-              <rect x="92" y="252" width="360" height="56" rx="10" fill="#fff"
-                stroke="#c55243" stroke-width="4"/>
-              <text x="92" y="338" fill="#9e382f" font-family="Avenir Next, Helvetica, sans-serif"
-                font-size="20" font-weight="800">Card declined. Retry or update.</text>
-              <rect x="92" y="374" width="168" height="52" rx="10" fill="#12312f"/>
-              <text x="128" y="407" fill="#fff" font-family="Avenir Next, Helvetica, sans-serif"
-                font-size="20" font-weight="800">Retry</text>
-              <rect x="280" y="374" width="210" height="52" rx="10" fill="#e4eee8"
-                stroke="#cbd8cd" stroke-width="2"/>
-              <text x="310" y="407" fill="#12312f" font-family="Avenir Next, Helvetica, sans-serif"
-                font-size="20" font-weight="800">Change card</text>
-              <rect x="560" y="170" width="260" height="180" rx="14" fill="#e4eee8"
-                stroke="#cbd8cd" stroke-width="2"/>
-              <text x="590" y="224" fill="#12312f" font-family="Avenir Next, Helvetica, sans-serif"
-                font-size="26" font-weight="800">Success state</text>
-              <text x="590" y="270" fill="#51605b" font-family="Avenir Next, Helvetica, sans-serif"
-                font-size="20">Recovery controls visible</text>
+              <rect width="960" height="540" fill="#121212"/>
+              <rect x="48" y="44" width="864" height="452" rx="18" fill="#1A1A1A"
+                stroke="#2A2A2A" stroke-width="3"/>
+              <text x="92" y="118" fill="#E0E0E0" font-family="system-ui, sans-serif"
+                font-size="34" font-weight="700">Checkout</text>
+              <rect x="92" y="170" width="360" height="56" rx="10" fill="#222222"
+                stroke="#2A2A2A" stroke-width="3"/>
+              <rect x="92" y="252" width="360" height="56" rx="10" fill="#222222"
+                stroke="#CF6679" stroke-width="4"/>
+              <text x="92" y="338" fill="#CF6679" font-family="system-ui, sans-serif"
+                font-size="19" font-weight="700">Card declined. Retry or update.</text>
+              <rect x="92" y="374" width="168" height="52" rx="10" fill="#90CAF9"/>
+              <text x="128" y="407" fill="#121212" font-family="system-ui, sans-serif"
+                font-size="19" font-weight="700">Retry</text>
+              <rect x="280" y="374" width="210" height="52" rx="10" fill="#222222"
+                stroke="#2A2A2A" stroke-width="2"/>
+              <text x="310" y="407" fill="#E0E0E0" font-family="system-ui, sans-serif"
+                font-size="19" font-weight="700">Change card</text>
+              <rect x="560" y="170" width="260" height="180" rx="14" fill="#222222"
+                stroke="#2A2A2A" stroke-width="2"/>
+              <text x="590" y="224" fill="#E0E0E0" font-family="system-ui, sans-serif"
+                font-size="24" font-weight="700">Success state</text>
+              <text x="590" y="270" fill="#A0A0A0" font-family="system-ui, sans-serif"
+                font-size="19">Recovery controls visible</text>
             </svg>
           </a>
           <figcaption>Loop #2 success-state screenshot:

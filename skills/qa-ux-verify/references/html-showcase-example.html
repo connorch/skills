@@ -17,6 +17,8 @@
       --success: #A5D6A7;
       --warning: #FFCC80;
       --danger: #CF6679;
+      --sans: system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+      --mono: ui-monospace, "SF Mono", "SFMono-Regular", Consolas, monospace;
     }
 
     * { box-sizing: border-box; }
@@ -25,8 +27,9 @@
       margin: 0;
       color: var(--text);
       background: var(--bg);
-      font-family: "Avenir Next", Helvetica, sans-serif;
-      line-height: 1.45;
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.5;
     }
 
     header,
@@ -38,22 +41,21 @@
     header { padding: 36px 0 20px; }
 
     h1 {
-      margin: 0 0 12px;
-      font-family: Georgia, "Times New Roman", serif;
-      font-size: clamp(38px, 6vw, 72px);
-      line-height: 0.98;
-      letter-spacing: 0;
+      margin: 0 0 10px;
+      font-size: 30px;
+      font-weight: 700;
+      line-height: 1.2;
     }
 
     h2,
     h3 {
       margin: 0;
-      line-height: 1.12;
-      letter-spacing: 0;
+      font-weight: 700;
+      line-height: 1.25;
     }
 
-    h2 { font-size: 28px; }
-    h3 { font-size: 20px; }
+    h2 { font-size: 19px; }
+    h3 { font-size: 15px; }
 
     p { margin: 8px 0 0; }
 
@@ -78,14 +80,15 @@
 
     .metric strong {
       display: block;
-      font-size: 32px;
+      font-size: 26px;
+      font-weight: 700;
     }
 
     .metric span,
     dt,
     figcaption {
       color: var(--muted);
-      font-weight: 700;
+      font-weight: 600;
     }
 
     .scenario {
@@ -110,7 +113,7 @@
       border-radius: 999px;
       color: var(--bg);
       font-size: 12px;
-      font-weight: 900;
+      font-weight: 700;
       letter-spacing: 0.06em;
       text-transform: uppercase;
     }
@@ -191,7 +194,7 @@
       padding: 2px 5px;
       border-radius: 5px;
       background: var(--border);
-      font-family: "SFMono-Regular", Consolas, monospace;
+      font-family: var(--mono);
       font-size: 0.95em;
     }
 
@@ -254,8 +257,8 @@
             <rect width="960" height="540" fill="#121212"/>
             <rect x="48" y="44" width="864" height="452" rx="18" fill="#1A1A1A"
               stroke="#2A2A2A" stroke-width="3"/>
-            <text x="92" y="118" fill="#E0E0E0" font-family="Avenir Next, Helvetica, sans-serif"
-              font-size="38" font-weight="800">Dashboard</text>
+            <text x="92" y="118" fill="#E0E0E0" font-family="system-ui, sans-serif"
+              font-size="34" font-weight="700">Dashboard</text>
             <rect x="92" y="170" width="230" height="128" rx="14" fill="#222222"
               stroke="#2A2A2A" stroke-width="2"/>
             <rect x="362" y="170" width="230" height="128" rx="14" fill="#222222"
@@ -264,8 +267,8 @@
               stroke="#2A2A2A" stroke-width="2"/>
             <rect x="92" y="338" width="770" height="86" rx="14" fill="#222222"
               stroke="#2A2A2A" stroke-width="2"/>
-            <text x="126" y="386" fill="#A5D6A7" font-family="Avenir Next, Helvetica, sans-serif"
-              font-size="24" font-weight="800">All expected widgets are visible</text>
+            <text x="126" y="386" fill="#A5D6A7" font-family="system-ui, sans-serif"
+              font-size="22" font-weight="700">All expected widgets are visible</text>
           </svg>
           <figcaption>Success evidence:
             <code>screenshots/001-dashboard-desktop-pass.png</code></figcaption>
@@ -341,21 +344,21 @@
             <rect width="960" height="540" fill="#121212"/>
             <rect x="48" y="44" width="864" height="452" rx="18" fill="#1A1A1A"
               stroke="#2A2A2A" stroke-width="3"/>
-            <text x="92" y="118" fill="#E0E0E0" font-family="Avenir Next, Helvetica, sans-serif"
-              font-size="38" font-weight="800">Checkout</text>
+            <text x="92" y="118" fill="#E0E0E0" font-family="system-ui, sans-serif"
+              font-size="34" font-weight="700">Checkout</text>
             <rect x="92" y="170" width="360" height="56" rx="10" fill="#222222"
               stroke="#2A2A2A" stroke-width="3"/>
             <rect x="92" y="252" width="360" height="56" rx="10" fill="#222222"
               stroke="#CF6679" stroke-width="4"/>
             <rect x="92" y="334" width="360" height="56" rx="10" fill="#CF6679"/>
-            <text x="120" y="370" fill="#121212" font-family="Avenir Next, Helvetica, sans-serif"
-              font-size="22" font-weight="800">Could not process payment</text>
+            <text x="120" y="370" fill="#121212" font-family="system-ui, sans-serif"
+              font-size="20" font-weight="700">Could not process payment</text>
             <rect x="560" y="170" width="260" height="180" rx="14" fill="#222222"
               stroke="#2A2A2A" stroke-width="2"/>
-            <text x="590" y="224" fill="#E0E0E0" font-family="Avenir Next, Helvetica, sans-serif"
-              font-size="26" font-weight="800">Issue state</text>
-            <text x="590" y="270" fill="#A0A0A0" font-family="Avenir Next, Helvetica, sans-serif"
-              font-size="20">Generic banner only</text>
+            <text x="590" y="224" fill="#E0E0E0" font-family="system-ui, sans-serif"
+              font-size="24" font-weight="700">Issue state</text>
+            <text x="590" y="270" fill="#A0A0A0" font-family="system-ui, sans-serif"
+              font-size="19">Generic banner only</text>
           </svg>
           <figcaption>Issue-state screenshot:
             <code>screenshots/014-checkout-payment-desktop-fail.png</code></figcaption>
@@ -367,21 +370,21 @@
             <rect width="960" height="540" fill="#121212"/>
             <rect x="48" y="44" width="864" height="452" rx="18" fill="#1A1A1A"
               stroke="#2A2A2A" stroke-width="3"/>
-            <text x="92" y="118" fill="#E0E0E0" font-family="Avenir Next, Helvetica, sans-serif"
-              font-size="38" font-weight="800">Checkout</text>
+            <text x="92" y="118" fill="#E0E0E0" font-family="system-ui, sans-serif"
+              font-size="34" font-weight="700">Checkout</text>
             <rect x="92" y="170" width="360" height="56" rx="10" fill="#222222"
               stroke="#2A2A2A" stroke-width="3"/>
             <rect x="92" y="252" width="360" height="56" rx="10" fill="#222222"
               stroke="#CF6679" stroke-width="4"/>
             <rect x="92" y="334" width="360" height="56" rx="10" fill="#CF6679"/>
-            <text x="120" y="370" fill="#121212" font-family="Avenir Next, Helvetica, sans-serif"
-              font-size="22" font-weight="800">Could not process payment</text>
+            <text x="120" y="370" fill="#121212" font-family="system-ui, sans-serif"
+              font-size="20" font-weight="700">Could not process payment</text>
             <rect x="560" y="170" width="260" height="180" rx="14" fill="#222222"
               stroke="#2A2A2A" stroke-width="2"/>
-            <text x="590" y="224" fill="#E0E0E0" font-family="Avenir Next, Helvetica, sans-serif"
-              font-size="26" font-weight="800">Mobile state</text>
-            <text x="590" y="270" fill="#A0A0A0" font-family="Avenir Next, Helvetica, sans-serif"
-              font-size="20">Still missing on mobile</text>
+            <text x="590" y="224" fill="#E0E0E0" font-family="system-ui, sans-serif"
+              font-size="24" font-weight="700">Mobile state</text>
+            <text x="590" y="270" fill="#A0A0A0" font-family="system-ui, sans-serif"
+              font-size="19">Still missing on mobile</text>
           </svg>
           <figcaption>Mobile issue-state screenshot:
             <code>screenshots/015-checkout-payment-mobile-fail.png</code></figcaption>

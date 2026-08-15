@@ -42,7 +42,7 @@ This palette is a suggestion. Use unless you have a need or are asked to deviate
 
 ```
 --bg:        #121212   page background
---surface:   #1A1A1A   cards, code blocks, table header rows. Go slightly lighter for each level of elevation.
+--surface:   #1A1A1A   cards, code blocks, table header rows. Go slightly lighter for each level of elevation. (ex: #222222 for lvl 2)
 --text:      #E0E0E0   body copy and headings
 --muted:     #A0A0A0   labels, captions, metadata
 --border:    #2A2A2A   dividers and hairlines
