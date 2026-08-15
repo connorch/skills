@@ -42,12 +42,13 @@ This palette is a suggestion. Use unless you have a need or are asked to deviate
 
 ```
 --bg:        #121212   page background
---surface:   #1E1E1E   cards, code blocks, table header rows. Go slightly lighter for each level of elevation.
+--surface:   #1A1A1A   cards, code blocks, table header rows. Go slightly lighter for each level of elevation.
 --text:      #E0E0E0   body copy and headings
 --muted:     #A0A0A0   labels, captions, metadata
 --border:    #2A2A2A   dividers and hairlines
 --accent:    #90CAF9   links and emphasis
 --success:   #A5D6A7   positive status indicator (passed, added, etc.)
+--warning:   #FFCC80   caution status indicator (flaky, degraded, needs review, etc.)
 --danger:    #CF6679   negative status indicator (blocked, failed, removed, etc.)
 ```
 
