@@ -304,13 +304,20 @@ workspace-local file such as `.context/qa-ux-fix-loop.md` when working in a repo
 - If a tool cannot be run, state why and use the next strongest verification
   available.
 
+## Publish
+
+When the report is final, invoke the `wovn-file-hosting` skill: upload the
+screenshots first, rewrite the report's image links to the returned URLs, then
+upload `qa-ux-report.html` privately. Publishing the HTML alone leaves the hosted
+report with broken images.
+
 ## Final Response
 
 Report:
 
 - source QA plan used
 - issues found and final status
-- HTML report path and screenshot artifact directory
+- HTML report path, published URL, and screenshot artifact directory
 - isolated fix commits
 - files changed
 - verification commands and browser checks performed

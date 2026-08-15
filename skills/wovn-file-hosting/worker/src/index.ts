@@ -1,5 +1,5 @@
 // File host for files.wovn.org (public) and private.wovn.org (Cloudflare
-// Access-gated), used by the file-upload skill. PUT/POST an authenticated
+// Access-gated), used by the wovn-file-hosting skill. PUT/POST an authenticated
 // file to any path; the response body is the permanent URL. GET serves
 // stored objects. POST mints a collision-proof immutable key
 // (yyyy/mm/<random>-<filename>); PUT writes the exact request path and

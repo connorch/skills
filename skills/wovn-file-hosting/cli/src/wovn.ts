@@ -1,4 +1,4 @@
-// wovn - CLI for the files.wovn.org file host (see skills/file-upload).
+// wovn - CLI for the files.wovn.org file host (see skills/wovn-file-hosting).
 //
 // --private uploads to private.wovn.org (Cloudflare Access-gated; only Connor
 // can read) using the Access service token in ~/.config/wovn-files/access.env.

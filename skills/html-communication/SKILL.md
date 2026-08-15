@@ -1,10 +1,10 @@
 ---
 name: html-communication
-description: When the user asks for an HTML writeup of work (NOT as part of the codebase), use this skill to create it and always publish it privately with the file-upload skill's wovn CLI. Also useful for reading private.wovn.org URLs back.
+description: When the user asks for an HTML writeup of work (NOT as part of the codebase), use this skill to create it and always publish it privately with the wovn-file-hosting skill's wovn CLI. Also useful for reading private.wovn.org URLs back.
 metadata:
   harness: [claude, codex]
   platform: [darwin, linux]
-  requires: "the wovn CLI on PATH (see the file-upload skill)"
+  requires: "the wovn CLI on PATH (see the wovn-file-hosting skill)"
 ---
 
 # HTML Communication
@@ -18,14 +18,14 @@ Do not use it for HTML that ships as part of a product.
 
 ## Document
 
-Create one self-contained HTML file, capped at 512 KB.
+Create one self-contained HTML file, capped at 1MB.
 
-- Write it like a spec, not a landing page: dense, scannable, no hero,
-  decorative chrome, marketing voice, or em dashes.
-- Default to true black (`#000`), white primary text, and dark gray only for
-  secondary surfaces or accents.
+- Write it like a spec, not a landing page: yes dense, yes scannable, no hero,
+  no decorative chrome, no marketing voice, and no em dashes.
+- Talk in ASD-STE100 Simplified Technical English, and use the ubiquitous language from `CONTEXT.md` if one exists.
 - Make it mobile-readable with a responsive viewport and no fixed-width layout.
 - Use semantic HTML, inline CSS, inline SVG, and HTTPS or data-URL images.
+- Use diagrams, charts, or visualizations when you think it will actually be useful to the user. Connor is a visual learner.
 - Use an inline classic script only when interactivity materially helps. Keep
   scripted pages useful without JavaScript; the sandbox blocks storage, fetch,
   workers, frames, forms, and popups.
@@ -35,6 +35,22 @@ Create one self-contained HTML file, capped at 512 KB.
 Never include external or module scripts, inline event handlers, `javascript:`
 URLs, forms, frames, embeds, objects, applets, meta refresh, linked stylesheets,
 secrets, private URLs, or local filesystem paths.
+
+### Palette
+
+This palette is a suggestion. Use unless you have a need or are asked to deviate.
+
+```
+--bg:        #121212   page background
+--surface:   #1A1A1A   cards, code blocks, table header rows. Go slightly lighter for each level of elevation. (ex: #222222 for lvl 2)
+--text:      #E0E0E0   body copy and headings
+--muted:     #A0A0A0   labels, captions, metadata
+--border:    #2A2A2A   dividers and hairlines
+--accent:    #90CAF9   links and emphasis
+--success:   #A5D6A7   positive status indicator (passed, added, etc.)
+--warning:   #FFCC80   caution status indicator (flaky, degraded, needs review, etc.)
+--danger:    #CF6679   negative status indicator (blocked, failed, removed, etc.)
+```
 
 ## UI Mocks
 
@@ -52,7 +68,7 @@ Connor has given standing permission to upload every artifact created or updated
 with this skill. Upload is required, including in Auto mode. Do not ask for
 separate permission or stop at the local file.
 
-1. Write the HTML file locally, named per the file-upload skill's naming
+1. Write the HTML file locally, named per the wovn-file-hosting skill's naming
    convention (kebab-case, descriptive, `.html`).
 2. Run `wovn put --private --at docs/<file name> <file path>` (add `--force`
    when updating a document that is already published).

@@ -1,7 +1,7 @@
 # wovn-files
 
 Cloudflare Worker behind `https://files.wovn.org` (public) and
-`https://private.wovn.org` (private), the file host used by the `file-upload`
+`https://private.wovn.org` (private), the file host used by the `wovn-file-hosting`
 skill. Authenticated uploads write to R2 and return the URL; `GET` serves
 stored objects. `POST` mints an immutable dated key (`yyyy/mm/<random>-<name>`);
 `PUT` writes to the exact request path, giving stable URLs for living

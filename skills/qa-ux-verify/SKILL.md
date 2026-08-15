@@ -193,9 +193,16 @@ workspace-local log is appropriate:
 - Notes:
 ```
 
+## Publish
+
+When the report is final, invoke the `wovn-file-hosting` skill: upload the
+screenshots first, rewrite the report's image links to the returned URLs, then
+upload `qa-ux-report.html` privately. Publishing the HTML alone leaves the hosted
+report with broken images.
+
 ## Completion Criteria
 
 Finish only after every in-scope scenario from the source plan is represented in
 the HTML report with evidence and a clear status. In the final response, provide
-the report path, artifact directory, app URL tested, and a concise outcome
-summary. Mention that no product fixes were made.
+the report path and published URL, artifact directory, app URL tested, and a
+concise outcome summary. Mention that no product fixes were made.
