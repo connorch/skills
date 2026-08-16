@@ -43,6 +43,4 @@ A clean textual merge is not a correct merge. Upstream may have renamed an API t
 
 ## 6. Report
 
-Summarize what came in from upstream, each conflict and how it was resolved, each fork feature and its verification result, and any open questions that need Connor's call. Leave the result on the working branch; merging it into the fork's main branch is Connor's decision unless already authorized.
-
-A merge report is usually too large to read in a terminal, so build it with the `html-communication` skill and give Connor the private URL. A per-feature verification table and a conflict-by-conflict breakdown are far easier to scan as HTML, and the open questions from steps 3 and 4 are what Connor needs to act on - put those at the top. Summarize the outcome and the open questions in chat too, so the URL is not the only place the result exists.
+At the end, summarize what came in from upstream, each conflict and how it was resolved, each fork feature and its verification result, and any open questions that need Connor's call. Leave the result on the working branch; merging it into the fork's main branch is Connor's decision unless already authorized. Build the report with the `/html-communication` skill and give Connor the private URL.
