@@ -3,7 +3,10 @@
 // file to any path; the response body is the permanent URL. GET serves
 // stored objects. POST mints a collision-proof immutable key
 // (yyyy/mm/<random>-<filename>); PUT writes the exact request path and
-// refuses to overwrite an existing object unless the client forces it.
+// refuses to overwrite an existing object unless the client forces it. A
+// forced overwrite first copies the old version to archive/<path>/<stamp>, so
+// stable paths keep their full history; GET /<path>?history lists it. The
+// archive/ prefix is reserved (PUT rejects it) and hidden from /?list.
 // Uploads carry the client's git context in x-wovn-* headers (see
 // META_HEADERS), stored as customMetadata. GET /?list returns recent objects
 // as JSON, newest first (authenticated); project/branch/worktree/dir query
@@ -70,6 +73,12 @@ function stableKey(pathname: string): string | null {
   return key || null;
 }
 
+function randomSlug(): string {
+  return [...crypto.getRandomValues(new Uint8Array(4))]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 function objectKey(pathname: string): string {
   const filename =
     decodeURIComponent(pathname)
@@ -80,10 +89,15 @@ function objectKey(pathname: string): string {
   const now = new Date();
   const yyyy = now.getUTCFullYear();
   const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
-  const slug = [...crypto.getRandomValues(new Uint8Array(4))]
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-  return `${yyyy}/${mm}/${slug}-${filename}`;
+  return `${yyyy}/${mm}/${randomSlug()}-${filename}`;
+}
+
+// Archived versions live under archive/<stable-path>/; the key structure is
+// the whole history index (no metadata bookkeeping to drift out of sync), and
+// the timestamp prefix makes lexicographic order chronological.
+function archiveKeyFor(key: string): string {
+  const stamp = new Date().toISOString().toLowerCase().replace(/[:.]/g, "-");
+  return `archive/${key}/${stamp}-${randomSlug()}`;
 }
 
 // Cloudflare Access JWT verification for the private host. The signing keys
@@ -167,12 +181,32 @@ async function upload(request: Request, env: Env, url: URL, bucket: R2Bucket): P
   if (request.method === "PUT") {
     const stable = stableKey(url.pathname);
     if (!stable) return new Response("PUT needs an explicit path\n", { status: 400 });
+    if (stable === "archive" || stable.startsWith("archive/")) {
+      return new Response("archive/ is reserved for previous versions of stable paths\n", { status: 400 });
+    }
     key = stable;
     customMetadata.stable = "true";
     // Overwrites are opt-in (the CLI's --force sets the header). Enforced
     // here, not just in the CLI, so no client can clobber a path by accident.
-    if (request.headers.get("x-wovn-force") !== "1" && (await bucket.head(key)) !== null) {
-      return new Response(`${key} already exists; pass --force to replace it\n`, { status: 409 });
+    if (request.headers.get("x-wovn-force") !== "1") {
+      if ((await bucket.head(key)) !== null) {
+        return new Response(`${key} already exists; pass --force to replace it\n`, { status: 409 });
+      }
+    } else {
+      // A forced overwrite archives the version it replaces, keeping its
+      // content type and git context. `uploaded` preserves when that version
+      // was originally written (the copy's own timestamp is the archive
+      // time); `stable` is dropped - archived versions are immutable.
+      const existing = await bucket.get(key);
+      if (existing) {
+        const meta = { ...existing.customMetadata };
+        delete meta.stable;
+        meta.uploaded = existing.uploaded.toISOString();
+        await bucket.put(archiveKeyFor(key), existing.body, {
+          httpMetadata: existing.httpMetadata,
+          customMetadata: meta,
+        });
+      }
     }
   } else {
     key = objectKey(url.pathname);
@@ -216,6 +250,8 @@ async function list(request: Request, env: Env, url: URL, bucket: R2Bucket): Pro
   do {
     const page = await bucket.list({ cursor, limit: 1000, include: ["customMetadata"] });
     for (const object of page.objects) {
+      // Archived previous versions only show up in per-path ?history.
+      if (object.key.startsWith("archive/")) continue;
       if (!matches(object.customMetadata)) continue;
       objects.push({ key: object.key, size: object.size, uploaded: object.uploaded.toISOString() });
     }
@@ -224,6 +260,47 @@ async function list(request: Request, env: Env, url: URL, bucket: R2Bucket): Pro
 
   objects.sort((a, b) => b.uploaded.localeCompare(a.uploaded));
   return Response.json(objects.slice(0, limit), { headers: { "cache-control": "no-store" } });
+}
+
+// GET /<path>?history returns a stable path's current object plus its
+// archived previous versions, newest first. Authenticated like /?list.
+async function history(request: Request, env: Env, url: URL, bucket: R2Bucket): Promise<Response> {
+  if (url.hostname !== PRIVATE_HOSTNAME) {
+    if (!env.FILE_HOST_TOKEN) return new Response("upload token not configured\n", { status: 503 });
+    if (!isAuthorized(request, env.FILE_HOST_TOKEN)) return new Response("unauthorized\n", { status: 401 });
+  }
+  const key = decodeURIComponent(url.pathname.slice(1));
+
+  const prefix = `archive/${key}/`;
+  const versions: { key: string; size: number; uploaded: string }[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await bucket.list({ prefix, cursor, limit: 1000, include: ["customMetadata"] });
+    for (const object of page.objects) {
+      // Versions sit directly under the prefix; deeper keys belong to the
+      // history of a nested stable path that has this one as a directory.
+      if (object.key.slice(prefix.length).includes("/")) continue;
+      versions.push({
+        key: object.key,
+        size: object.size,
+        // When the version was originally written, preserved at archive time
+        // (the object's own `uploaded` is when it was archived).
+        uploaded: object.customMetadata?.uploaded ?? object.uploaded.toISOString(),
+      });
+    }
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+
+  // Timestamped archive keys sort lexicographically in chronological order.
+  versions.sort((a, b) => b.key.localeCompare(a.key));
+  const current = await bucket.head(key);
+  return Response.json(
+    {
+      current: current ? { key, size: current.size, uploaded: current.uploaded.toISOString() } : null,
+      versions,
+    },
+    { headers: { "cache-control": "no-store" } },
+  );
 }
 
 function objectHeaders(object: R2Object, isPrivate: boolean): HeadersInit {
@@ -277,6 +354,9 @@ export default {
     if (request.method === "PUT" || request.method === "POST") return upload(request, env, url, bucket);
     if (request.method === "GET" && url.pathname === "/" && url.searchParams.has("list")) {
       return list(request, env, url, bucket);
+    }
+    if (request.method === "GET" && url.pathname !== "/" && url.searchParams.has("history")) {
+      return history(request, env, url, bucket);
     }
     if (request.method === "GET" || request.method === "HEAD") return serve(request, url, bucket);
     return new Response("method not allowed\n", { status: 405 });

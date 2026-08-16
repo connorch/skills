@@ -8,7 +8,14 @@ stored objects. `POST` mints an immutable dated key (`yyyy/mm/<random>-<name>`);
 documents (the CLI maps `wovn put` to POST and `wovn put --at` to PUT). A
 `PUT` to an existing key is rejected with 409 unless the request carries the
 `x-wovn-force: 1` header (the CLI's `--force`), so paths are never clobbered
-by accident. Uploads may carry the client's git context in `x-wovn-dir`,
+by accident. A forced overwrite first copies the old version to
+`archive/<path>/<timestamp>-<random>`, preserving its content type and
+metadata (plus the original upload time as `uploaded`), so stable paths keep
+their full history; the `archive/` prefix is reserved (PUT rejects it) and
+hidden from `/?list`. `GET /<path>?history` (same auth as listing) returns
+`{current, versions}` for a stable path, versions newest first (the CLI maps
+`wovn history` and `wovn diff` onto it). Uploads may carry the client's git
+context in `x-wovn-dir`,
 `x-wovn-branch`, `x-wovn-worktree`, `x-wovn-project`, and
 `x-wovn-project-path` headers (the CLI infers and sends these automatically);
 they are stored as R2 customMetadata. `GET /?list` (optional `limit`, default
@@ -50,6 +57,9 @@ humans: `wovn put <file...>` uploads and prints URLs (`--at` for stable paths,
 hosts (`--project` / `--branch` / `--worktree` / `--dir` filter by that
 context; bare flags infer the current environment),
 `wovn read <url-or-path>` prints a hosted file (handling private auth),
+`wovn history <url-or-path>` lists all versions of a stable path,
+`wovn diff <old> [new]` git-diffs two hosted files (one argument = previous
+vs current version of a stable path),
 `wovn rotate` rotates the token. Build and install:
 `pnpm install && pnpm build` in `../cli`, then `cp ../cli/dist/wovn
 ~/.local/bin/wovn` (re-run after editing `../cli/src/wovn.ts`).

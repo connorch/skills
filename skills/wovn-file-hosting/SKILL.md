@@ -48,6 +48,25 @@ wovn put --private --at docs/q3-roadmap.html /tmp/q3-roadmap.html
 wovn put --private --at docs/q3-roadmap.html --force /tmp/q3-roadmap.html  # update in place
 ```
 
+## Version history
+
+Overwriting a stable path never destroys anything: the worker first copies
+the old version to `archive/<path>/<timestamp>`, a permanent immutable URL of
+its own. The `archive/` prefix is reserved (`--at` cannot write there), and
+archived versions never appear in `wovn list` - only in per-path history.
+
+`wovn history <path-or-url>` prints every version of a stable path, newest
+first, with the current one marked. `wovn diff` fetches two versions and runs
+`git diff` on them; with a single argument it compares a stable path's
+previous version against its current one - "what changed in the last
+update?". Bare paths refer to the private host, like `wovn read`.
+
+```sh
+wovn history docs/q3-roadmap.html
+wovn diff docs/q3-roadmap.html                  # previous vs current
+wovn diff <old-url-or-path> <new-url-or-path>   # any two versions
+```
+
 ## Listing recent files
 
 `wovn list` prints recent uploads across both hosts, newest first, one line

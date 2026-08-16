@@ -9,8 +9,8 @@
 
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { mkdirSync, openAsBlob, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { mkdirSync, mkdtempSync, openAsBlob, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -225,21 +225,105 @@ async function list(opts: ListOptions): Promise<void> {
   }
 }
 
-async function read(target: string): Promise<void> {
-  let url = target;
-  let headers: Record<string, string> = {};
+// A target is a wovn URL on either host, or a bare path on the private host
+// (public URLs need no CLI anyway). Private targets carry the Access headers;
+// public reads need no auth.
+function resolveTarget(
+  target: string,
+  reason: string,
+): { host: string; key: string; headers: Record<string, string> } {
   if (target.startsWith(`${HOST}/`)) {
-    // Public URLs need no auth.
-  } else if (/^https?:\/\//.test(target) && !target.startsWith(`${PRIVATE_HOST}/`)) {
-    fail(`not a wovn file host URL: ${target}`);
-  } else {
-    // Bare paths read from the private host; public URLs need no CLI anyway.
-    if (!target.startsWith(`${PRIVATE_HOST}/`)) url = `${PRIVATE_HOST}/${target}`;
-    headers = accessHeaders("reading private files");
+    return { host: HOST, key: target.slice(HOST.length + 1), headers: {} };
   }
-  const res = await fetch(url, { headers });
+  if (/^https?:\/\//.test(target) && !target.startsWith(`${PRIVATE_HOST}/`)) {
+    fail(`not a wovn file host URL: ${target}`);
+  }
+  const key = target.startsWith(`${PRIVATE_HOST}/`) ? target.slice(PRIVATE_HOST.length + 1) : target;
+  return { host: PRIVATE_HOST, key, headers: accessHeaders(reason) };
+}
+
+async function read(target: string): Promise<void> {
+  const { host, key, headers } = resolveTarget(target, "reading private files");
+  const res = await fetch(`${host}/${key}`, { headers });
   if (!res.ok) fail(`read failed (${res.status}): ${(await res.text()).trim()}`);
   if (res.body) await pipeline(Readable.fromWeb(res.body as import("node:stream/web").ReadableStream), process.stdout, { end: false });
+}
+
+interface FileVersion {
+  key: string;
+  size: number;
+  uploaded: string;
+}
+
+interface FileHistory {
+  current: FileVersion | null;
+  versions: FileVersion[]; // archived previous versions, newest first
+}
+
+// History is authenticated on both hosts, like listing: Access covers the
+// private host, the upload token covers the public one.
+async function fetchHistory(target: string): Promise<{ host: string; key: string; history: FileHistory }> {
+  const { host, key, headers } = resolveTarget(target, "history");
+  if (host === HOST) headers.authorization = `Bearer ${token()}`;
+  const res = await fetch(`${host}/${key}?history`, { headers });
+  if (!res.ok) fail(`history failed (${res.status}): ${(await res.text()).trim()}`);
+  return { host, key, history: (await res.json()) as FileHistory };
+}
+
+async function history(target: string): Promise<void> {
+  const { host, key, history } = await fetchHistory(target);
+  if (!history.current && history.versions.length === 0) fail(`${host}/${key} not found`);
+  if (history.current) {
+    console.log(
+      `${formatWhen(history.current.uploaded)}  ${formatSize(history.current.size).padStart(9)}  current  ${host}/${history.current.key}`,
+    );
+  }
+  for (const version of history.versions) {
+    console.log(
+      `${formatWhen(version.uploaded)}  ${formatSize(version.size).padStart(9)}           ${host}/${version.key}`,
+    );
+  }
+}
+
+// The filename a version renders as in the diff: archive keys are
+// archive/<stable-path>/<stamp>, so the name is the stable path's last segment.
+function displayName(key: string): string {
+  const segments = key.split("/").filter(Boolean);
+  if (segments[0] === "archive" && segments.length >= 3) return segments[segments.length - 2];
+  return segments[segments.length - 1] ?? "file";
+}
+
+async function fetchToFile(target: string, dir: string, side: "old" | "new"): Promise<string> {
+  const { host, key, headers } = resolveTarget(target, "diff");
+  const res = await fetch(`${host}/${key}`, { headers });
+  if (!res.ok) fail(`fetch failed for ${host}/${key} (${res.status}): ${(await res.text()).trim()}`);
+  const rel = join(side, displayName(key));
+  mkdirSync(join(dir, side), { recursive: true });
+  writeFileSync(join(dir, rel), Buffer.from(await res.arrayBuffer()));
+  return rel;
+}
+
+async function diff(oldTarget: string, newTarget: string | undefined): Promise<void> {
+  // One argument = a stable path: diff its most recent archived version
+  // against the current object.
+  if (newTarget === undefined) {
+    const { host, key, history } = await fetchHistory(oldTarget);
+    if (!history.current) fail(`${host}/${key} not found`);
+    if (history.versions.length === 0) fail(`${host}/${key} has no previous versions to diff against`);
+    newTarget = `${host}/${history.current.key}`;
+    oldTarget = `${host}/${history.versions[0].key}`;
+  }
+  const dir = mkdtempSync(join(tmpdir(), "wovn-diff-"));
+  try {
+    const oldRel = await fetchToFile(oldTarget, dir, "old");
+    const newRel = await fetchToFile(newTarget, dir, "new");
+    // git diff --no-index exits 0 when identical, 1 when the files differ.
+    const result = spawnSync("git", ["diff", "--no-index", oldRel, newRel], { cwd: dir, stdio: "inherit" });
+    if (result.status === 0) console.error("wovn: no differences");
+    else if (result.status !== 1) fail("git diff failed");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 function rotate(): void {
@@ -290,6 +374,19 @@ program
   .description("print a hosted file to stdout; bare paths read the private host")
   .argument("<url-or-path>", "wovn URL, or a path on the private host")
   .action(read);
+
+program
+  .command("history")
+  .description("list all versions of a stable path, newest first")
+  .argument("<url-or-path>", "wovn URL, or a path on the private host")
+  .action(history);
+
+program
+  .command("diff")
+  .description("git-diff two hosted files; with one argument, diff a stable path's previous version against its current one")
+  .argument("<old>", "wovn URL or private-host path (the stable path, when used alone)")
+  .argument("[new]", "wovn URL or private-host path")
+  .action(diff);
 
 program
   .command("rotate")
