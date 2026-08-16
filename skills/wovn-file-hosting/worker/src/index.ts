@@ -4,7 +4,10 @@
 // stored objects. POST mints a collision-proof immutable key
 // (yyyy/mm/<random>-<filename>); PUT writes the exact request path and
 // refuses to overwrite an existing object unless the client forces it.
-// GET /?list returns recent objects as JSON, newest first (authenticated).
+// Uploads carry the client's git context in x-wovn-* headers (see
+// META_HEADERS), stored as customMetadata. GET /?list returns recent objects
+// as JSON, newest first (authenticated); project/branch/worktree/dir query
+// params filter on that stored context.
 //
 // The private host verifies the Access JWT itself (signature, issuer,
 // audience, expiry) rather than trusting that the Access app is configured,
@@ -32,6 +35,16 @@ const MIME_TYPES: Record<string, string> = {
   pdf: "application/pdf",
   zip: "application/zip",
 };
+
+// Git context the wovn CLI infers at upload time and sends as headers;
+// stored as customMetadata so /?list can filter by it.
+const META_HEADERS = {
+  "x-wovn-dir": "dir",
+  "x-wovn-branch": "branch",
+  "x-wovn-worktree": "worktree",
+  "x-wovn-project": "project",
+  "x-wovn-project-path": "projectPath",
+} as const;
 
 function contentTypeFor(filename: string, headerValue: string | null): string {
   if (headerValue && headerValue !== "application/octet-stream") return headerValue;
@@ -142,15 +155,20 @@ async function upload(request: Request, env: Env, url: URL, bucket: R2Bucket): P
   }
   if (!request.body) return new Response("missing request body\n", { status: 400 });
 
+  const customMetadata: Record<string, string> = {};
+  for (const [header, name] of Object.entries(META_HEADERS)) {
+    const value = request.headers.get(header);
+    if (value) customMetadata[name] = value;
+  }
+
   // POST mints an immutable dated key; PUT stores at the exact requested
   // path, so the URL stays stable across re-uploads.
   let key: string;
-  let customMetadata: Record<string, string> | undefined;
   if (request.method === "PUT") {
     const stable = stableKey(url.pathname);
     if (!stable) return new Response("PUT needs an explicit path\n", { status: 400 });
     key = stable;
-    customMetadata = { stable: "true" };
+    customMetadata.stable = "true";
     // Overwrites are opt-in (the CLI's --force sets the header). Enforced
     // here, not just in the CLI, so no client can clobber a path by accident.
     if (request.headers.get("x-wovn-force") !== "1" && (await bucket.head(key)) !== null) {
@@ -176,13 +194,29 @@ async function list(request: Request, env: Env, url: URL, bucket: R2Bucket): Pro
   }
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit")) || 20, 1), 1000);
 
+  // Git-context filters (see META_HEADERS). Every provided filter must match;
+  // objects uploaded without context (pre-tagging, or curl) never match.
+  // "project" matches the project name or its full path, so both
+  // `--project skills` and an inferred absolute path work.
+  const filters = (["project", "branch", "worktree", "dir"] as const).flatMap((name) => {
+    const value = url.searchParams.get(name);
+    return value === null ? [] : [{ name, value }];
+  });
+  const matches = (meta: Record<string, string> | undefined) =>
+    filters.every(({ name, value }) =>
+      name === "project"
+        ? meta?.project === value || meta?.projectPath === value
+        : meta?.[name] === value,
+    );
+
   // R2 lists lexicographically with no reverse option, so walk the whole
   // bucket and sort by upload time; these are small personal buckets.
   const objects: { key: string; size: number; uploaded: string }[] = [];
   let cursor: string | undefined;
   do {
-    const page = await bucket.list({ cursor, limit: 1000 });
+    const page = await bucket.list({ cursor, limit: 1000, include: ["customMetadata"] });
     for (const object of page.objects) {
+      if (!matches(object.customMetadata)) continue;
       objects.push({ key: object.key, size: object.size, uploaded: object.uploaded.toISOString() });
     }
     cursor = page.truncated ? page.cursor : undefined;

@@ -56,6 +56,40 @@ function accessHeaders(reason: string): Record<string, string> {
   return { "cf-access-client-id": id, "cf-access-client-secret": secret };
 }
 
+// Git context inferred from the environment wovn runs in. Uploads are tagged
+// with it (as x-wovn-* headers -> R2 customMetadata) and `wovn list` filters
+// by it, so nothing has to be passed explicitly.
+interface GitContext {
+  dir: string; // cwd, always present
+  branch?: string; // unset outside a repo or on a detached HEAD
+  worktree?: string; // checkout root (--show-toplevel)
+  project?: string; // basename of the main worktree - the project this checkout came from
+  projectPath?: string; // full path of the main worktree
+}
+
+function git(...args: string[]): string | undefined {
+  const result = spawnSync("git", args, { encoding: "utf8" });
+  return result.status === 0 ? result.stdout.trim() || undefined : undefined;
+}
+
+function gitContext(): GitContext {
+  const context: GitContext = { dir: process.cwd() };
+  const worktree = git("rev-parse", "--show-toplevel");
+  if (!worktree) return context;
+  context.worktree = worktree;
+  const branch = git("rev-parse", "--abbrev-ref", "HEAD");
+  if (branch && branch !== "HEAD") context.branch = branch;
+  // The first entry of `git worktree list` is always the main worktree, i.e.
+  // the project a linked worktree was created off of (in the main checkout it
+  // coincides with the worktree itself).
+  const main = git("worktree", "list", "--porcelain")?.match(/^worktree (.+)$/m)?.[1];
+  if (main) {
+    context.projectPath = main;
+    context.project = basename(main);
+  }
+  return context;
+}
+
 interface PutOptions {
   private?: true;
   name?: string;
@@ -74,6 +108,20 @@ async function put(files: string[], opts: PutOptions): Promise<void> {
     ? accessHeaders("--private")
     : { authorization: `Bearer ${token()}` };
   if (opts.force) headers["x-wovn-force"] = "1";
+
+  // Tag the upload with where it came from. Header values must be ASCII, so
+  // the rare non-ASCII path is skipped rather than breaking the upload.
+  const context = gitContext();
+  const meta: [string, string | undefined][] = [
+    ["x-wovn-dir", context.dir],
+    ["x-wovn-branch", context.branch],
+    ["x-wovn-worktree", context.worktree],
+    ["x-wovn-project", context.project],
+    ["x-wovn-project-path", context.projectPath],
+  ];
+  for (const [header, value] of meta) {
+    if (value && /^[\x20-\x7e]+$/.test(value)) headers[header] = value;
+  }
 
   for (const file of files) {
     // A file-backed Blob streams the upload with a known Content-Length
@@ -124,12 +172,36 @@ interface ListOptions {
   public?: true;
   private?: true;
   limit: string;
+  // Filter flags take an optional value; `true` means "infer from the
+  // current environment" (e.g. bare --branch = the branch I'm on now).
+  project?: string | true;
+  branch?: string | true;
+  worktree?: string | true;
+  dir?: string | true;
 }
 
 async function list(opts: ListOptions): Promise<void> {
   if (opts.public && opts.private) fail("--public and --private are mutually exclusive");
   const limit = Number(opts.limit);
   if (!Number.isInteger(limit) || limit < 1) fail("--limit must be a positive integer");
+
+  const query = new URLSearchParams({ list: "", limit: String(limit) });
+  const context = gitContext();
+  const inferred = {
+    // The full path is the exact identity; the server matches --project
+    // against both the project name and its path.
+    project: context.projectPath,
+    branch: context.branch,
+    worktree: context.worktree,
+    dir: context.dir,
+  };
+  for (const name of ["project", "branch", "worktree", "dir"] as const) {
+    const value = opts[name];
+    if (value === undefined) continue;
+    const resolved = value === true ? inferred[name] : value;
+    if (!resolved) fail(`--${name} has no value and none can be inferred from the current directory`);
+    query.set(name, resolved);
+  }
 
   const hosts: { host: string; headers: Record<string, string> }[] = [];
   if (!opts.private) hosts.push({ host: HOST, headers: { authorization: `Bearer ${token()}` } });
@@ -138,7 +210,7 @@ async function list(opts: ListOptions): Promise<void> {
   const entries = (
     await Promise.all(
       hosts.map(async ({ host, headers }) => {
-        const res = await fetch(`${host}/?list&limit=${limit}`, { headers });
+        const res = await fetch(`${host}/?${query}`, { headers });
         if (!res.ok) fail(`list failed for ${host} (${res.status}): ${(await res.text()).trim()}`);
         const objects = (await res.json()) as ListEntry[];
         return objects.map((entry) => ({ ...entry, url: `${host}/${entry.key}` }));
@@ -207,6 +279,10 @@ program
   .option("--public", "only list files.wovn.org")
   .option("--private", "only list private.wovn.org")
   .option("-n, --limit <count>", "max files to show", "20")
+  .option("--project [name-or-path]", "only files uploaded from this project (default: the current one)")
+  .option("--branch [branch]", "only files uploaded from this git branch (default: the current one)")
+  .option("--worktree [path]", "only files uploaded from this git worktree (default: the current one)")
+  .option("--dir [path]", "only files uploaded from this directory (default: the current one)")
   .action(list);
 
 program
