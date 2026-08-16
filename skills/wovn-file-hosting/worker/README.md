@@ -8,10 +8,16 @@ stored objects. `POST` mints an immutable dated key (`yyyy/mm/<random>-<name>`);
 documents (the CLI maps `wovn put` to POST and `wovn put --at` to PUT). A
 `PUT` to an existing key is rejected with 409 unless the request carries the
 `x-wovn-force: 1` header (the CLI's `--force`), so paths are never clobbered
-by accident. `GET /?list` (optional `limit`, default 20, max 1000) returns
-recent objects as JSON, newest first; it requires the upload token on the
-public host (generated URLs are unguessable capability URLs, so the listing
-must not be open) and rides the Access check on the private host.
+by accident. Uploads may carry the client's git context in `x-wovn-dir`,
+`x-wovn-branch`, `x-wovn-worktree`, `x-wovn-project`, and
+`x-wovn-project-path` headers (the CLI infers and sends these automatically);
+they are stored as R2 customMetadata. `GET /?list` (optional `limit`, default
+20, max 1000) returns recent objects as JSON, newest first; `project`,
+`branch`, `worktree`, and `dir` query params filter on the stored context
+(`project` matches the project name or its full path, the rest match
+exactly). Listing requires the upload token on the public host (generated
+URLs are unguessable capability URLs, so the listing must not be open) and
+rides the Access check on the private host.
 Stable objects are served with etag revalidation instead of immutable caching. Deployed on the personal
 Cloudflare account (connorchev@gmail.com), pinned via `account_id` in
 `wrangler.jsonc`.
@@ -39,7 +45,10 @@ pnpm run deploy
 
 `../cli` is a TypeScript commander program that wraps the host for agents and
 humans: `wovn put <file...>` uploads and prints URLs (`--at` for stable paths,
-`--force` to replace), `wovn list` shows recent files on both hosts,
+`--force` to replace), tagging each upload with the git context it ran in
+(directory, branch, worktree, project), `wovn list` shows recent files on both
+hosts (`--project` / `--branch` / `--worktree` / `--dir` filter by that
+context; bare flags infer the current environment),
 `wovn read <url-or-path>` prints a hosted file (handling private auth),
 `wovn rotate` rotates the token. Build and install:
 `pnpm install && pnpm build` in `../cli`, then `cp ../cli/dist/wovn

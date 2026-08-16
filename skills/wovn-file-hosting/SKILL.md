@@ -61,6 +61,28 @@ wovn list
 wovn list --private -n 50
 ```
 
+## Filtering by git context
+
+Every `wovn put` automatically tags the upload with the environment it ran
+in: the working directory, and (when inside a git repo) the branch, the
+worktree root, and the project - the main checkout the worktree was created
+off of. Nothing needs to be passed at upload time.
+
+`wovn list` filters on those tags with `--project`, `--branch`, `--worktree`,
+and `--dir`. Each takes an optional value; a bare flag means "the current
+one", inferred the same way uploads are tagged:
+
+```sh
+wovn list --branch                    # uploads made from the branch I'm on now
+wovn list --project                   # uploads from this project, any worktree/branch
+wovn list --project skills            # by project name (or full path)
+wovn list --branch main --private     # explicit values combine with other flags
+```
+
+`--project` matches the project name or its full path; `--worktree` and
+`--dir` match exact paths. Files uploaded before tagging existed, or via the
+curl fallback, carry no context and never match a filter.
+
 ## File naming
 
 The filename survives into the permanent URL, so rename files before
