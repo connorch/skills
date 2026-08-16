@@ -1,6 +1,6 @@
 ---
 name: pull-upstream
-description: Sync a forked repository with its upstream - inventory the fork's own features, inventory what upstream has added, merge upstream in with upstream taking priority, re-establish the fork's features on top, and verify nothing broke, clean merges included. Use when asked to "pull upstream", "sync the fork", "merge upstream", "update the fork", or "catch up with upstream".
+description: Sync a forked repository with its upstream. Use when asked to "pull upstream", "sync the fork", "merge upstream", "update the fork", or "catch up with upstream".
 metadata:
   harness: [claude, codex]
   platform: [darwin, linux]
