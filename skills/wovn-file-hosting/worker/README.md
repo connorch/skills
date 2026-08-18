@@ -22,7 +22,9 @@ they are stored as R2 customMetadata. `GET /?list` (optional `limit`, default
 20, max 1000) returns recent objects as JSON, newest first; `project`,
 `branch`, `worktree`, and `dir` query params filter on the stored context
 (`project` matches the project name or its full path, the rest match
-exactly). Listing requires the upload token on the public host (generated
+exactly); a `type` param (comma-separated categories from `TYPE_CATEGORIES`
+and/or bare extensions) filters by the extension in the key, before the limit
+is applied. Listing requires the upload token on the public host (generated
 URLs are unguessable capability URLs, so the listing must not be open) and
 rides the Access check on the private host.
 Stable objects are served with etag revalidation instead of immutable caching. Deployed on the personal
@@ -55,7 +57,8 @@ humans: `wovn put <file...>` uploads and prints URLs (`--at` for stable paths,
 `--force` to replace), tagging each upload with the git context it ran in
 (directory, branch, worktree, project), `wovn list` shows recent files on both
 hosts (`--project` / `--branch` / `--worktree` / `--dir` filter by that
-context; bare flags infer the current environment),
+context; bare flags infer the current environment, and `--type` filters by
+file type),
 `wovn read <url-or-path>` prints a hosted file (handling private auth),
 `wovn history <url-or-path>` lists all versions of a stable path,
 `wovn diff <old> [new]` git-diffs two hosted files (one argument = previous
