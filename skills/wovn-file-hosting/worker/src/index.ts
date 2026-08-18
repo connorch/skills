@@ -10,7 +10,8 @@
 // Uploads carry the client's git context in x-wovn-* headers (see
 // META_HEADERS), stored as customMetadata. GET /?list returns recent objects
 // as JSON, newest first (authenticated); project/branch/worktree/dir query
-// params filter on that stored context.
+// params filter on that stored context, and a type param filters by file type
+// (see TYPE_CATEGORIES).
 //
 // The private host verifies the Access JWT itself (signature, issuer,
 // audience, expiry) rather than trusting that the Access app is configured,
@@ -34,10 +35,35 @@ const MIME_TYPES: Record<string, string> = {
   log: "text/plain; charset=utf-8",
   md: "text/markdown; charset=utf-8",
   json: "application/json",
+  csv: "text/csv; charset=utf-8",
+  yaml: "application/yaml",
+  yml: "application/yaml",
   html: "text/html; charset=utf-8",
   pdf: "application/pdf",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   zip: "application/zip",
+  tar: "application/x-tar",
+  gz: "application/gzip",
 };
+
+// Coarse file-type buckets for the `type` list filter, matched against the
+// extension in the object key. Categories are deliberately non-overlapping so
+// combining them stays easy to reason about; anything not covered here is
+// still filterable by passing the bare extension.
+const TYPE_CATEGORIES: Record<string, string[]> = {
+  image: ["png", "jpg", "jpeg", "gif", "webp", "svg"],
+  video: ["mp4", "webm", "mov"],
+  document: ["pdf", "doc", "docx", "odt", "rtf", "md", "html", "txt", "log"],
+  data: ["json", "csv", "yaml", "yml"],
+  archive: ["zip", "tar", "gz", "tgz"],
+};
+
+// The lowercased extension of a key's final segment, or "" when it has none.
+function extensionOf(key: string): string {
+  const name = key.split("/").pop() ?? "";
+  const dot = name.lastIndexOf(".");
+  return dot <= 0 ? "" : name.slice(dot + 1).toLowerCase();
+}
 
 // Git context the wovn CLI infers at upload time and sends as headers;
 // stored as customMetadata so /?list can filter by it.
@@ -243,6 +269,22 @@ async function list(request: Request, env: Env, url: URL, bucket: R2Bucket): Pro
         : meta?.[name] === value,
     );
 
+  // File-type filter: comma-separated categories (see TYPE_CATEGORIES) and/or
+  // bare extensions, OR'd together. Applied before the limit slice, so
+  // `?limit=20&type=pdf` means the 20 newest PDFs, not the PDFs among the 20
+  // newest files. Keys without an extension never match.
+  const typeParam = url.searchParams.get("type");
+  const extensions = typeParam
+    ? new Set(
+        typeParam
+          .split(",")
+          .map((value) => value.trim().toLowerCase())
+          .filter(Boolean)
+          .flatMap((value) => TYPE_CATEGORIES[value] ?? [value]),
+      )
+    : null;
+  const matchesType = (key: string) => extensions === null || extensions.has(extensionOf(key));
+
   // R2 lists lexicographically with no reverse option, so walk the whole
   // bucket and sort by upload time; these are small personal buckets.
   const objects: { key: string; size: number; uploaded: string }[] = [];
@@ -253,6 +295,7 @@ async function list(request: Request, env: Env, url: URL, bucket: R2Bucket): Pro
       // Archived previous versions only show up in per-path ?history.
       if (object.key.startsWith("archive/")) continue;
       if (!matches(object.customMetadata)) continue;
+      if (!matchesType(object.key)) continue;
       objects.push({ key: object.key, size: object.size, uploaded: object.uploaded.toISOString() });
     }
     cursor = page.truncated ? page.cursor : undefined;

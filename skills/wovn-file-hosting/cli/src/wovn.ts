@@ -168,6 +168,30 @@ function formatWhen(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// File-type categories the `list` endpoint understands. Kept in sync with
+// TYPE_CATEGORIES in worker/src/index.ts, which does the actual matching; the
+// CLI only needs the names so it can reject typos before making a request.
+const TYPE_CATEGORIES = ["image", "video", "document", "data", "archive"];
+
+// --type values: categories and/or bare extensions, comma-separated and/or
+// repeated. Collected into one list and sent as a single query param.
+function collectTypes(value: string, previous: string[] = []): string[] {
+  const values = value
+    .split(",")
+    .map((part) => part.trim().toLowerCase())
+    .filter(Boolean);
+  if (values.length === 0) fail("--type needs at least one category or extension");
+  for (const entry of values) {
+    if (TYPE_CATEGORIES.includes(entry)) continue;
+    // Anything else is treated as a literal extension; reject values that
+    // cannot be one rather than silently matching nothing.
+    if (!/^[a-z0-9]+$/.test(entry)) {
+      fail(`unknown --type ${entry}; use a category (${TYPE_CATEGORIES.join(", ")}) or a file extension`);
+    }
+  }
+  return [...previous, ...values];
+}
+
 interface ListOptions {
   public?: true;
   private?: true;
@@ -178,6 +202,7 @@ interface ListOptions {
   branch?: string | true;
   worktree?: string | true;
   dir?: string | true;
+  type?: string[];
 }
 
 async function list(opts: ListOptions): Promise<void> {
@@ -202,6 +227,7 @@ async function list(opts: ListOptions): Promise<void> {
     if (!resolved) fail(`--${name} has no value and none can be inferred from the current directory`);
     query.set(name, resolved);
   }
+  if (opts.type) query.set("type", opts.type.join(","));
 
   const hosts: { host: string; headers: Record<string, string> }[] = [];
   if (!opts.private) hosts.push({ host: HOST, headers: { authorization: `Bearer ${token()}` } });
@@ -367,6 +393,11 @@ program
   .option("--branch [branch]", "only files uploaded from this git branch (default: the current one)")
   .option("--worktree [path]", "only files uploaded from this git worktree (default: the current one)")
   .option("--dir [path]", "only files uploaded from this directory (default: the current one)")
+  .option(
+    "--type <types>",
+    `only files of these types: a category (${TYPE_CATEGORIES.join(", ")}) or a file extension, comma-separated or repeated`,
+    collectTypes,
+  )
   .action(list);
 
 program

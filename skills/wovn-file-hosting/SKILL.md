@@ -102,6 +102,24 @@ wovn list --branch main --private     # explicit values combine with other flags
 `--dir` match exact paths. Files uploaded before tagging existed, or via the
 curl fallback, carry no context and never match a filter.
 
+## Filtering by file type
+
+`wovn list --type` narrows the listing to a file type, matched on the
+extension in the URL. Values are either a category - `image`, `video`,
+`document`, `data`, `archive` - or a bare extension, and can be
+comma-separated or repeated:
+
+```sh
+wovn list --type image                 # png, jpg, jpeg, gif, webp, svg
+wovn list --type document              # pdf, doc, docx, odt, rtf, md, html, txt, log
+wovn list --type pdf,png               # exact extensions
+wovn list --type image --private -n 50
+```
+
+The filter runs before the limit, so `--type pdf -n 20` means the 20 newest
+PDFs rather than the PDFs among the 20 newest files. Files whose URL has no
+extension never match.
+
 ## File naming
 
 The filename survives into the permanent URL, so rename files before
