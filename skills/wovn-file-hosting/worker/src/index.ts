@@ -35,10 +35,16 @@
 // GET /<path>?visibility and PATCH /<path>?visibility=public|private read and
 // flip the stamp (a metadata self-copy; same key, same URL). DELETE /<path>
 // removes the object and its whole archive/<path>/ history.
+//
+// /_ hosts the browse UI (authenticated like any private object; anonymous
+// browsers round-trip through /login). GET /_/api/browse?prefix= lists one
+// directory level; GET /_/api/history?key= is ?history for the UI; everything
+// else under /_/ is served from the built SPA assets (ui/dist via the ASSETS
+// binding). A bare GET / with no query redirects to /_/.
 
 // Top-level key segments uploads may never claim: system routes and the
 // version-history namespace. Grow this list when new routes are added.
-const RESERVED_KEYS = ["archive", "login"];
+const RESERVED_KEYS = ["archive", "login", "_"];
 
 const AUTH_COOKIE = "wovn_auth";
 // Query marker appended by the /login redirect; if a request arrives with it
@@ -416,12 +422,9 @@ async function list(request: Request, env: Env, url: URL, bucket: R2Bucket): Pro
   return Response.json(objects.slice(0, limit), { headers: { "cache-control": "no-store" } });
 }
 
-// GET /<path>?history returns a stable path's current object plus its
-// archived previous versions, newest first. Authenticated like /?list.
-async function history(request: Request, env: Env, url: URL, bucket: R2Bucket): Promise<Response> {
-  if (!(await isAuthenticated(request, env))) return new Response("unauthorized\n", { status: 401 });
-  const key = decodeURIComponent(url.pathname.slice(1));
-
+// A stable path's current object plus its archived previous versions, newest
+// first. Shared by GET /<path>?history and the browse UI's /_/api/history.
+async function historyOf(bucket: R2Bucket, key: string) {
   const prefix = `archive/${key}/`;
   const versions: { key: string; size: number; uploaded: string }[] = [];
   let cursor: string | undefined;
@@ -445,13 +448,102 @@ async function history(request: Request, env: Env, url: URL, bucket: R2Bucket): 
   // Timestamped archive keys sort lexicographically in chronological order.
   versions.sort((a, b) => b.key.localeCompare(a.key));
   const current = await bucket.head(key);
-  return Response.json(
-    {
-      current: current ? { key, size: current.size, uploaded: current.uploaded.toISOString() } : null,
-      versions,
-    },
-    { headers: { "cache-control": "no-store" } },
-  );
+  return {
+    current: current ? { key, size: current.size, uploaded: current.uploaded.toISOString() } : null,
+    versions,
+  };
+}
+
+// GET /<path>?history returns a stable path's current object plus its
+// archived previous versions, newest first. Authenticated like /?list.
+async function history(request: Request, env: Env, url: URL, bucket: R2Bucket): Promise<Response> {
+  if (!(await isAuthenticated(request, env))) return new Response("unauthorized\n", { status: 401 });
+  const key = decodeURIComponent(url.pathname.slice(1));
+  return Response.json(await historyOf(bucket, key), { headers: { "cache-control": "no-store" } });
+}
+
+// GET /_/api/browse?prefix=<p> returns one directory level as
+// {prefixes, files}: the sub-folder prefixes under <p> (sorted) and the files
+// directly under it (newest first), via R2 delimited listing.
+async function browse(url: URL, bucket: R2Bucket): Promise<Response> {
+  const raw = url.searchParams.get("prefix") ?? "";
+  const prefix = raw && !raw.endsWith("/") ? `${raw}/` : raw;
+
+  const folders = new Set<string>();
+  const files: {
+    key: string;
+    size: number;
+    uploaded: string;
+    visibility: string;
+    stable: boolean;
+    project?: string;
+    branch?: string;
+  }[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await bucket.list({
+      prefix,
+      delimiter: "/",
+      cursor,
+      limit: 1000,
+      include: ["customMetadata"],
+    });
+    for (const p of page.delimitedPrefixes) folders.add(p);
+    for (const object of page.objects) {
+      files.push({
+        key: object.key,
+        size: object.size,
+        uploaded: object.uploaded.toISOString(),
+        visibility: visibilityOf(object.key, object.customMetadata),
+        stable: object.customMetadata?.stable === "true",
+        project: object.customMetadata?.project,
+        branch: object.customMetadata?.branch,
+      });
+    }
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+
+  // System namespaces (archive/ version history, reserved routes) never show
+  // at the root; deeper levels cannot contain them because uploads reject
+  // reserved top-level keys.
+  const prefixes = [...folders].filter((p) => prefix !== "" || !isReservedKey(p.slice(0, -1))).sort();
+  files.sort((a, b) => b.uploaded.localeCompare(a.uploaded));
+  return Response.json({ prefixes, files }, { headers: { "cache-control": "no-store" } });
+}
+
+// GET /_ and /_/*: the browse UI. The API routes answer JSON about the
+// bucket; every other path is served from the built SPA assets. Anonymous
+// requests take the same /login round-trip as private objects (with the same
+// cookie-refusal guard), so the UI is exactly as private as the files it
+// lists.
+async function ui(request: Request, env: Env, url: URL, bucket: R2Bucket): Promise<Response> {
+  if (!(await isAuthenticated(request, env))) {
+    if (url.searchParams.has(LOGIN_MARKER)) {
+      return new Response("authentication requires cookies\n", { status: 403 });
+    }
+    return new Response(null, {
+      status: 302,
+      headers: {
+        location: `/login?to=${encodeURIComponent(url.pathname + url.search)}`,
+        "cache-control": "no-store",
+      },
+    });
+  }
+  if (url.pathname === "/_/api/browse") return browse(url, bucket);
+  if (url.pathname === "/_/api/history") {
+    const key = url.searchParams.get("key");
+    if (!key) return new Response("history needs a key parameter\n", { status: 400 });
+    return Response.json(await historyOf(bucket, key), { headers: { "cache-control": "no-store" } });
+  }
+  // The SPA is built with base /_/ so its index lives at /_/; normalize the
+  // bare /_ (asset serving would otherwise redirect, losing the query).
+  if (url.pathname === "/_") {
+    return new Response(null, {
+      status: 302,
+      headers: { location: `/_/${url.search}`, "cache-control": "no-store" },
+    });
+  }
+  return env.ASSETS.fetch(request);
 }
 
 // GET /<path>?visibility prints the stamp; PATCH /<path>?visibility=<value>
@@ -575,7 +667,21 @@ export default {
     if (request.method === "PATCH") return visibility(request, env, url, bucket);
     if (request.method === "DELETE") return remove(request, env, url, bucket);
     if (request.method === "GET" || request.method === "HEAD") {
-      if (url.pathname === "/" && url.searchParams.has("list")) return list(request, env, url, bucket);
+      // The browse UI. Non-GET methods fall through to the handlers above so
+      // uploads to _/... still hit the reserved-key rejection.
+      if (url.pathname === "/_" || url.pathname.startsWith("/_/")) {
+        return ui(request, env, url, bucket);
+      }
+      if (url.pathname === "/") {
+        if (url.searchParams.has("list")) return list(request, env, url, bucket);
+        // The bare hostname in a browser lands in the UI.
+        if (!url.search) {
+          return new Response(null, {
+            status: 302,
+            headers: { location: "/_/", "cache-control": "no-store" },
+          });
+        }
+      }
       if (url.pathname !== "/") {
         if (url.searchParams.has("history")) return history(request, env, url, bucket);
         if (url.searchParams.has("visibility")) return visibility(request, env, url, bucket);

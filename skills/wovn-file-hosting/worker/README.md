@@ -27,6 +27,19 @@ metadata self-copy - same key, same URL. `DELETE /<path>` removes the object
 plus its whole `archive/<path>/` history (an archive URL deletes one
 version) and returns the deleted keys.
 
+## Browse UI
+
+`/_` serves a small Vite + React SPA (in `../ui`) for browsing the bucket:
+per-directory tables with visibility flips, version history, copy and delete.
+It is authenticated exactly like a private object (bearer token or the
+`/login` cookie round-trip) and is served from the worker's static assets
+binding (`assets.directory` -> `../ui/dist`, with `run_worker_first` keeping
+auth and R2 serving in front). `GET /_/api/browse?prefix=` returns one
+directory level via delimited listing; `GET /_/api/history?key=` is
+`?history` for the UI; a bare `GET /` with no query redirects to `/_/`. The
+`_` top-level key is reserved. Build the UI (`pnpm build` in `../ui`) before
+`pnpm run deploy`.
+
 ## Auth
 
 Two interchangeable credentials, accepted on every route:
