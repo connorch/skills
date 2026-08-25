@@ -9,7 +9,11 @@
   // one bucket (visibility lives in object metadata; see docs/adr/0001).
   "routes": [{ "pattern": "files.wovn.org", "custom_domain": true }],
   "workers_dev": false,
-  "r2_buckets": [{ "binding": "FILES", "bucket_name": "wovn-files" }],
+  "r2_buckets": [
+    { "binding": "FILES", "bucket_name": "wovn-files" },
+    // TEMPORARY for the one-shot migration; removed with the /_migrate revert.
+    { "binding": "PRIVATE", "bucket_name": "wovn-private" }
+  ],
   // Cloudflare Access app path-scoped to files.wovn.org/login; the worker
   // verifies its JWTs itself (relayed via cookie), so these identify which
   // app to trust.
