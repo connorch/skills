@@ -59,8 +59,8 @@ These skills help you plan, verify, write, refactor, and fix code.
 - **step-back** — Step-back review of a branch after a batch of point fixes, finding and fixing the damage the iteration itself caused.
 - **pull-upstream** - Sync a fork with its upstream: inventory the fork's features, merge upstream in with upstream taking priority, re-apply the fork's work on top, and verify every feature survived - clean merges included.
 - **babysit-pr** — Monitor a pull request through review and CI, verifying bot findings, fixing real failures, and dismissing false positives with reasons. Adapted from a skill by [Theo Browne](https://youtu.be/e1snsuY4lTI).
-- **html-communication** — Create self-contained HTML writeups (plans, specs, findings, UI mocks) and publish them privately to private.wovn.org with the wovn CLI. Adapted from a skill by Theo Browne.
-- **wovn-file-hosting** - Upload any local file to the public file host at files.wovn.org and return a permanent public URL, backed by the Cloudflare Worker in `skills/wovn-file-hosting/worker/`. Adapted from a skill by Theo Browne.
+- **html-communication** — Create self-contained HTML writeups (plans, specs, findings, UI mocks) and publish them privately to files.wovn.org with the wovn CLI. Adapted from a skill by Theo Browne.
+- **wovn-file-hosting** - Upload any local file to files.wovn.org and return a permanent URL (private by default, public on request), backed by the Cloudflare Worker in `skills/wovn-file-hosting/worker/`. Adapted from a skill by Theo Browne.
 
 ## Second Brain
 

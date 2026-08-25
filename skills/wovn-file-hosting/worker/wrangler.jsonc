@@ -5,15 +5,14 @@
   "account_id": "290536f56594ac82bc4bacde9af0e082",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-11",
-  "routes": [
-    { "pattern": "files.wovn.org", "custom_domain": true },
-    { "pattern": "private.wovn.org", "custom_domain": true }
-  ],
-  "r2_buckets": [
-    { "binding": "FILES", "bucket_name": "wovn-files" },
-    { "binding": "PRIVATE", "bucket_name": "wovn-private" }
-  ],
-  // Cloudflare Access config for private.wovn.org (app "wovn private files").
+  // Single host: files.wovn.org serves both public and private objects from
+  // one bucket (visibility lives in object metadata; see docs/adr/0001).
+  "routes": [{ "pattern": "files.wovn.org", "custom_domain": true }],
+  "workers_dev": false,
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "wovn-files" }],
+  // Cloudflare Access app path-scoped to files.wovn.org/login; the worker
+  // verifies its JWTs itself (relayed via cookie), so these identify which
+  // app to trust.
   "vars": {
     "ACCESS_TEAM_DOMAIN": "connorchev.cloudflareaccess.com",
     "ACCESS_AUD": "469e2cf049d6c642d60160a7aa0ba5b4fdf1ae47638a648f8a878b98b44f6d1c"

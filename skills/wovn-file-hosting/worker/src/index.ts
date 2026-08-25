@@ -1,23 +1,50 @@
-// File host for files.wovn.org (public) and private.wovn.org (Cloudflare
-// Access-gated), used by the wovn-file-hosting skill. PUT/POST an authenticated
-// file to any path; the response body is the permanent URL. GET serves
-// stored objects. POST mints a collision-proof immutable key
-// (yyyy/mm/<random>-<filename>); PUT writes the exact request path and
-// refuses to overwrite an existing object unless the client forces it. A
-// forced overwrite first copies the old version to archive/<path>/<stamp>, so
-// stable paths keep their full history; GET /<path>?history lists it. The
-// archive/ prefix is reserved (PUT rejects it) and hidden from /?list.
-// Uploads carry the client's git context in x-wovn-* headers (see
-// META_HEADERS), stored as customMetadata. GET /?list returns recent objects
-// as JSON, newest first (authenticated); project/branch/worktree/dir query
-// params filter on that stored context, and a type param filters by file type
-// (see TYPE_CATEGORIES).
+// File host for files.wovn.org, used by the wovn-file-hosting skill. One
+// hostname, one R2 bucket; every object carries its visibility in
+// customMetadata and is private unless explicitly stamped
+// `visibility: public` (fail closed). Objects under archive/ - previous
+// versions of stable paths - are always private regardless of stamping.
 //
-// The private host verifies the Access JWT itself (signature, issuer,
-// audience, expiry) rather than trusting that the Access app is configured,
-// so deleting or misconfiguring the Access app fails closed.
+// Auth: two interchangeable credentials, checked by isAuthenticated().
+//  - The WOVN_TOKEN bearer token (the wovn CLI and curl fallback).
+//  - A Cloudflare Access JWT in a cookie, minted by the /login flow: the
+//    Access application is path-scoped to files.wovn.org/login only, so the
+//    Access edge intercepts just that path, runs the interactive login, and
+//    injects `cf-access-jwt-assertion`; the /login handler copies that JWT
+//    into a host-wide cookie and redirects back. Every other route verifies
+//    the cookie itself (signature, issuer, audience, expiry), so a deleted or
+//    misconfigured Access app fails closed. See docs/adr/0001.
+//
+// Serving is uniform fail-closed: a public object is served to anyone;
+// anything else - private object or no object at all - 302s anonymous
+// requests to /login, so probing leaks nothing about which keys exist.
+//
+// PUT/POST upload (authenticated); the response body is the permanent URL.
+// POST mints a collision-proof immutable key (yyyy/mm/<random>-<filename>);
+// PUT writes the exact request path and refuses to overwrite an existing
+// object unless the client forces it. A forced overwrite first copies the old
+// version to archive/<path>/<stamp>, so stable paths keep their full history,
+// and preserves the old object's visibility unless the request explicitly
+// restates it - updating a published document does not unpublish it.
+// Reserved keys (RESERVED_KEYS) are rejected. Uploads carry the client's git
+// context in x-wovn-* headers (see META_HEADERS), stored as customMetadata.
+//
+// GET /?list returns recent objects as JSON, newest first (authenticated);
+// project/branch/worktree/dir params filter on stored git context, type
+// filters by extension (TYPE_CATEGORIES), visibility=public|private filters
+// on the stamp. GET /<path>?history lists a stable path's versions.
+// GET /<path>?visibility and PATCH /<path>?visibility=public|private read and
+// flip the stamp (a metadata self-copy; same key, same URL). DELETE /<path>
+// removes the object and its whole archive/<path>/ history.
 
-const PRIVATE_HOSTNAME = "private.wovn.org";
+// Top-level key segments uploads may never claim: system routes and the
+// version-history namespace. Grow this list when new routes are added.
+const RESERVED_KEYS = ["archive", "login"];
+
+const AUTH_COOKIE = "wovn_auth";
+// Query marker appended by the /login redirect; if a request arrives with it
+// and still has no valid cookie, the client refuses cookies - fail with 403
+// instead of redirecting forever.
+const LOGIN_MARKER = "wovn-authed";
 
 // Fallback for uploads that arrive without a useful Content-Type (curl -T
 // sends application/octet-stream), so browsers render images inline.
@@ -81,12 +108,53 @@ function contentTypeFor(filename: string, headerValue: string | null): string {
   return MIME_TYPES[ext] ?? "application/octet-stream";
 }
 
-function isAuthorized(request: Request, token: string): boolean {
+function isArchiveKey(key: string): boolean {
+  return key === "archive" || key.startsWith("archive/");
+}
+
+function isReservedKey(key: string): boolean {
+  return RESERVED_KEYS.some((r) => key === r || key.startsWith(`${r}/`));
+}
+
+// The single fail-closed visibility rule: public only when explicitly
+// stamped, and never under archive/.
+function isPublic(key: string, meta: Record<string, string> | undefined): boolean {
+  return !isArchiveKey(key) && meta?.visibility === "public";
+}
+
+function visibilityOf(key: string, meta: Record<string, string> | undefined): "public" | "private" {
+  return isPublic(key, meta) ? "public" : "private";
+}
+
+function isTokenAuthorized(request: Request, token: string | undefined): boolean {
+  if (!token) return false;
   const provided = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   const a = new TextEncoder().encode(provided);
   const b = new TextEncoder().encode(token);
   if (a.byteLength !== b.byteLength) return false;
   return crypto.subtle.timingSafeEqual(a, b);
+}
+
+function cookieValue(request: Request, name: string): string | undefined {
+  const cookies = request.headers.get("cookie") ?? "";
+  for (const part of cookies.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq !== -1 && part.slice(0, eq).trim() === name) return part.slice(eq + 1).trim();
+  }
+  return undefined;
+}
+
+// A request is authenticated with either the bearer token or a valid Access
+// JWT cookie - our own relay cookie, or the CF_Authorization cookie Access
+// itself sets on this hostname during the /login flow. Both credentials are
+// equivalent everywhere; there are no per-route auth rules.
+async function isAuthenticated(request: Request, env: Env): Promise<boolean> {
+  if (isTokenAuthorized(request, env.WOVN_TOKEN)) return true;
+  for (const name of [AUTH_COOKIE, "CF_Authorization"]) {
+    const jwt = cookieValue(request, name);
+    if (jwt && (await verifyJwt(jwt, env)) !== null) return true;
+  }
+  return false;
 }
 
 // Stable keys (PUT) use the request path verbatim, sanitized per segment.
@@ -126,9 +194,8 @@ function archiveKeyFor(key: string): string {
   return `archive/${key}/${stamp}-${randomSlug()}`;
 }
 
-// Cloudflare Access JWT verification for the private host. The signing keys
-// are public and rotate rarely; caching them module-level is config, not
-// request state.
+// Cloudflare Access JWT verification. The signing keys are public and rotate
+// rarely; caching them module-level is config, not request state.
 let certsCache: { keys: (JsonWebKey & { kid?: string })[]; expires: number } | undefined;
 
 function b64urlDecode(s: string): Uint8Array {
@@ -148,11 +215,12 @@ async function accessSigningKeys(teamDomain: string) {
   return keys;
 }
 
-async function verifyAccessJwt(request: Request, env: Env): Promise<boolean> {
-  const jwt = request.headers.get("cf-access-jwt-assertion");
-  if (!jwt) return false;
+// Full verification of an Access JWT: issuer, audience, expiry, signature.
+// Returns the expiry (for cookie Max-Age) on success, null on any failure.
+async function verifyJwt(jwt: string, env: Env): Promise<{ exp: number } | null> {
+  if (!env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD) return null;
   const parts = jwt.split(".");
-  if (parts.length !== 3) return false;
+  if (parts.length !== 3) return null;
   try {
     const decoder = new TextDecoder();
     const header = JSON.parse(decoder.decode(b64urlDecode(parts[0]))) as { kid?: string };
@@ -161,13 +229,13 @@ async function verifyAccessJwt(request: Request, env: Env): Promise<boolean> {
       aud?: string | string[];
       exp?: number;
     };
-    if (payload.iss !== `https://${env.ACCESS_TEAM_DOMAIN}`) return false;
+    if (payload.iss !== `https://${env.ACCESS_TEAM_DOMAIN}`) return null;
     const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-    if (!aud.includes(env.ACCESS_AUD)) return false;
-    if (typeof payload.exp !== "number" || payload.exp * 1000 < Date.now()) return false;
+    if (!aud.includes(env.ACCESS_AUD)) return null;
+    if (typeof payload.exp !== "number" || payload.exp * 1000 < Date.now()) return null;
 
     const jwk = (await accessSigningKeys(env.ACCESS_TEAM_DOMAIN)).find((k) => k.kid === header.kid);
-    if (!jwk) return false;
+    if (!jwk) return null;
     const key = await crypto.subtle.importKey(
       "jwk",
       jwk,
@@ -175,24 +243,49 @@ async function verifyAccessJwt(request: Request, env: Env): Promise<boolean> {
       false,
       ["verify"],
     );
-    return crypto.subtle.verify(
+    const valid = await crypto.subtle.verify(
       "RSASSA-PKCS1-v1_5",
       key,
       b64urlDecode(parts[2]),
       new TextEncoder().encode(`${parts[0]}.${parts[1]}`),
     );
+    return valid ? { exp: payload.exp } : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
-async function upload(request: Request, env: Env, url: URL, bucket: R2Bucket): Promise<Response> {
-  // Public host uploads authenticate with the bearer token; on the private
-  // host the Access JWT check in fetch() has already established identity.
-  if (url.hostname !== PRIVATE_HOSTNAME) {
-    if (!env.FILE_HOST_TOKEN) return new Response("upload token not configured\n", { status: 503 });
-    if (!isAuthorized(request, env.FILE_HOST_TOKEN)) return new Response("unauthorized\n", { status: 401 });
+// /login: the only Access-gated path. The Access edge has already forced the
+// interactive login and injected the JWT; relay it into a host-wide cookie
+// and bounce back to the requested path. Without the Access app in front,
+// there is no JWT and this fails closed.
+async function login(request: Request, env: Env, url: URL): Promise<Response> {
+  const jwt = request.headers.get("cf-access-jwt-assertion");
+  if (!jwt) {
+    return new Response("login is not gated by a Cloudflare Access application; refusing\n", {
+      status: 503,
+    });
   }
+  const payload = await verifyJwt(jwt, env);
+  if (!payload) return new Response("forbidden\n", { status: 403 });
+
+  // `to` must be a same-origin absolute path ("/x", not "//host" or a URL).
+  const to = url.searchParams.get("to") ?? "/";
+  const dest = /^\/(?!\/)/.test(to) ? to : "/";
+  const maxAge = Math.max(0, Math.floor(payload.exp - Date.now() / 1000));
+  const separator = dest.includes("?") ? "&" : "?";
+  return new Response(null, {
+    status: 302,
+    headers: {
+      location: `${dest}${separator}${LOGIN_MARKER}=1`,
+      "set-cookie": `${AUTH_COOKIE}=${jwt}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`,
+      "cache-control": "no-store",
+    },
+  });
+}
+
+async function upload(request: Request, env: Env, url: URL, bucket: R2Bucket): Promise<Response> {
+  if (!(await isAuthenticated(request, env))) return new Response("unauthorized\n", { status: 401 });
   if (!request.body) return new Response("missing request body\n", { status: 400 });
 
   const customMetadata: Record<string, string> = {};
@@ -200,6 +293,10 @@ async function upload(request: Request, env: Env, url: URL, bucket: R2Bucket): P
     const value = request.headers.get(header);
     if (value) customMetadata[name] = value;
   }
+  // Fail closed: public only on an explicit request. An absent or unknown
+  // header value means private (no stamp at all).
+  const requestedVisibility = request.headers.get("x-wovn-visibility");
+  if (requestedVisibility === "public") customMetadata.visibility = "public";
 
   // POST mints an immutable dated key; PUT stores at the exact requested
   // path, so the URL stays stable across re-uploads.
@@ -207,8 +304,8 @@ async function upload(request: Request, env: Env, url: URL, bucket: R2Bucket): P
   if (request.method === "PUT") {
     const stable = stableKey(url.pathname);
     if (!stable) return new Response("PUT needs an explicit path\n", { status: 400 });
-    if (stable === "archive" || stable.startsWith("archive/")) {
-      return new Response("archive/ is reserved for previous versions of stable paths\n", { status: 400 });
+    if (isReservedKey(stable)) {
+      return new Response(`${stable.split("/")[0]}/ is a reserved path\n`, { status: 400 });
     }
     key = stable;
     customMetadata.stable = "true";
@@ -222,16 +319,24 @@ async function upload(request: Request, env: Env, url: URL, bucket: R2Bucket): P
       // A forced overwrite archives the version it replaces, keeping its
       // content type and git context. `uploaded` preserves when that version
       // was originally written (the copy's own timestamp is the archive
-      // time); `stable` is dropped - archived versions are immutable.
+      // time); `stable` and `visibility` are dropped - archived versions are
+      // immutable and always private.
       const existing = await bucket.get(key);
       if (existing) {
         const meta = { ...existing.customMetadata };
         delete meta.stable;
+        delete meta.visibility;
         meta.uploaded = existing.uploaded.toISOString();
         await bucket.put(archiveKeyFor(key), existing.body, {
           httpMetadata: existing.httpMetadata,
           customMetadata: meta,
         });
+        // Visibility is an attribute of the path, not of one upload: updating
+        // a published document must not silently unpublish it. The request
+        // can still restate it explicitly ("public" or "private") to flip.
+        if (requestedVisibility !== "public" && requestedVisibility !== "private") {
+          if (existing.customMetadata?.visibility === "public") customMetadata.visibility = "public";
+        }
       }
     }
   } else {
@@ -243,15 +348,11 @@ async function upload(request: Request, env: Env, url: URL, bucket: R2Bucket): P
   return new Response(`https://${url.hostname}/${key}\n`, { status: 201 });
 }
 
-// GET /?list returns recent objects as JSON, newest first. Authenticated on
-// both hosts: the private host is already behind the Access check, and the
-// public listing requires the upload token - generated URLs are unguessable
-// capability URLs, so an open listing would enumerate them.
+// GET /?list returns recent objects as JSON, newest first. Authenticated:
+// generated URLs are unguessable capability URLs, so the listing is never
+// open, and private keys must not be enumerable.
 async function list(request: Request, env: Env, url: URL, bucket: R2Bucket): Promise<Response> {
-  if (url.hostname !== PRIVATE_HOSTNAME) {
-    if (!env.FILE_HOST_TOKEN) return new Response("upload token not configured\n", { status: 503 });
-    if (!isAuthorized(request, env.FILE_HOST_TOKEN)) return new Response("unauthorized\n", { status: 401 });
-  }
+  if (!(await isAuthenticated(request, env))) return new Response("unauthorized\n", { status: 401 });
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit")) || 20, 1), 1000);
 
   // Git-context filters (see META_HEADERS). Every provided filter must match;
@@ -285,18 +386,28 @@ async function list(request: Request, env: Env, url: URL, bucket: R2Bucket): Pro
     : null;
   const matchesType = (key: string) => extensions === null || extensions.has(extensionOf(key));
 
+  // Visibility filter: "public" or "private" (anything else matches nothing).
+  const visibilityParam = url.searchParams.get("visibility");
+
   // R2 lists lexicographically with no reverse option, so walk the whole
   // bucket and sort by upload time; these are small personal buckets.
-  const objects: { key: string; size: number; uploaded: string }[] = [];
+  const objects: { key: string; size: number; uploaded: string; visibility: string }[] = [];
   let cursor: string | undefined;
   do {
     const page = await bucket.list({ cursor, limit: 1000, include: ["customMetadata"] });
     for (const object of page.objects) {
       // Archived previous versions only show up in per-path ?history.
-      if (object.key.startsWith("archive/")) continue;
+      if (isArchiveKey(object.key)) continue;
       if (!matches(object.customMetadata)) continue;
       if (!matchesType(object.key)) continue;
-      objects.push({ key: object.key, size: object.size, uploaded: object.uploaded.toISOString() });
+      const visibility = visibilityOf(object.key, object.customMetadata);
+      if (visibilityParam !== null && visibility !== visibilityParam) continue;
+      objects.push({
+        key: object.key,
+        size: object.size,
+        uploaded: object.uploaded.toISOString(),
+        visibility,
+      });
     }
     cursor = page.truncated ? page.cursor : undefined;
   } while (cursor);
@@ -308,10 +419,7 @@ async function list(request: Request, env: Env, url: URL, bucket: R2Bucket): Pro
 // GET /<path>?history returns a stable path's current object plus its
 // archived previous versions, newest first. Authenticated like /?list.
 async function history(request: Request, env: Env, url: URL, bucket: R2Bucket): Promise<Response> {
-  if (url.hostname !== PRIVATE_HOSTNAME) {
-    if (!env.FILE_HOST_TOKEN) return new Response("upload token not configured\n", { status: 503 });
-    if (!isAuthorized(request, env.FILE_HOST_TOKEN)) return new Response("unauthorized\n", { status: 401 });
-  }
+  if (!(await isAuthenticated(request, env))) return new Response("unauthorized\n", { status: 401 });
   const key = decodeURIComponent(url.pathname.slice(1));
 
   const prefix = `archive/${key}/`;
@@ -346,14 +454,73 @@ async function history(request: Request, env: Env, url: URL, bucket: R2Bucket): 
   );
 }
 
-function objectHeaders(object: R2Object, isPrivate: boolean): HeadersInit {
-  // Private files must never land in shared caches. Public stable objects
+// GET /<path>?visibility prints the stamp; PATCH /<path>?visibility=<value>
+// flips it via a metadata self-copy (R2 has no metadata-only update). Same
+// key, same URL, no content change - so flips never archive anything.
+async function visibility(request: Request, env: Env, url: URL, bucket: R2Bucket): Promise<Response> {
+  if (!(await isAuthenticated(request, env))) return new Response("unauthorized\n", { status: 401 });
+  const key = decodeURIComponent(url.pathname.slice(1));
+
+  if (request.method === "GET") {
+    const object = await bucket.head(key);
+    if (!object) return new Response("not found\n", { status: 404 });
+    return new Response(`${visibilityOf(key, object.customMetadata)}\n`, {
+      headers: { "cache-control": "no-store" },
+    });
+  }
+
+  const value = url.searchParams.get("visibility");
+  if (value !== "public" && value !== "private") {
+    return new Response("visibility must be public or private\n", { status: 400 });
+  }
+  if (isArchiveKey(key)) {
+    return new Response("archived versions are always private\n", { status: 400 });
+  }
+  const object = await bucket.get(key);
+  if (!object) return new Response("not found\n", { status: 404 });
+  const meta = { ...object.customMetadata };
+  if (value === "public") meta.visibility = "public";
+  else delete meta.visibility;
+  await bucket.put(key, object.body, { httpMetadata: object.httpMetadata, customMetadata: meta });
+  return new Response(`https://${url.hostname}/${key}\n`, { headers: { "cache-control": "no-store" } });
+}
+
+// DELETE /<path> removes the whole identity: the object plus every archived
+// version under archive/<path>/. Deleting one archived version by its own
+// archive URL prunes just that version. Responds with the deleted keys.
+async function remove(request: Request, env: Env, url: URL, bucket: R2Bucket): Promise<Response> {
+  if (!(await isAuthenticated(request, env))) return new Response("unauthorized\n", { status: 401 });
+  const key = decodeURIComponent(url.pathname.slice(1));
+  if (!key) return new Response("DELETE needs an explicit path\n", { status: 400 });
+
+  const deleted: string[] = [];
+  if ((await bucket.head(key)) !== null) deleted.push(key);
+  if (!isArchiveKey(key)) {
+    const prefix = `archive/${key}/`;
+    let cursor: string | undefined;
+    do {
+      const page = await bucket.list({ prefix, cursor, limit: 1000 });
+      for (const object of page.objects) {
+        // Only direct children: deeper keys are the history of a nested
+        // stable path, not versions of this one.
+        if (!object.key.slice(prefix.length).includes("/")) deleted.push(object.key);
+      }
+      cursor = page.truncated ? page.cursor : undefined;
+    } while (cursor);
+  }
+  if (deleted.length === 0) return new Response("not found\n", { status: 404 });
+  await bucket.delete(deleted);
+  return Response.json({ deleted }, { headers: { "cache-control": "no-store" } });
+}
+
+function objectHeaders(object: R2Object, publicObject: boolean): HeadersInit {
+  // Private responses must never land in shared caches. Public stable objects
   // change in place, so they revalidate by etag; generated keys are immutable.
   const stable = object.customMetadata?.stable === "true";
   return {
     "content-type": object.httpMetadata?.contentType ?? "application/octet-stream",
     "content-length": String(object.size),
-    "cache-control": isPrivate
+    "cache-control": !publicObject
       ? "private, no-store"
       : stable
         ? "public, max-age=0, must-revalidate"
@@ -362,46 +529,59 @@ function objectHeaders(object: R2Object, isPrivate: boolean): HeadersInit {
   };
 }
 
-async function serve(request: Request, url: URL, bucket: R2Bucket): Promise<Response> {
+// GET/HEAD of a key. Public objects are served to anyone. Everything else -
+// a private object or a key that does not exist - is indistinguishable to an
+// anonymous client: both redirect to /login, so nothing leaks.
+async function serve(request: Request, env: Env, url: URL, bucket: R2Bucket): Promise<Response> {
   const key = decodeURIComponent(url.pathname.slice(1));
-  if (!key) return new Response("not found\n", { status: 404 });
-  const isPrivate = url.hostname === PRIVATE_HOSTNAME;
+  const object = key
+    ? request.method === "HEAD"
+      ? await bucket.head(key)
+      : await bucket.get(key)
+    : null;
 
-  // HEAD reads only object metadata; GET streams the body from R2.
-  if (request.method === "HEAD") {
-    const object = await bucket.head(key);
-    if (!object) return new Response(null, { status: 404 });
-    return new Response(null, { headers: objectHeaders(object, isPrivate) });
+  const publicObject = object !== null && isPublic(key, object.customMetadata);
+  if (!publicObject && !(await isAuthenticated(request, env))) {
+    // Arriving with the marker means we just came back from /login and the
+    // cookie still is not there: the client refuses cookies, so redirecting
+    // again would loop.
+    if (url.searchParams.has(LOGIN_MARKER)) {
+      return new Response("authentication requires cookies\n", { status: 403 });
+    }
+    return new Response(null, {
+      status: 302,
+      headers: {
+        location: `/login?to=${encodeURIComponent(url.pathname)}`,
+        "cache-control": "no-store",
+      },
+    });
   }
-
-  const object = await bucket.get(key);
   if (!object) return new Response("not found\n", { status: 404 });
-  return new Response(object.body, { headers: objectHeaders(object, isPrivate) });
+
+  const headers = objectHeaders(object, publicObject);
+  // head() results have no body; get() results do.
+  const body = "body" in object ? (object as R2ObjectBody).body : null;
+  if (request.method === "HEAD" || body === null) return new Response(null, { headers });
+  return new Response(body, { headers });
 }
 
 export default {
   async fetch(request, env): Promise<Response> {
     const url = new URL(request.url);
+    const bucket = env.FILES;
 
-    let bucket = env.FILES;
-    if (url.hostname === PRIVATE_HOSTNAME) {
-      if (!env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD) {
-        return new Response("private host not configured\n", { status: 503 });
-      }
-      if (!(await verifyAccessJwt(request, env))) {
-        return new Response("forbidden\n", { status: 403 });
-      }
-      bucket = env.PRIVATE;
-    }
-
+    if (url.pathname === "/login") return login(request, env, url);
     if (request.method === "PUT" || request.method === "POST") return upload(request, env, url, bucket);
-    if (request.method === "GET" && url.pathname === "/" && url.searchParams.has("list")) {
-      return list(request, env, url, bucket);
+    if (request.method === "PATCH") return visibility(request, env, url, bucket);
+    if (request.method === "DELETE") return remove(request, env, url, bucket);
+    if (request.method === "GET" || request.method === "HEAD") {
+      if (url.pathname === "/" && url.searchParams.has("list")) return list(request, env, url, bucket);
+      if (url.pathname !== "/") {
+        if (url.searchParams.has("history")) return history(request, env, url, bucket);
+        if (url.searchParams.has("visibility")) return visibility(request, env, url, bucket);
+      }
+      return serve(request, env, url, bucket);
     }
-    if (request.method === "GET" && url.pathname !== "/" && url.searchParams.has("history")) {
-      return history(request, env, url, bucket);
-    }
-    if (request.method === "GET" || request.method === "HEAD") return serve(request, url, bucket);
     return new Response("method not allowed\n", { status: 405 });
   },
 } satisfies ExportedHandler<Env>;
