@@ -565,92 +565,11 @@ async function serve(request: Request, env: Env, url: URL, bucket: R2Bucket): Pr
   return new Response(body, { headers });
 }
 
-// TEMPORARY one-shot migration endpoint; this commit is reverted after the
-// cutover. POST /_migrate?step=backfill|copy[&cursor=...], bearer-token only,
-// batched small to stay inside the per-request subrequest limit.
-//  - backfill: stamp visibility=public on every non-archive wovn-files object
-//    that lacks it (they were all public before the fail-closed worker).
-//  - copy: move every wovn-private object into wovn-files, unstamped
-//    (= private). Private wins key conflicts; the displaced public object is
-//    archived into archive/<key>/ first, like a forced overwrite would.
-async function migrate(request: Request, env: Env, url: URL): Promise<Response> {
-  if (!isTokenAuthorized(request, env.WOVN_TOKEN)) return new Response("unauthorized\n", { status: 401 });
-  const cursor = url.searchParams.get("cursor") ?? undefined;
-  const step = url.searchParams.get("step");
-
-  if (step === "backfill") {
-    const page = await env.FILES.list({ cursor, limit: 20, include: ["customMetadata"] });
-    let stamped = 0;
-    for (const entry of page.objects) {
-      if (isArchiveKey(entry.key)) continue;
-      if (entry.customMetadata?.visibility === "public") continue;
-      const object = await env.FILES.get(entry.key);
-      if (!object) continue;
-      await env.FILES.put(entry.key, object.body, {
-        httpMetadata: object.httpMetadata,
-        customMetadata: { ...object.customMetadata, visibility: "public" },
-      });
-      stamped++;
-    }
-    return Response.json({ done: !page.truncated, cursor: page.truncated ? page.cursor : null, stamped });
-  }
-
-  if (step === "copy") {
-    if (!env.PRIVATE) return new Response("PRIVATE binding missing\n", { status: 503 });
-    const page = await env.PRIVATE.list({ cursor, limit: 8 });
-    let copied = 0;
-    let archived = 0;
-    let skipped = 0;
-    for (const entry of page.objects) {
-      // Idempotency: identical content already at this key means this entry
-      // was migrated on a previous (interrupted) run.
-      const existingHead = await env.FILES.head(entry.key);
-      if (existingHead && existingHead.etag === entry.etag) {
-        skipped++;
-        continue;
-      }
-      const source = await env.PRIVATE.get(entry.key);
-      if (!source) continue;
-      if (!isArchiveKey(entry.key)) {
-        const existing = existingHead ? await env.FILES.get(entry.key) : null;
-        if (existing) {
-          const meta = { ...existing.customMetadata };
-          delete meta.stable;
-          delete meta.visibility;
-          meta.uploaded = existing.uploaded.toISOString();
-          await env.FILES.put(archiveKeyFor(entry.key), existing.body, {
-            httpMetadata: existing.httpMetadata,
-            customMetadata: meta,
-          });
-          archived++;
-        }
-      }
-      const meta = { ...source.customMetadata };
-      delete meta.visibility;
-      await env.FILES.put(entry.key, source.body, {
-        httpMetadata: source.httpMetadata,
-        customMetadata: meta,
-      });
-      copied++;
-    }
-    return Response.json({
-      done: !page.truncated,
-      cursor: page.truncated ? page.cursor : null,
-      copied,
-      archived,
-      skipped,
-    });
-  }
-
-  return new Response("step must be backfill or copy\n", { status: 400 });
-}
-
 export default {
   async fetch(request, env): Promise<Response> {
     const url = new URL(request.url);
     const bucket = env.FILES;
 
-    if (request.method === "POST" && url.pathname === "/_migrate") return migrate(request, env, url);
     if (url.pathname === "/login") return login(request, env, url);
     if (request.method === "PUT" || request.method === "POST") return upload(request, env, url, bucket);
     if (request.method === "PATCH") return visibility(request, env, url, bucket);
