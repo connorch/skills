@@ -1,10 +1,13 @@
 // wovn - CLI for the files.wovn.org file host (see skills/wovn-file-hosting).
 //
-// --private uploads to private.wovn.org (Cloudflare Access-gated; only Connor
-// can read) using the Access service token in ~/.config/wovn-files/access.env.
+// One host, one credential: every request authenticates with the WOVN_TOKEN
+// bearer token. Files are private by default; `--public` (or
+// `wovn visibility set <path> public`) makes one public. Browser access to
+// private files goes through the host's /login flow instead - the CLI never
+// needs Cloudflare Access credentials.
 //
 // Token resolution: ~/.config/wovn-files/token.txt first (canonical on this
-// machine, survives rotation without a new shell), FILE_HOST_TOKEN env second
+// machine, survives rotation without a new shell), WOVN_TOKEN env second
 // (for machines that only have the env var).
 
 import { spawnSync } from "node:child_process";
@@ -16,11 +19,9 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { Command } from "commander";
 
-// WOVN_HOST / WOVN_PRIVATE_HOST are test hooks for pointing at wrangler dev.
+// WOVN_HOST is a test hook for pointing at wrangler dev.
 const HOST = process.env.WOVN_HOST ?? "https://files.wovn.org";
-const PRIVATE_HOST = process.env.WOVN_PRIVATE_HOST ?? "https://private.wovn.org";
 const TOKEN_FILE = join(homedir(), ".config", "wovn-files", "token.txt");
-const ACCESS_ENV_FILE = join(homedir(), ".config", "wovn-files", "access.env");
 // Personal Cloudflare account (connorchev@gmail.com), where the wovn-files worker lives.
 const ACCOUNT_ID = "290536f56594ac82bc4bacde9af0e082";
 
@@ -33,27 +34,14 @@ function token(): string {
   try {
     return readFileSync(TOKEN_FILE, "utf8").trim();
   } catch {
-    const env = process.env.FILE_HOST_TOKEN;
+    const env = process.env.WOVN_TOKEN;
     if (env) return env;
-    fail(`no token at ${TOKEN_FILE} and FILE_HOST_TOKEN is unset`);
+    fail(`no token at ${TOKEN_FILE} and WOVN_TOKEN is unset`);
   }
 }
 
-// Access service token creds, parsed from the shell-sourceable access.env
-// (CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET lines).
-function accessHeaders(reason: string): Record<string, string> {
-  let text: string;
-  try {
-    text = readFileSync(ACCESS_ENV_FILE, "utf8");
-  } catch {
-    fail(`${reason} needs ${ACCESS_ENV_FILE}`);
-  }
-  const value = (name: string) =>
-    text.match(new RegExp(`^(?:export +)?${name}=["']?([^"'\\r\\n]+)`, "m"))?.[1];
-  const id = value("CF_ACCESS_CLIENT_ID");
-  const secret = value("CF_ACCESS_CLIENT_SECRET");
-  if (!id || !secret) fail(`missing CF_ACCESS_CLIENT_ID/CF_ACCESS_CLIENT_SECRET in ${ACCESS_ENV_FILE}`);
-  return { "cf-access-client-id": id, "cf-access-client-secret": secret };
+function authHeaders(): Record<string, string> {
+  return { authorization: `Bearer ${token()}` };
 }
 
 // Git context inferred from the environment wovn runs in. Uploads are tagged
@@ -91,6 +79,7 @@ function gitContext(): GitContext {
 }
 
 interface PutOptions {
+  public?: true;
   private?: true;
   name?: string;
   at?: string;
@@ -98,16 +87,19 @@ interface PutOptions {
 }
 
 async function put(files: string[], opts: PutOptions): Promise<void> {
+  if (opts.public && opts.private) fail("--public and --private are mutually exclusive");
   if (opts.name !== undefined && files.length > 1) fail("--name only applies to a single file");
   if (opts.at !== undefined && files.length > 1) fail("--at only applies to a single file");
   if (opts.at !== undefined && opts.name !== undefined) fail("--at already names the file; drop --name");
   if (opts.force && opts.at === undefined) fail("--force only applies to --at uploads");
 
-  const host = opts.private ? PRIVATE_HOST : HOST;
-  const headers: Record<string, string> = opts.private
-    ? accessHeaders("--private")
-    : { authorization: `Bearer ${token()}` };
+  const headers: Record<string, string> = authHeaders();
   if (opts.force) headers["x-wovn-force"] = "1";
+  // Fail closed: uploads are private unless --public. The explicit values
+  // matter on forced overwrites, where the server otherwise preserves the
+  // existing object's visibility (updating a published doc keeps it public).
+  if (opts.public) headers["x-wovn-visibility"] = "public";
+  else if (opts.private) headers["x-wovn-visibility"] = "private";
 
   // Tag the upload with where it came from. Header values must be ASCII, so
   // the rare non-ASCII path is skipped rather than breaking the upload.
@@ -136,9 +128,9 @@ async function put(files: string[], opts: PutOptions): Promise<void> {
     const method = opts.at === undefined ? "POST" : "PUT";
     const path =
       opts.at ?? (opts.name ?? basename(file)).replace(/[^a-zA-Z0-9._-]/g, "-");
-    const res = await fetch(`${host}/${path}`, { method, headers, body: blob });
+    const res = await fetch(`${HOST}/${path}`, { method, headers, body: blob });
     const body = await res.text();
-    if (res.status === 409) fail(`${host}/${path} already exists; pass --force to replace it`);
+    if (res.status === 409) fail(`${HOST}/${path} already exists; pass --force to replace it`);
     if (!res.ok) fail(`upload failed (${res.status}): ${body.trim()}`);
     process.stdout.write(body);
   }
@@ -148,6 +140,7 @@ interface ListEntry {
   key: string;
   size: number;
   uploaded: string;
+  visibility: "public" | "private";
 }
 
 function formatSize(bytes: number): string {
@@ -211,6 +204,8 @@ async function list(opts: ListOptions): Promise<void> {
   if (!Number.isInteger(limit) || limit < 1) fail("--limit must be a positive integer");
 
   const query = new URLSearchParams({ list: "", limit: String(limit) });
+  if (opts.public) query.set("visibility", "public");
+  if (opts.private) query.set("visibility", "private");
   const context = gitContext();
   const inferred = {
     // The full path is the exact identity; the server matches --project
@@ -229,48 +224,28 @@ async function list(opts: ListOptions): Promise<void> {
   }
   if (opts.type) query.set("type", opts.type.join(","));
 
-  const hosts: { host: string; headers: Record<string, string> }[] = [];
-  if (!opts.private) hosts.push({ host: HOST, headers: { authorization: `Bearer ${token()}` } });
-  if (!opts.public) hosts.push({ host: PRIVATE_HOST, headers: accessHeaders("listing private files") });
-
-  const entries = (
-    await Promise.all(
-      hosts.map(async ({ host, headers }) => {
-        const res = await fetch(`${host}/?${query}`, { headers });
-        if (!res.ok) fail(`list failed for ${host} (${res.status}): ${(await res.text()).trim()}`);
-        const objects = (await res.json()) as ListEntry[];
-        return objects.map((entry) => ({ ...entry, url: `${host}/${entry.key}` }));
-      }),
-    )
-  ).flat();
-
-  // Merge both hosts newest-first; --limit caps the combined output.
-  entries.sort((a, b) => b.uploaded.localeCompare(a.uploaded));
-  for (const entry of entries.slice(0, limit)) {
-    console.log(`${formatWhen(entry.uploaded)}  ${formatSize(entry.size).padStart(9)}  ${entry.url}`);
+  const res = await fetch(`${HOST}/?${query}`, { headers: authHeaders() });
+  if (!res.ok) fail(`list failed (${res.status}): ${(await res.text()).trim()}`);
+  const entries = (await res.json()) as ListEntry[];
+  for (const entry of entries) {
+    const tag = entry.visibility === "public" ? "pub" : "prv";
+    console.log(
+      `${formatWhen(entry.uploaded)}  ${formatSize(entry.size).padStart(9)}  ${tag}  ${HOST}/${entry.key}`,
+    );
   }
 }
 
-// A target is a wovn URL on either host, or a bare path on the private host
-// (public URLs need no CLI anyway). Private targets carry the Access headers;
-// public reads need no auth.
-function resolveTarget(
-  target: string,
-  reason: string,
-): { host: string; key: string; headers: Record<string, string> } {
-  if (target.startsWith(`${HOST}/`)) {
-    return { host: HOST, key: target.slice(HOST.length + 1), headers: {} };
-  }
-  if (/^https?:\/\//.test(target) && !target.startsWith(`${PRIVATE_HOST}/`)) {
-    fail(`not a wovn file host URL: ${target}`);
-  }
-  const key = target.startsWith(`${PRIVATE_HOST}/`) ? target.slice(PRIVATE_HOST.length + 1) : target;
-  return { host: PRIVATE_HOST, key, headers: accessHeaders(reason) };
+// A target is a wovn URL or a bare key path; both name the same object on the
+// single host.
+function resolveKey(target: string): string {
+  if (target.startsWith(`${HOST}/`)) return target.slice(HOST.length + 1);
+  if (/^https?:\/\//.test(target)) fail(`not a ${HOST} URL: ${target}`);
+  return target.replace(/^\/+/, "");
 }
 
 async function read(target: string): Promise<void> {
-  const { host, key, headers } = resolveTarget(target, "reading private files");
-  const res = await fetch(`${host}/${key}`, { headers });
+  const key = resolveKey(target);
+  const res = await fetch(`${HOST}/${key}`, { headers: authHeaders() });
   if (!res.ok) fail(`read failed (${res.status}): ${(await res.text()).trim()}`);
   if (res.body) await pipeline(Readable.fromWeb(res.body as import("node:stream/web").ReadableStream), process.stdout, { end: false });
 }
@@ -286,27 +261,24 @@ interface FileHistory {
   versions: FileVersion[]; // archived previous versions, newest first
 }
 
-// History is authenticated on both hosts, like listing: Access covers the
-// private host, the upload token covers the public one.
-async function fetchHistory(target: string): Promise<{ host: string; key: string; history: FileHistory }> {
-  const { host, key, headers } = resolveTarget(target, "history");
-  if (host === HOST) headers.authorization = `Bearer ${token()}`;
-  const res = await fetch(`${host}/${key}?history`, { headers });
+async function fetchHistory(target: string): Promise<{ key: string; history: FileHistory }> {
+  const key = resolveKey(target);
+  const res = await fetch(`${HOST}/${key}?history`, { headers: authHeaders() });
   if (!res.ok) fail(`history failed (${res.status}): ${(await res.text()).trim()}`);
-  return { host, key, history: (await res.json()) as FileHistory };
+  return { key, history: (await res.json()) as FileHistory };
 }
 
 async function history(target: string): Promise<void> {
-  const { host, key, history } = await fetchHistory(target);
-  if (!history.current && history.versions.length === 0) fail(`${host}/${key} not found`);
+  const { key, history } = await fetchHistory(target);
+  if (!history.current && history.versions.length === 0) fail(`${HOST}/${key} not found`);
   if (history.current) {
     console.log(
-      `${formatWhen(history.current.uploaded)}  ${formatSize(history.current.size).padStart(9)}  current  ${host}/${history.current.key}`,
+      `${formatWhen(history.current.uploaded)}  ${formatSize(history.current.size).padStart(9)}  current  ${HOST}/${history.current.key}`,
     );
   }
   for (const version of history.versions) {
     console.log(
-      `${formatWhen(version.uploaded)}  ${formatSize(version.size).padStart(9)}           ${host}/${version.key}`,
+      `${formatWhen(version.uploaded)}  ${formatSize(version.size).padStart(9)}           ${HOST}/${version.key}`,
     );
   }
 }
@@ -320,9 +292,9 @@ function displayName(key: string): string {
 }
 
 async function fetchToFile(target: string, dir: string, side: "old" | "new"): Promise<string> {
-  const { host, key, headers } = resolveTarget(target, "diff");
-  const res = await fetch(`${host}/${key}`, { headers });
-  if (!res.ok) fail(`fetch failed for ${host}/${key} (${res.status}): ${(await res.text()).trim()}`);
+  const key = resolveKey(target);
+  const res = await fetch(`${HOST}/${key}`, { headers: authHeaders() });
+  if (!res.ok) fail(`fetch failed for ${HOST}/${key} (${res.status}): ${(await res.text()).trim()}`);
   const rel = join(side, displayName(key));
   mkdirSync(join(dir, side), { recursive: true });
   writeFileSync(join(dir, rel), Buffer.from(await res.arrayBuffer()));
@@ -333,11 +305,11 @@ async function diff(oldTarget: string, newTarget: string | undefined): Promise<v
   // One argument = a stable path: diff its most recent archived version
   // against the current object.
   if (newTarget === undefined) {
-    const { host, key, history } = await fetchHistory(oldTarget);
-    if (!history.current) fail(`${host}/${key} not found`);
-    if (history.versions.length === 0) fail(`${host}/${key} has no previous versions to diff against`);
-    newTarget = `${host}/${history.current.key}`;
-    oldTarget = `${host}/${history.versions[0].key}`;
+    const { key, history } = await fetchHistory(oldTarget);
+    if (!history.current) fail(`${HOST}/${key} not found`);
+    if (history.versions.length === 0) fail(`${HOST}/${key} has no previous versions to diff against`);
+    newTarget = history.current.key;
+    oldTarget = history.versions[0].key;
   }
   const dir = mkdtempSync(join(tmpdir(), "wovn-diff-"));
   try {
@@ -352,12 +324,40 @@ async function diff(oldTarget: string, newTarget: string | undefined): Promise<v
   }
 }
 
+async function visibilityGet(target: string): Promise<void> {
+  const key = resolveKey(target);
+  const res = await fetch(`${HOST}/${key}?visibility`, { headers: authHeaders() });
+  if (!res.ok) fail(`visibility get failed (${res.status}): ${(await res.text()).trim()}`);
+  process.stdout.write(await res.text());
+}
+
+async function visibilitySet(target: string, value: string): Promise<void> {
+  if (value !== "public" && value !== "private") fail("visibility must be public or private");
+  const key = resolveKey(target);
+  const res = await fetch(`${HOST}/${key}?visibility=${value}`, {
+    method: "PATCH",
+    headers: authHeaders(),
+  });
+  if (!res.ok) fail(`visibility set failed (${res.status}): ${(await res.text()).trim()}`);
+  process.stdout.write(await res.text());
+}
+
+async function rm(targets: string[]): Promise<void> {
+  for (const target of targets) {
+    const key = resolveKey(target);
+    const res = await fetch(`${HOST}/${key}`, { method: "DELETE", headers: authHeaders() });
+    if (!res.ok) fail(`rm failed for ${HOST}/${key} (${res.status}): ${(await res.text()).trim()}`);
+    const { deleted } = (await res.json()) as { deleted: string[] };
+    for (const deletedKey of deleted) console.log(`deleted ${HOST}/${deletedKey}`);
+  }
+}
+
 function rotate(): void {
   const next = randomBytes(32).toString("hex");
   // Server first: if the secret update fails, the local token stays valid.
   const result = spawnSync(
     "npx",
-    ["-y", "wrangler", "secret", "put", "FILE_HOST_TOKEN", "--name", "wovn-files"],
+    ["-y", "wrangler", "secret", "put", "WOVN_TOKEN", "--name", "wovn-files"],
     {
       input: next,
       stdio: ["pipe", "inherit", "inherit"],
@@ -368,16 +368,17 @@ function rotate(): void {
   mkdirSync(dirname(TOKEN_FILE), { recursive: true, mode: 0o700 });
   writeFileSync(TOKEN_FILE, `${next}\n`, { mode: 0o600 });
   console.log(`wovn: token rotated (${TOKEN_FILE} and the Worker secret are updated)`);
-  console.log("wovn: shells with a stale FILE_HOST_TOKEN env var need restarting; wovn itself reads the file");
+  console.log("wovn: shells with a stale WOVN_TOKEN env var need restarting; wovn itself reads the file");
 }
 
 const program = new Command("wovn").description("CLI for the files.wovn.org file host");
 
 program
   .command("put")
-  .description("upload files and print one permanent URL per line")
+  .description("upload files (private by default) and print one permanent URL per line")
   .argument("<file...>", "local file(s) to upload")
-  .option("--private", "upload to private.wovn.org (Access-gated; only Connor can read)")
+  .option("--public", "make the upload publicly readable")
+  .option("--private", "keep the upload private (the default; explicit on overwrites)")
   .option("--name <filename>", "filename for the generated URL (single file only)")
   .option("--at <remote-path>", "write to a stable path instead of a generated key; the URL never changes")
   .option("--force", "with --at, replace an existing object at that path")
@@ -385,9 +386,9 @@ program
 
 program
   .command("list")
-  .description("list recent files on both hosts, newest first")
-  .option("--public", "only list files.wovn.org")
-  .option("--private", "only list private.wovn.org")
+  .description("list recent files, newest first")
+  .option("--public", "only public files")
+  .option("--private", "only private files")
   .option("-n, --limit <count>", "max files to show", "20")
   .option("--project [name-or-path]", "only files uploaded from this project (default: the current one)")
   .option("--branch [branch]", "only files uploaded from this git branch (default: the current one)")
@@ -402,26 +403,48 @@ program
 
 program
   .command("read")
-  .description("print a hosted file to stdout; bare paths read the private host")
-  .argument("<url-or-path>", "wovn URL, or a path on the private host")
+  .description("print a hosted file to stdout")
+  .argument("<url-or-path>", "wovn URL or key path")
   .action(read);
 
 program
   .command("history")
   .description("list all versions of a stable path, newest first")
-  .argument("<url-or-path>", "wovn URL, or a path on the private host")
+  .argument("<url-or-path>", "wovn URL or key path")
   .action(history);
 
 program
   .command("diff")
   .description("git-diff two hosted files; with one argument, diff a stable path's previous version against its current one")
-  .argument("<old>", "wovn URL or private-host path (the stable path, when used alone)")
-  .argument("[new]", "wovn URL or private-host path")
+  .argument("<old>", "wovn URL or key path (the stable path, when used alone)")
+  .argument("[new]", "wovn URL or key path")
   .action(diff);
 
+const visibility = program
+  .command("visibility")
+  .description("read or change whether a file is public or private");
+visibility
+  .command("get")
+  .description("print a file's visibility (public or private)")
+  .argument("<url-or-path>", "wovn URL or key path")
+  .action(visibilityGet);
+visibility
+  .command("set")
+  .description("change a file's visibility; the URL never changes")
+  .argument("<url-or-path>", "wovn URL or key path")
+  .argument("<visibility>", "public or private")
+  .action(visibilitySet);
+
 program
+  .command("rm")
+  .description("delete files, including all archived versions of a stable path")
+  .argument("<url-or-path...>", "wovn URL(s) or key path(s); an archive URL deletes just that version")
+  .action(rm);
+
+const tokenCommand = program.command("token").description("manage the WOVN_TOKEN credential");
+tokenCommand
   .command("rotate")
-  .description("rotate the upload token (file + Worker secret)")
+  .description("rotate the token (file + Worker secret)")
   .action(rotate);
 
 program.parseAsync().catch((error: unknown) => {
