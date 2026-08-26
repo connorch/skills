@@ -14,3 +14,7 @@ skills/wovn-file-hosting/worker/.wrangler/
 # wovn-file-hosting CLI build artifacts
 skills/wovn-file-hosting/cli/node_modules/
 skills/wovn-file-hosting/cli/dist/
+
+# wovn-file-hosting browse UI build artifacts
+skills/wovn-file-hosting/ui/node_modules/
+skills/wovn-file-hosting/ui/dist/

@@ -181,8 +181,10 @@ The file host is a Cloudflare Worker whose source lives in `worker/` next to
 this file (single R2 bucket `wovn-files`; the `WOVN_TOKEN` secret and the
 `files.wovn.org/login` Cloudflare Access app handle auth - see
 `docs/adr/0001`). To change it, edit `worker/src/index.ts` and run
-`pnpm typecheck && pnpm run deploy` there. `wovn token rotate` rotates the
-token (Worker secret + `~/.config/wovn-files/token.txt`).
+`pnpm typecheck && pnpm run deploy` there. Deploys bundle the browse UI from
+`ui/dist`, so run `pnpm install && pnpm build` in `ui/` first on a fresh
+checkout. `wovn token rotate` rotates the token (Worker secret +
+`~/.config/wovn-files/token.txt`).
 
 The `wovn` CLI is a TypeScript commander program in `cli/`; after editing
 `cli/src/wovn.ts`, run `pnpm install && pnpm typecheck && pnpm build` there
