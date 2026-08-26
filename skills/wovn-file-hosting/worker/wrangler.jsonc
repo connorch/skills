@@ -10,6 +10,14 @@
   "routes": [{ "pattern": "files.wovn.org", "custom_domain": true }],
   "workers_dev": false,
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "wovn-files" }],
+  // The browse-UI bundle (built into ../ui/dist/_ - run `pnpm build` in ../ui
+  // before deploying). run_worker_first keeps auth and R2 serving in front:
+  // the worker decides when to serve the SPA shell or an asset.
+  "assets": {
+    "directory": "../ui/dist",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
   // Cloudflare Access app path-scoped to files.wovn.org/login; the worker
   // verifies its JWTs itself (relayed via cookie), so these identify which
   // app to trust.

@@ -1,8 +1,8 @@
 // File host for files.wovn.org, used by the wovn-file-hosting skill. One
-// hostname, one R2 bucket; every object carries its visibility in
+// hostname, one R2 bucket; every File carries its Visibility in
 // customMetadata and is private unless explicitly stamped
-// `visibility: public` (fail closed). Objects under archive/ - previous
-// versions of stable paths - are always private regardless of stamping.
+// `visibility: public` (fail closed). Objects under archive/ - Versions of
+// Stable Paths - are always private regardless of stamping.
 //
 // Auth: two interchangeable credentials, checked by isAuthenticated().
 //  - The WOVN_TOKEN bearer token (the wovn CLI and curl fallback).
@@ -14,31 +14,72 @@
 //    the cookie itself (signature, issuer, audience, expiry), so a deleted or
 //    misconfigured Access app fails closed. See docs/adr/0001.
 //
-// Serving is uniform fail-closed: a public object is served to anyone;
-// anything else - private object or no object at all - 302s anonymous
-// requests to /login, so probing leaks nothing about which keys exist.
+// URL resolution (docs/adr/0002): an exact Key match serves the File; any
+// other GET path is a Directory Route. A public File is served to anyone;
+// everything else - private File, Directory Route, or nothing at all - 302s
+// anonymous requests to /login identically, so probing leaks nothing.
+// Authenticated Directory Routes serve the browse-UI SPA shell (the ui/ app,
+// bundled under the reserved /_/ prefix via the ASSETS binding) when the
+// request accepts text/html; non-HTML clients keep a plain 404 so scripted
+// reads detect errors. A trailing slash always means a Directory Route.
+// /<key>/archive/<stamp> is an alias serving the archive/<key>/<stamp>
+// Version (/<key>/archive itself has no Key, so it falls to the SPA, which
+// renders the File's history).
 //
 // PUT/POST upload (authenticated); the response body is the permanent URL.
-// POST mints a collision-proof immutable key (yyyy/mm/<random>-<filename>);
-// PUT writes the exact request path and refuses to overwrite an existing
-// object unless the client forces it. A forced overwrite first copies the old
-// version to archive/<path>/<stamp>, so stable paths keep their full history,
-// and preserves the old object's visibility unless the request explicitly
-// restates it - updating a published document does not unpublish it.
-// Reserved keys (RESERVED_KEYS) are rejected. Uploads carry the client's git
-// context in x-wovn-* headers (see META_HEADERS), stored as customMetadata.
+// POST mints a collision-proof immutable Generated Key
+// (yyyy/mm/<random>-<filename>); PUT writes the exact request path (a Stable
+// Path) and refuses to overwrite an existing File unless the client forces
+// it. A forced overwrite first copies the old state to
+// archive/<path>/<stamp>, so Stable Paths keep their full history, and
+// preserves the old File's Visibility unless the request explicitly restates
+// it - updating a published document does not unpublish it. Reserved Keys
+// are rejected with a message naming the reserved word. Uploads carry the
+// client's git context in x-wovn-* headers (see META_HEADERS), stored as
+// customMetadata.
 //
-// GET /?list returns recent objects as JSON, newest first (authenticated);
-// project/branch/worktree/dir params filter on stored git context, type
-// filters by extension (TYPE_CATEGORIES), visibility=public|private filters
-// on the stamp. GET /<path>?history lists a stable path's versions.
-// GET /<path>?visibility and PATCH /<path>?visibility=public|private read and
-// flip the stamp (a metadata self-copy; same key, same URL). DELETE /<path>
-// removes the object and its whole archive/<path>/ history.
+// Management is REST under /api (anonymous requests get a plain 401, never
+// the login redirect):
+//   GET /api/files                - the collection; ?prefix=&delimiter=/ is
+//     one directory level (browse), project/branch/worktree/dir/type/
+//     visibility/limit compose as filters (list), newest first when not
+//     browsing.
+//   GET|PATCH|DELETE /api/files/<key> - metadata; {"visibility": ...} flips
+//     the stamp; DELETE removes the File and all its Versions.
+//   GET /api/versions/<key>       - the File's Versions, newest first.
 
-// Top-level key segments uploads may never claim: system routes and the
-// version-history namespace. Grow this list when new routes are added.
-const RESERVED_KEYS = ["archive", "login"];
+// Top-level Key segments uploads may never claim: live system routes plus
+// deliberately over-reserved future surfaces (docs/adr/0002) - permanent URLs
+// make later collisions expensive, reserving costs nothing.
+const RESERVED_TOP_LEVEL = [
+  "login",
+  "_", // the browse-UI asset bundle
+  "favicon.ico",
+  "robots.txt",
+  ".well-known",
+  "api",
+  "app",
+  "assets",
+  "static",
+  "auth",
+  "logout",
+  "admin",
+  "settings",
+  "upload",
+  "search",
+  "share",
+  "status",
+  "health",
+];
+
+// The reserved word an upload key violates, or null. `archive` is a Reserved
+// Key in EVERY segment (not just top-level) so the /<key>/archive alias
+// routes can never be shadowed by a real File.
+function reservedWordIn(key: string): string | null {
+  const segments = key.split("/");
+  if (segments.includes("archive")) return "archive";
+  return RESERVED_TOP_LEVEL.includes(segments[0]) ? segments[0] : null;
+}
 
 const AUTH_COOKIE = "wovn_auth";
 // Query marker appended by the /login redirect; if a request arrives with it
@@ -73,8 +114,8 @@ const MIME_TYPES: Record<string, string> = {
   gz: "application/gzip",
 };
 
-// Coarse file-type buckets for the `type` list filter, matched against the
-// extension in the object key. Categories are deliberately non-overlapping so
+// Coarse file-type buckets for the `type` filter, matched against the
+// extension in the Key. Categories are deliberately non-overlapping so
 // combining them stays easy to reason about; anything not covered here is
 // still filterable by passing the bare extension.
 const TYPE_CATEGORIES: Record<string, string[]> = {
@@ -93,7 +134,7 @@ function extensionOf(key: string): string {
 }
 
 // Git context the wovn CLI infers at upload time and sends as headers;
-// stored as customMetadata so /?list can filter by it.
+// stored as customMetadata so /api/files can filter by it.
 const META_HEADERS = {
   "x-wovn-dir": "dir",
   "x-wovn-branch": "branch",
@@ -112,11 +153,7 @@ function isArchiveKey(key: string): boolean {
   return key === "archive" || key.startsWith("archive/");
 }
 
-function isReservedKey(key: string): boolean {
-  return RESERVED_KEYS.some((r) => key === r || key.startsWith(`${r}/`));
-}
-
-// The single fail-closed visibility rule: public only when explicitly
+// The single fail-closed Visibility rule: public only when explicitly
 // stamped, and never under archive/.
 function isPublic(key: string, meta: Record<string, string> | undefined): boolean {
   return !isArchiveKey(key) && meta?.visibility === "public";
@@ -157,7 +194,26 @@ async function isAuthenticated(request: Request, env: Env): Promise<boolean> {
   return false;
 }
 
-// Stable keys (PUT) use the request path verbatim, sanitized per segment.
+// The uniform response for anonymous requests to anything non-public: private
+// File, Directory Route, or nothing at all - identical, so probing leaks
+// nothing about which Keys exist.
+function loginRedirect(url: URL): Response {
+  // Arriving with the marker means we just came back from /login and the
+  // cookie still is not there: the client refuses cookies, so redirecting
+  // again would loop.
+  if (url.searchParams.has(LOGIN_MARKER)) {
+    return new Response("authentication requires cookies\n", { status: 403 });
+  }
+  return new Response(null, {
+    status: 302,
+    headers: {
+      location: `/login?to=${encodeURIComponent(url.pathname)}`,
+      "cache-control": "no-store",
+    },
+  });
+}
+
+// Stable Paths (PUT) use the request path verbatim, sanitized per segment.
 function stableKey(pathname: string): string | null {
   const key = decodeURIComponent(pathname)
     .split("/")
@@ -186,9 +242,9 @@ function objectKey(pathname: string): string {
   return `${yyyy}/${mm}/${randomSlug()}-${filename}`;
 }
 
-// Archived versions live under archive/<stable-path>/; the key structure is
-// the whole history index (no metadata bookkeeping to drift out of sync), and
-// the timestamp prefix makes lexicographic order chronological.
+// Versions live under archive/<stable-path>/; the key structure is the whole
+// history index (no metadata bookkeeping to drift out of sync), and the
+// timestamp prefix makes lexicographic order chronological.
 function archiveKeyFor(key: string): string {
   const stamp = new Date().toISOString().toLowerCase().replace(/[:.]/g, "-");
   return `archive/${key}/${stamp}-${randomSlug()}`;
@@ -304,8 +360,11 @@ async function upload(request: Request, env: Env, url: URL, bucket: R2Bucket): P
   if (request.method === "PUT") {
     const stable = stableKey(url.pathname);
     if (!stable) return new Response("PUT needs an explicit path\n", { status: 400 });
-    if (isReservedKey(stable)) {
-      return new Response(`${stable.split("/")[0]}/ is a reserved path\n`, { status: 400 });
+    const reserved = reservedWordIn(stable);
+    if (reserved) {
+      return new Response(`${reserved} is a reserved name; pick a different path\n`, {
+        status: 400,
+      });
     }
     key = stable;
     customMetadata.stable = "true";
@@ -316,10 +375,10 @@ async function upload(request: Request, env: Env, url: URL, bucket: R2Bucket): P
         return new Response(`${key} already exists; pass --force to replace it\n`, { status: 409 });
       }
     } else {
-      // A forced overwrite archives the version it replaces, keeping its
-      // content type and git context. `uploaded` preserves when that version
+      // A forced overwrite archives the Version it replaces, keeping its
+      // content type and git context. `uploaded` preserves when that Version
       // was originally written (the copy's own timestamp is the archive
-      // time); `stable` and `visibility` are dropped - archived versions are
+      // time); `stable` and `visibility` are dropped - Versions are
       // immutable and always private.
       const existing = await bucket.get(key);
       if (existing) {
@@ -348,19 +407,45 @@ async function upload(request: Request, env: Env, url: URL, bucket: R2Bucket): P
   return new Response(`https://${url.hostname}/${key}\n`, { status: 201 });
 }
 
-// GET /?list returns recent objects as JSON, newest first. Authenticated:
-// generated URLs are unguessable capability URLs, so the listing is never
-// open, and private keys must not be enumerable.
-async function list(request: Request, env: Env, url: URL, bucket: R2Bucket): Promise<Response> {
-  if (!(await isAuthenticated(request, env))) return new Response("unauthorized\n", { status: 401 });
-  const limit = Math.min(Math.max(Number(url.searchParams.get("limit")) || 20, 1), 1000);
+interface FileEntry {
+  key: string;
+  size: number;
+  uploaded: string;
+  visibility: "public" | "private";
+  stable: boolean;
+  project?: string;
+  branch?: string;
+}
+
+function fileEntryOf(object: R2Object): FileEntry {
+  const meta = object.customMetadata;
+  return {
+    key: object.key,
+    size: object.size,
+    uploaded: object.uploaded.toISOString(),
+    visibility: visibilityOf(object.key, meta),
+    stable: meta?.stable === "true",
+    ...(meta?.project && { project: meta.project }),
+    ...(meta?.branch && { branch: meta.branch }),
+  };
+}
+
+// GET /api/files - the collection. `prefix` + `delimiter` browse one
+// directory level; project/branch/worktree/dir (git context), type
+// (extension), and visibility filter; `limit` caps the result. Filters
+// compose. Browse results sort by name, everything else newest first.
+async function listFiles(url: URL, bucket: R2Bucket): Promise<Response> {
+  const params = url.searchParams;
+  const limit = Math.min(Math.max(Number(params.get("limit")) || 20, 1), 1000);
+  const prefix = params.get("prefix") ?? "";
+  const delimiter = params.get("delimiter") ?? undefined;
 
   // Git-context filters (see META_HEADERS). Every provided filter must match;
-  // objects uploaded without context (pre-tagging, or curl) never match.
+  // Files uploaded without context (pre-tagging, or curl) never match.
   // "project" matches the project name or its full path, so both
   // `--project skills` and an inferred absolute path work.
   const filters = (["project", "branch", "worktree", "dir"] as const).flatMap((name) => {
-    const value = url.searchParams.get(name);
+    const value = params.get(name);
     return value === null ? [] : [{ name, value }];
   });
   const matches = (meta: Record<string, string> | undefined) =>
@@ -373,8 +458,8 @@ async function list(request: Request, env: Env, url: URL, bucket: R2Bucket): Pro
   // File-type filter: comma-separated categories (see TYPE_CATEGORIES) and/or
   // bare extensions, OR'd together. Applied before the limit slice, so
   // `?limit=20&type=pdf` means the 20 newest PDFs, not the PDFs among the 20
-  // newest files. Keys without an extension never match.
-  const typeParam = url.searchParams.get("type");
+  // newest Files. Keys without an extension never match.
+  const typeParam = params.get("type");
   const extensions = typeParam
     ? new Set(
         typeParam
@@ -387,41 +472,117 @@ async function list(request: Request, env: Env, url: URL, bucket: R2Bucket): Pro
   const matchesType = (key: string) => extensions === null || extensions.has(extensionOf(key));
 
   // Visibility filter: "public" or "private" (anything else matches nothing).
-  const visibilityParam = url.searchParams.get("visibility");
+  const visibilityParam = params.get("visibility");
 
   // R2 lists lexicographically with no reverse option, so walk the whole
-  // bucket and sort by upload time; these are small personal buckets.
-  const objects: { key: string; size: number; uploaded: string; visibility: string }[] = [];
+  // prefix and sort afterwards; these are small personal buckets.
+  const directories: string[] = [];
+  const files: FileEntry[] = [];
   let cursor: string | undefined;
   do {
-    const page = await bucket.list({ cursor, limit: 1000, include: ["customMetadata"] });
+    const page = await bucket.list({
+      prefix: prefix || undefined,
+      delimiter,
+      cursor,
+      limit: 1000,
+      include: ["customMetadata"],
+    });
+    for (const dir of page.delimitedPrefixes ?? []) {
+      // The version namespace and reserved names stay out of the root
+      // listing; deeper levels have nothing to hide.
+      if (!prefix && (dir === "archive/" || RESERVED_TOP_LEVEL.includes(dir.slice(0, -1)))) continue;
+      directories.push(dir);
+    }
     for (const object of page.objects) {
-      // Archived previous versions only show up in per-path ?history.
+      // Versions only show up in /api/versions/<key>.
       if (isArchiveKey(object.key)) continue;
+      if (!prefix && RESERVED_TOP_LEVEL.includes(object.key.split("/")[0])) continue;
       if (!matches(object.customMetadata)) continue;
       if (!matchesType(object.key)) continue;
-      const visibility = visibilityOf(object.key, object.customMetadata);
-      if (visibilityParam !== null && visibility !== visibilityParam) continue;
-      objects.push({
-        key: object.key,
-        size: object.size,
-        uploaded: object.uploaded.toISOString(),
-        visibility,
-      });
+      const entry = fileEntryOf(object);
+      if (visibilityParam !== null && entry.visibility !== visibilityParam) continue;
+      files.push(entry);
     }
     cursor = page.truncated ? page.cursor : undefined;
   } while (cursor);
 
-  objects.sort((a, b) => b.uploaded.localeCompare(a.uploaded));
-  return Response.json(objects.slice(0, limit), { headers: { "cache-control": "no-store" } });
+  directories.sort();
+  if (delimiter) files.sort((a, b) => a.key.localeCompare(b.key));
+  else files.sort((a, b) => b.uploaded.localeCompare(a.uploaded));
+
+  return Response.json(
+    { prefix, directories, files: files.slice(0, limit) },
+    { headers: { "cache-control": "no-store" } },
+  );
 }
 
-// GET /<path>?history returns a stable path's current object plus its
-// archived previous versions, newest first. Authenticated like /?list.
-async function history(request: Request, env: Env, url: URL, bucket: R2Bucket): Promise<Response> {
-  if (!(await isAuthenticated(request, env))) return new Response("unauthorized\n", { status: 401 });
-  const key = decodeURIComponent(url.pathname.slice(1));
+// GET /api/files/<key> - the File's metadata.
+async function fileMeta(key: string, bucket: R2Bucket): Promise<Response> {
+  const object = await bucket.head(key);
+  if (!object) return new Response("not found\n", { status: 404 });
+  const meta = object.customMetadata ?? {};
+  return Response.json(
+    {
+      ...fileEntryOf(object),
+      contentType: object.httpMetadata?.contentType,
+      ...(meta.worktree && { worktree: meta.worktree }),
+      ...(meta.dir && { dir: meta.dir }),
+    },
+    { headers: { "cache-control": "no-store" } },
+  );
+}
 
+// PATCH /api/files/<key> with {"visibility": "public"|"private"} flips the
+// stamp via a metadata self-copy (R2 has no metadata-only update). Same key,
+// same URL, no content change - so flips never archive anything.
+async function patchFile(request: Request, key: string, bucket: R2Bucket): Promise<Response> {
+  const body = (await request.json().catch(() => null)) as { visibility?: unknown } | null;
+  const value = body?.visibility;
+  if (value !== "public" && value !== "private") {
+    return new Response('body must be {"visibility": "public"} or {"visibility": "private"}\n', {
+      status: 400,
+    });
+  }
+  if (isArchiveKey(key)) {
+    return new Response("Versions are always private\n", { status: 400 });
+  }
+  const object = await bucket.get(key);
+  if (!object) return new Response("not found\n", { status: 404 });
+  const meta = { ...object.customMetadata };
+  if (value === "public") meta.visibility = "public";
+  else delete meta.visibility;
+  await bucket.put(key, object.body, { httpMetadata: object.httpMetadata, customMetadata: meta });
+  return fileMeta(key, bucket);
+}
+
+// DELETE /api/files/<key> removes the whole identity: the File plus every
+// Version under archive/<key>/. Deleting one Version by its own archive key
+// prunes just that Version. Responds with the deleted keys.
+async function deleteFile(key: string, bucket: R2Bucket): Promise<Response> {
+  const deleted: string[] = [];
+  if ((await bucket.head(key)) !== null) deleted.push(key);
+  if (!isArchiveKey(key)) {
+    const prefix = `archive/${key}/`;
+    let cursor: string | undefined;
+    do {
+      const page = await bucket.list({ prefix, cursor, limit: 1000 });
+      for (const object of page.objects) {
+        // Only direct children: deeper keys are the history of a nested
+        // Stable Path, not Versions of this one.
+        if (!object.key.slice(prefix.length).includes("/")) deleted.push(object.key);
+      }
+      cursor = page.truncated ? page.cursor : undefined;
+    } while (cursor);
+  }
+  if (deleted.length === 0) return new Response("not found\n", { status: 404 });
+  await bucket.delete(deleted);
+  return Response.json({ deleted }, { headers: { "cache-control": "no-store" } });
+}
+
+// GET /api/versions/<key> - the File's current state plus its Versions,
+// newest first. A top-level resource because Keys contain slashes: a
+// /versions suffix on the Key would be unparseable.
+async function listVersions(key: string, bucket: R2Bucket): Promise<Response> {
   const prefix = `archive/${key}/`;
   const versions: { key: string; size: number; uploaded: string }[] = [];
   let cursor: string | undefined;
@@ -429,12 +590,12 @@ async function history(request: Request, env: Env, url: URL, bucket: R2Bucket): 
     const page = await bucket.list({ prefix, cursor, limit: 1000, include: ["customMetadata"] });
     for (const object of page.objects) {
       // Versions sit directly under the prefix; deeper keys belong to the
-      // history of a nested stable path that has this one as a directory.
+      // history of a nested Stable Path that has this one as a directory.
       if (object.key.slice(prefix.length).includes("/")) continue;
       versions.push({
         key: object.key,
         size: object.size,
-        // When the version was originally written, preserved at archive time
+        // When the Version was originally written, preserved at archive time
         // (the object's own `uploaded` is when it was archived).
         uploaded: object.customMetadata?.uploaded ?? object.uploaded.toISOString(),
       });
@@ -454,68 +615,36 @@ async function history(request: Request, env: Env, url: URL, bucket: R2Bucket): 
   );
 }
 
-// GET /<path>?visibility prints the stamp; PATCH /<path>?visibility=<value>
-// flips it via a metadata self-copy (R2 has no metadata-only update). Same
-// key, same URL, no content change - so flips never archive anything.
-async function visibility(request: Request, env: Env, url: URL, bucket: R2Bucket): Promise<Response> {
+// The /api machine surface. Anonymous requests get a plain 401, never the
+// login redirect: /api is a Reserved Key whose existence is not secret, and
+// a 302 to an HTML login page confuses API clients.
+async function api(request: Request, env: Env, url: URL, bucket: R2Bucket): Promise<Response> {
   if (!(await isAuthenticated(request, env))) return new Response("unauthorized\n", { status: 401 });
-  const key = decodeURIComponent(url.pathname.slice(1));
+  const path = decodeURIComponent(url.pathname);
 
-  if (request.method === "GET") {
-    const object = await bucket.head(key);
-    if (!object) return new Response("not found\n", { status: 404 });
-    return new Response(`${visibilityOf(key, object.customMetadata)}\n`, {
-      headers: { "cache-control": "no-store" },
-    });
+  if (path === "/api/files" || path === "/api/files/") {
+    if (request.method !== "GET") return new Response("method not allowed\n", { status: 405 });
+    return listFiles(url, bucket);
   }
-
-  const value = url.searchParams.get("visibility");
-  if (value !== "public" && value !== "private") {
-    return new Response("visibility must be public or private\n", { status: 400 });
+  if (path.startsWith("/api/files/")) {
+    const key = path.slice("/api/files/".length).replace(/\/+$/, "");
+    if (request.method === "GET") return fileMeta(key, bucket);
+    if (request.method === "PATCH") return patchFile(request, key, bucket);
+    if (request.method === "DELETE") return deleteFile(key, bucket);
+    return new Response("method not allowed\n", { status: 405 });
   }
-  if (isArchiveKey(key)) {
-    return new Response("archived versions are always private\n", { status: 400 });
+  if (path.startsWith("/api/versions/")) {
+    if (request.method !== "GET") return new Response("method not allowed\n", { status: 405 });
+    const key = path.slice("/api/versions/".length).replace(/\/+$/, "");
+    return listVersions(key, bucket);
   }
-  const object = await bucket.get(key);
-  if (!object) return new Response("not found\n", { status: 404 });
-  const meta = { ...object.customMetadata };
-  if (value === "public") meta.visibility = "public";
-  else delete meta.visibility;
-  await bucket.put(key, object.body, { httpMetadata: object.httpMetadata, customMetadata: meta });
-  return new Response(`https://${url.hostname}/${key}\n`, { headers: { "cache-control": "no-store" } });
-}
-
-// DELETE /<path> removes the whole identity: the object plus every archived
-// version under archive/<path>/. Deleting one archived version by its own
-// archive URL prunes just that version. Responds with the deleted keys.
-async function remove(request: Request, env: Env, url: URL, bucket: R2Bucket): Promise<Response> {
-  if (!(await isAuthenticated(request, env))) return new Response("unauthorized\n", { status: 401 });
-  const key = decodeURIComponent(url.pathname.slice(1));
-  if (!key) return new Response("DELETE needs an explicit path\n", { status: 400 });
-
-  const deleted: string[] = [];
-  if ((await bucket.head(key)) !== null) deleted.push(key);
-  if (!isArchiveKey(key)) {
-    const prefix = `archive/${key}/`;
-    let cursor: string | undefined;
-    do {
-      const page = await bucket.list({ prefix, cursor, limit: 1000 });
-      for (const object of page.objects) {
-        // Only direct children: deeper keys are the history of a nested
-        // stable path, not versions of this one.
-        if (!object.key.slice(prefix.length).includes("/")) deleted.push(object.key);
-      }
-      cursor = page.truncated ? page.cursor : undefined;
-    } while (cursor);
-  }
-  if (deleted.length === 0) return new Response("not found\n", { status: 404 });
-  await bucket.delete(deleted);
-  return Response.json({ deleted }, { headers: { "cache-control": "no-store" } });
+  return new Response("not found\n", { status: 404 });
 }
 
 function objectHeaders(object: R2Object, publicObject: boolean): HeadersInit {
-  // Private responses must never land in shared caches. Public stable objects
-  // change in place, so they revalidate by etag; generated keys are immutable.
+  // Private responses must never land in shared caches. Public Stable Paths
+  // change in place, so they revalidate by etag; Generated Keys are
+  // immutable.
   const stable = object.customMetadata?.stable === "true";
   return {
     "content-type": object.httpMetadata?.contentType ?? "application/octet-stream",
@@ -529,40 +658,65 @@ function objectHeaders(object: R2Object, publicObject: boolean): HeadersInit {
   };
 }
 
-// GET/HEAD of a key. Public objects are served to anyone. Everything else -
-// a private object or a key that does not exist - is indistinguishable to an
-// anonymous client: both redirect to /login, so nothing leaks.
-async function serve(request: Request, env: Env, url: URL, bucket: R2Bucket): Promise<Response> {
-  const key = decodeURIComponent(url.pathname.slice(1));
-  const object = key
-    ? request.method === "HEAD"
-      ? await bucket.head(key)
-      : await bucket.get(key)
-    : null;
-
-  const publicObject = object !== null && isPublic(key, object.customMetadata);
-  if (!publicObject && !(await isAuthenticated(request, env))) {
-    // Arriving with the marker means we just came back from /login and the
-    // cookie still is not there: the client refuses cookies, so redirecting
-    // again would loop.
-    if (url.searchParams.has(LOGIN_MARKER)) {
-      return new Response("authentication requires cookies\n", { status: 403 });
-    }
-    return new Response(null, {
-      status: 302,
-      headers: {
-        location: `/login?to=${encodeURIComponent(url.pathname)}`,
-        "cache-control": "no-store",
-      },
-    });
-  }
-  if (!object) return new Response("not found\n", { status: 404 });
-
+function fileResponse(request: Request, object: R2Object, publicObject: boolean): Response {
   const headers = objectHeaders(object, publicObject);
   // head() results have no body; get() results do.
   const body = "body" in object ? (object as R2ObjectBody).body : null;
   if (request.method === "HEAD" || body === null) return new Response(null, { headers });
   return new Response(body, { headers });
+}
+
+// The browse-UI SPA shell (ui/dist/_/index.html via the ASSETS binding),
+// served at the Directory Route's own URL so the app can read its location.
+async function serveShell(request: Request, env: Env): Promise<Response> {
+  const shell = await env.ASSETS.fetch(new URL("/_/", request.url));
+  return new Response(request.method === "HEAD" ? null : shell.body, {
+    status: 200,
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "private, no-store",
+    },
+  });
+}
+
+// GET/HEAD of any content path, resolved per docs/adr/0002: an exact Key
+// match serves the File (public ones to anyone); every other path is a
+// Directory Route - browse UI for authenticated browsers, plain 404 for
+// authenticated non-HTML clients, the login redirect for everyone else.
+async function resolve(request: Request, env: Env, url: URL, bucket: R2Bucket): Promise<Response> {
+  const rawKey = decodeURIComponent(url.pathname).replace(/^\/+/, "");
+  // A trailing slash always means a Directory Route, so /pr-assets/ is the
+  // listing even when a File named pr-assets exists.
+  const trailingSlash = rawKey.endsWith("/");
+  const key = rawKey.replace(/\/+$/, "");
+
+  // Version alias: /<key>/archive/<stamp> serves archive/<key>/<stamp>.
+  // Real archive/... Keys pass through untouched, and no other Key can
+  // contain an archive segment (Reserved Key), so the rewrite is unambiguous.
+  let lookupKey = key;
+  if (!isArchiveKey(key)) {
+    const alias = key.match(/^(.+)\/archive\/([^/]+)$/);
+    if (alias) lookupKey = `archive/${alias[1]}/${alias[2]}`;
+  }
+
+  const object =
+    key && !trailingSlash
+      ? request.method === "HEAD"
+        ? await bucket.head(lookupKey)
+        : await bucket.get(lookupKey)
+      : null;
+
+  const publicObject = object !== null && isPublic(lookupKey, object.customMetadata);
+  if (publicObject) return fileResponse(request, object, true);
+
+  if (!(await isAuthenticated(request, env))) return loginRedirect(url);
+  if (object) return fileResponse(request, object, false);
+
+  // Directory Route (also /<key>/archive, whose history view lives in the
+  // SPA). Only clients that accept text/html get the shell; scripted reads
+  // keep 404 semantics instead of a 200 HTML page.
+  if (request.headers.get("accept")?.includes("text/html")) return serveShell(request, env);
+  return new Response("not found\n", { status: 404 });
 }
 
 export default {
@@ -571,17 +725,23 @@ export default {
     const bucket = env.FILES;
 
     if (url.pathname === "/login") return login(request, env, url);
+    // Every PUT/POST is an upload attempt - no system route accepts them - so
+    // routing them first lets upload() reject Reserved Keys with the 400 that
+    // names the reserved word instead of a generic 405.
     if (request.method === "PUT" || request.method === "POST") return upload(request, env, url, bucket);
-    if (request.method === "PATCH") return visibility(request, env, url, bucket);
-    if (request.method === "DELETE") return remove(request, env, url, bucket);
-    if (request.method === "GET" || request.method === "HEAD") {
-      if (url.pathname === "/" && url.searchParams.has("list")) return list(request, env, url, bucket);
-      if (url.pathname !== "/") {
-        if (url.searchParams.has("history")) return history(request, env, url, bucket);
-        if (url.searchParams.has("visibility")) return visibility(request, env, url, bucket);
-      }
-      return serve(request, env, url, bucket);
+    if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
+      return api(request, env, url, bucket);
     }
+    // The UI asset bundle. Gated like everything else (fail closed): the only
+    // legitimate consumer is the shell, which required auth to load.
+    if (url.pathname === "/_" || url.pathname.startsWith("/_/")) {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response("method not allowed\n", { status: 405 });
+      }
+      if (!(await isAuthenticated(request, env))) return loginRedirect(url);
+      return env.ASSETS.fetch(request);
+    }
+    if (request.method === "GET" || request.method === "HEAD") return resolve(request, env, url, bucket);
     return new Response("method not allowed\n", { status: 405 });
   },
 } satisfies ExportedHandler<Env>;

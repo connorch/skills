@@ -203,7 +203,7 @@ async function list(opts: ListOptions): Promise<void> {
   const limit = Number(opts.limit);
   if (!Number.isInteger(limit) || limit < 1) fail("--limit must be a positive integer");
 
-  const query = new URLSearchParams({ list: "", limit: String(limit) });
+  const query = new URLSearchParams({ limit: String(limit) });
   if (opts.public) query.set("visibility", "public");
   if (opts.private) query.set("visibility", "private");
   const context = gitContext();
@@ -224,10 +224,10 @@ async function list(opts: ListOptions): Promise<void> {
   }
   if (opts.type) query.set("type", opts.type.join(","));
 
-  const res = await fetch(`${HOST}/?${query}`, { headers: authHeaders() });
+  const res = await fetch(`${HOST}/api/files?${query}`, { headers: authHeaders() });
   if (!res.ok) fail(`list failed (${res.status}): ${(await res.text()).trim()}`);
-  const entries = (await res.json()) as ListEntry[];
-  for (const entry of entries) {
+  const { files } = (await res.json()) as { files: ListEntry[] };
+  for (const entry of files) {
     const tag = entry.visibility === "public" ? "pub" : "prv";
     console.log(
       `${formatWhen(entry.uploaded)}  ${formatSize(entry.size).padStart(9)}  ${tag}  ${HOST}/${entry.key}`,
@@ -235,12 +235,17 @@ async function list(opts: ListOptions): Promise<void> {
   }
 }
 
-// A target is a wovn URL or a bare key path; both name the same object on the
-// single host.
+// A target is a wovn URL or a bare key path; both name the same File on the
+// single host. A pasted Version alias URL (/<key>/archive[/<stamp>]) resolves
+// to the Stable Path it belongs to, so `wovn history` and `wovn diff` accept
+// those URLs; real archive/... keys pass through untouched.
 function resolveKey(target: string): string {
-  if (target.startsWith(`${HOST}/`)) return target.slice(HOST.length + 1);
-  if (/^https?:\/\//.test(target)) fail(`not a ${HOST} URL: ${target}`);
-  return target.replace(/^\/+/, "");
+  let key = target;
+  if (target.startsWith(`${HOST}/`)) key = target.slice(HOST.length + 1);
+  else if (/^https?:\/\//.test(target)) fail(`not a ${HOST} URL: ${target}`);
+  key = key.replace(/^\/+/, "").replace(/\/+$/, "");
+  if (!key.startsWith("archive/")) key = key.replace(/\/archive(\/[^/]+)?$/, "");
+  return key;
 }
 
 async function read(target: string): Promise<void> {
@@ -263,7 +268,7 @@ interface FileHistory {
 
 async function fetchHistory(target: string): Promise<{ key: string; history: FileHistory }> {
   const key = resolveKey(target);
-  const res = await fetch(`${HOST}/${key}?history`, { headers: authHeaders() });
+  const res = await fetch(`${HOST}/api/versions/${key}`, { headers: authHeaders() });
   if (!res.ok) fail(`history failed (${res.status}): ${(await res.text()).trim()}`);
   return { key, history: (await res.json()) as FileHistory };
 }
@@ -326,26 +331,31 @@ async function diff(oldTarget: string, newTarget: string | undefined): Promise<v
 
 async function visibilityGet(target: string): Promise<void> {
   const key = resolveKey(target);
-  const res = await fetch(`${HOST}/${key}?visibility`, { headers: authHeaders() });
+  const res = await fetch(`${HOST}/api/files/${key}`, { headers: authHeaders() });
   if (!res.ok) fail(`visibility get failed (${res.status}): ${(await res.text()).trim()}`);
-  process.stdout.write(await res.text());
+  const { visibility } = (await res.json()) as { visibility: string };
+  console.log(visibility);
 }
 
 async function visibilitySet(target: string, value: string): Promise<void> {
   if (value !== "public" && value !== "private") fail("visibility must be public or private");
   const key = resolveKey(target);
-  const res = await fetch(`${HOST}/${key}?visibility=${value}`, {
+  const res = await fetch(`${HOST}/api/files/${key}`, {
     method: "PATCH",
-    headers: authHeaders(),
+    headers: { ...authHeaders(), "content-type": "application/json" },
+    body: JSON.stringify({ visibility: value }),
   });
   if (!res.ok) fail(`visibility set failed (${res.status}): ${(await res.text()).trim()}`);
-  process.stdout.write(await res.text());
+  console.log(`${HOST}/${key}`);
 }
 
 async function rm(targets: string[]): Promise<void> {
   for (const target of targets) {
     const key = resolveKey(target);
-    const res = await fetch(`${HOST}/${key}`, { method: "DELETE", headers: authHeaders() });
+    const res = await fetch(`${HOST}/api/files/${key}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
     if (!res.ok) fail(`rm failed for ${HOST}/${key} (${res.status}): ${(await res.text()).trim()}`);
     const { deleted } = (await res.json()) as { deleted: string[] };
     for (const deletedKey of deleted) console.log(`deleted ${HOST}/${deletedKey}`);
