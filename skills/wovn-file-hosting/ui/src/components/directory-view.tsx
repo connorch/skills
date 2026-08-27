@@ -31,11 +31,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 // in classic-autoindex spirit - a dense table of directories then Files.
 export function DirectoryView({
   prefix,
-  filter,
   navigate,
 }: {
   prefix: string
-  filter: string
   navigate: (to: string) => void
 }) {
   const [listing, setListing] = useState<Listing | null>(null)
@@ -80,10 +78,8 @@ export function DirectoryView({
 
   if (!listing) return <ListingSkeleton />
 
-  const needle = filter.trim().toLowerCase()
   const nameOf = (key: string) => key.slice(prefix.length)
-  const directories = listing.directories.filter((d) => nameOf(d).toLowerCase().includes(needle))
-  const files = listing.files.filter((f) => nameOf(f.key).toLowerCase().includes(needle))
+  const { directories, files } = listing
   const parent = prefix === "" ? null : `/${prefix.replace(/[^/]+\/$/, "")}`
 
   const removeFile = (key: string) =>
@@ -102,10 +98,8 @@ export function DirectoryView({
       {directories.length === 0 && files.length === 0 ? (
         <Empty className="py-10">
           <EmptyHeader>
-            <EmptyTitle>{needle ? "no matches" : "empty directory"}</EmptyTitle>
-            <EmptyDescription>
-              {needle ? `nothing here matches "${filter.trim()}"` : "no Files under this prefix"}
-            </EmptyDescription>
+            <EmptyTitle>empty directory</EmptyTitle>
+            <EmptyDescription>no Files under this prefix</EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : (
