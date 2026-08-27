@@ -2,8 +2,8 @@ import { Fragment, useCallback, useEffect, useState } from "react"
 
 import { DirectoryView } from "@/components/directory-view"
 import { HistoryView } from "@/components/history-view"
+import { SearchPalette } from "@/components/search-palette"
 import { Toaster } from "@/components/ui/sonner"
-import { Input } from "@/components/ui/input"
 import { navClick } from "@/lib/format"
 
 // The worker serves this shell for every Directory Route - any authenticated
@@ -31,7 +31,7 @@ function parseRoute(pathname: string): Route {
 
 export default function App() {
   const [path, setPath] = useState(() => window.location.pathname)
-  const [filter, setFilter] = useState("")
+  const [searchOpen, setSearchOpen] = useState(false)
 
   // Drop the ?wovn-authed=1 marker the /login flow appends, so copied URLs
   // stay clean.
@@ -43,21 +43,34 @@ export default function App() {
     }
   }, [])
 
-  // Any navigation - pushState or back/forward - lands on a fresh view, so
-  // the filter resets alongside the path.
   useEffect(() => {
-    const onPopState = () => {
-      setPath(window.location.pathname)
-      setFilter("")
-    }
+    const onPopState = () => setPath(window.location.pathname)
     window.addEventListener("popstate", onPopState)
     return () => window.removeEventListener("popstate", onPopState)
+  }, [])
+
+  // ⌘K / Ctrl+K toggles the search palette from anywhere; `/` opens it unless
+  // a text field already has focus.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "k" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault()
+        setSearchOpen((open) => !open)
+      } else if (
+        event.key === "/" &&
+        !(event.target instanceof HTMLElement && event.target.closest("input, textarea"))
+      ) {
+        event.preventDefault()
+        setSearchOpen(true)
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
   }, [])
 
   const navigate = useCallback((to: string) => {
     window.history.pushState(null, "", to)
     setPath(to)
-    setFilter("")
   }, [])
 
   const route = parseRoute(path)
@@ -70,22 +83,28 @@ export default function App() {
     <div className="mx-auto max-w-4xl px-4 py-6 font-mono text-[13px]">
       <div className="flex items-center gap-4 border-b border-border pb-2">
         <Breadcrumb route={route} navigate={navigate} />
-        {route.kind === "listing" && (
-          <Input
-            className="ml-auto h-7 w-40 font-mono text-[13px]"
-            placeholder="filter"
-            value={filter}
-            onChange={(event) => setFilter(event.target.value)}
-          />
-        )}
+        <button
+          type="button"
+          className="ml-auto flex cursor-pointer items-center gap-1.5 rounded-md border border-border px-2 py-0.5 text-xs whitespace-nowrap text-muted-foreground hover:bg-accent"
+          onClick={() => setSearchOpen(true)}
+        >
+          search <kbd className="rounded border border-border px-1 text-[11px]">⌘K</kbd>
+        </button>
       </div>
       <main className="pt-1">
         {route.kind === "listing" ? (
-          <DirectoryView key={path} prefix={route.target} filter={filter} navigate={navigate} />
+          <DirectoryView key={path} prefix={route.target} navigate={navigate} />
         ) : (
           <HistoryView key={path} fileKey={route.target} />
         )}
       </main>
+      <SearchPalette
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        // On the archive view, the File's own directory.
+        prefix={route.kind === "listing" ? route.target : route.target.replace(/[^/]*$/, "")}
+        navigate={navigate}
+      />
       <Toaster />
     </div>
   )

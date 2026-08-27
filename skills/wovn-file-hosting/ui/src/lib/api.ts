@@ -48,6 +48,13 @@ export function fetchListing(prefix: string): Promise<Listing> {
   return request<Listing>(`/api/files?${query}`)
 }
 
+// Every File in the bucket (no delimiter, so no directories), newest first;
+// the search palette matches and filters client-side. The limit is far above
+// this personal bucket's size, and the worker caps at 1000 anyway.
+export function fetchAllFiles(): Promise<Listing> {
+  return request<Listing>("/api/files?limit=1000")
+}
+
 export function fetchVersions(key: string): Promise<Versions> {
   return request<Versions>(`/api/versions/${key}`)
 }
