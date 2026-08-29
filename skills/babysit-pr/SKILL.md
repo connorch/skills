@@ -29,3 +29,7 @@ Screenshots and videos help as well. Use the `wovn-file-hosting` skill when need
 Do not let review feedback expand the PR beyond the user's original goal. Address real shortcomings, but avoid scope creep.
 
 If nothing has changed, stay quiet rather than posting filler comments. Stop when the review bots and required checks are green on the latest commit. Merge only when the user explicitly requested it; otherwise report that the PR is ready.
+
+## chatgpt-codex-connector reviews
+
+This is section is specifically for reviews from the `chatgpt-codex-connector` (i.e., "Codex Review" comments on the PR). Be selective about which codex review comments are worth addressing. The Codex review bot is notoriously bad at judging severity - a comment it labels P1 could really be a P3, or not a real issue at all. Don't take Codex Review severity label at face value; use your own judgement on whether a finding is real and worth fixing.
