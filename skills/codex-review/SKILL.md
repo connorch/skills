@@ -20,14 +20,16 @@ ARTIFACT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/codex-review.XXXXXX")"
 REPORT="$ARTIFACT_DIR/report.md"
 
 # Review staged, unstaged, and untracked changes.
-codex -C "$PWD" review --uncommitted > "$REPORT"
+codex -C "$PWD" review --uncommitted </dev/null > "$REPORT" 2>"$ARTIFACT_DIR/run.log"
 
 # Review current branch against a base branch.
-codex -C "$PWD" review --base main > "$REPORT"
+codex -C "$PWD" review --base main </dev/null > "$REPORT" 2>"$ARTIFACT_DIR/run.log"
 
 # Review a single commit.
-codex -C "$PWD" review --commit <sha> > "$REPORT"
+codex -C "$PWD" review --commit <sha> </dev/null > "$REPORT" 2>"$ARTIFACT_DIR/run.log"
 ```
+
+Stdin must be closed with `</dev/null` (unless piping a prompt in, as in focused review below); otherwise Codex blocks waiting on a terminal that never answers.
 
 Choose this when: the goal is comprehensive bug-finding with no specific angle, the diff is large, or you want Codex's independent judgment without steering it.
 
