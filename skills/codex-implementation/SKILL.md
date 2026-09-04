@@ -15,9 +15,10 @@ Use this when the user asks for Codex or delegation, or when a bounded task woul
 2. Define the implementation scope: files or behavior to change, files to avoid, constraints, and verification commands.
 3. Create a temporary artifact directory for Codex's report.
 4. Run `codex exec` with repo write access.
-5. After Codex exits, inspect `git status` and `git diff`.
-6. Run the cheapest reliable verification yourself when practical.
-7. Report what Codex changed, what Claude verified, and any remaining risks.
+5. Confirm `run.log` has content shortly after launch.
+6. After Codex exits, inspect `git status` and `git diff`.
+7. Run the cheapest reliable verification yourself when practical.
+8. Report what Codex changed, what Claude verified, and any remaining risks.
 
 Use this command shape:
 
@@ -32,12 +33,20 @@ codex exec \
   --add-dir "$ARTIFACT_DIR" \
   -s workspace-write \
   -o "$REPORT" \
-  "$(cat "$PROMPT")"
+  "$(cat "$PROMPT")" </dev/null >"$ARTIFACT_DIR/run.log" 2>&1
 ```
 
 Use `-s workspace-write` by default. Use `-s danger-full-access` only when the implementation truly needs access outside the repo, app launch automation, simulator work, package-manager global state, or other machine-level operations.
 
 If `codex` is not installed or the command fails, report the error and offer to implement the change directly instead.
+
+### Running in the background
+
+Runs commonly exceed the Bash tool's 10-minute timeout. Either pass an explicit long timeout or run in the background.
+
+- Always close stdin with `</dev/null`, backgrounded or not. Codex otherwise blocks waiting on a terminal that never answers and the run hangs silently.
+- Shortly after launch, check once that `run.log` has content. This catches a bad launch (missing binary, rejected flag) without waiting for the full run. After that, rely on the process exit notification; no polling.
+- The report file at `$REPORT` is the completion signal. Do not read the diff until it exists.
 
 ## Prompt Requirements
 
