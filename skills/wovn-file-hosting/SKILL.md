@@ -175,17 +175,15 @@ the real extension. Characters outside `a-z A-Z 0-9 . _ -` are replaced with
   hosted videos as a plain link, or convert short clips to GIF first if
   inline playback matters.
 
-## Maintenance
+## In the browser
 
-The file host is a Cloudflare Worker whose source lives in `worker/` next to
-this file (single R2 bucket `wovn-files`; the `WOVN_TOKEN` secret and the
-`files.wovn.org/login` Cloudflare Access app handle auth - see
-`docs/adr/0001`). To change it, edit `worker/src/index.ts` and run
-`pnpm typecheck && pnpm run deploy` there. Deploys bundle the browse UI from
-`ui/dist`, so run `pnpm install && pnpm build` in `ui/` first on a fresh
-checkout. `wovn token rotate` rotates the token (Worker secret +
-`~/.config/wovn-files/token.txt`).
+A File opened in a logged-in browser renders inside a Wovn wrapper (path,
+visibility, versions) around the content, so it does not look like the bytes
+`wovn read` returns. Public URLs and every non-browser reader get the exact
+bytes; append `?raw` to see them in a browser. `wovn open <url-or-path>`
+opens a File in the browser from the terminal.
 
-The `wovn` CLI is a TypeScript commander program in `cli/`; after editing
-`cli/src/wovn.ts`, run `pnpm install && pnpm typecheck && pnpm build` there
-and install the bundle with `cp dist/wovn ~/.local/bin/wovn`.
+## Where it runs
+
+files.wovn.org is a Cloudflare Worker in front of one R2 bucket. This skill
+is for using the CLI; changing the host is a separate job.
