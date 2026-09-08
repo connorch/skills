@@ -175,15 +175,28 @@ the real extension. Characters outside `a-z A-Z 0-9 . _ -` are replaced with
   hosted videos as a plain link, or convert short clips to GIF first if
   inline playback matters.
 
+## In the browser
+
+A File URL opened in a logged-in browser renders inside the Wovn app: a
+strip across the top with the path, visibility, a `raw` link, the version
+count, and ⌘K search, which expands into the parent directory listing, the
+File's versions, and its details and actions. Everything else (`wovn read`,
+curl, agents, images embedded elsewhere, and anyone not logged in) gets the
+exact bytes. Add `?raw` to a URL to see the bytes in your own browser, and
+`wovn open <path-or-url>` opens a File from the terminal. Versions live at
+`<url>?version=<stamp>`; `<url>?versions` opens the versions panel.
+
 ## Maintenance
 
-The file host is a Cloudflare Worker whose source lives in `worker/` next to
-this file (single R2 bucket `wovn-files`; the `WOVN_TOKEN` secret and the
-`files.wovn.org/login` Cloudflare Access app handle auth - see
-`docs/adr/0001`). To change it, edit `worker/src/index.ts` and run
-`pnpm typecheck && pnpm run deploy` there. Deploys bundle the browse UI from
-`ui/dist`, so run `pnpm install && pnpm build` in `ui/` first on a fresh
-checkout. `wovn token rotate` rotates the token (Worker secret +
+The file host is a TanStack Start app on a Cloudflare Worker whose source
+lives in `app/` next to this file (single R2 bucket `wovn-files`; the
+`WOVN_TOKEN` secret and the `files.wovn.org/login` Cloudflare Access app
+handle auth - see `docs/adr/0001`; the browser wrapper is `docs/adr/0003`
+and `0004`). To change it, edit `app/src` and run
+`pnpm install && pnpm typecheck && pnpm build && pnpm run deploy` there;
+`pnpm dev` serves app pages with hot reload, and `pnpm build && pnpm preview`
+runs the built Worker locally with a local bucket for checking the injected
+banner. `wovn token rotate` rotates the token (Worker secret +
 `~/.config/wovn-files/token.txt`).
 
 The `wovn` CLI is a TypeScript commander program in `cli/`; after editing

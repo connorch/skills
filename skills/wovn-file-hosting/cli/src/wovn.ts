@@ -248,6 +248,16 @@ function resolveKey(target: string): string {
   return key;
 }
 
+// Opens the File in the default browser, where a logged-in session renders
+// it inside the Wovn app (the Banner); `wovn read` keeps returning the bytes.
+function open(target: string): void {
+  const url = `${HOST}/${resolveKey(target)}`;
+  const opener = process.platform === "darwin" ? "open" : "xdg-open";
+  const result = spawnSync(opener, [url], { stdio: "inherit" });
+  if (result.status !== 0) fail(`could not open ${url}`);
+  console.log(url);
+}
+
 async function read(target: string): Promise<void> {
   const key = resolveKey(target);
   const res = await fetch(`${HOST}/${key}`, { headers: authHeaders() });
@@ -416,6 +426,12 @@ program
   .description("print a hosted file to stdout")
   .argument("<url-or-path>", "wovn URL or key path")
   .action(read);
+
+program
+  .command("open")
+  .description("open a hosted file in the browser (logged in, it renders inside the Wovn app)")
+  .argument("<url-or-path>", "wovn URL or key path")
+  .action(open);
 
 program
   .command("history")
