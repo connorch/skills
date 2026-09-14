@@ -25,6 +25,7 @@ skills add connorch/skills --skill step-back
 skills add connorch/skills --skill pull-upstream
 skills add connorch/skills --skill babysit-pr
 skills add connorch/skills --skill file-pr
+skills add connorch/skills --skill implement-and-review
 skills add connorch/skills --skill html-communication
 skills add connorch/skills --skill wovn-file-hosting
 skills add connorch/skills --skill sb-ingest
@@ -34,7 +35,7 @@ skills add connorch/skills --skill sb-ingest-superwhisper-meeting
 You can also install multiple specific skills in one command:
 
 ```sh
-skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation step-back pull-upstream babysit-pr file-pr html-communication wovn-file-hosting sb-ingest sb-ingest-superwhisper-meeting
+skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation step-back pull-upstream babysit-pr file-pr implement-and-review html-communication wovn-file-hosting sb-ingest sb-ingest-superwhisper-meeting
 ```
 
 Install the current local checkout with Conductor's agent targeting:
@@ -58,6 +59,7 @@ These skills help you plan, verify, write, refactor, and fix code.
 - **codex-implementation** — Delegate bounded code changes to Codex CLI, then inspect the resulting diff and verification.
 - **step-back** — Step-back review of a branch after a batch of point fixes, finding and fixing the damage the iteration itself caused.
 - **pull-upstream** - Sync a fork with its upstream: inventory the fork's features, merge upstream in with upstream taking priority, re-apply the fork's work on top, and verify every feature survived - clean merges included.
+- **implement-and-review** - Take an approved plan through implementation, browser QA, PR filing, the review-bot loop with step-back every three Codex rounds, a final QA pass, and a handoff writeup of unplanned decisions and deferred findings.
 - **babysit-pr** — Monitor a pull request through review and CI, verifying bot findings, fixing real failures, and dismissing false positives with reasons. Adapted from a skill by [Theo Browne](https://youtu.be/e1snsuY4lTI).
 - **html-communication** — Create self-contained HTML writeups (plans, specs, findings, UI mocks) and publish them privately to files.wovn.org with the wovn CLI. Adapted from a skill by Theo Browne.
 - **wovn-file-hosting** - Upload any local file to files.wovn.org and return a permanent URL (private by default, public on request), backed by the Cloudflare Worker in `skills/wovn-file-hosting/worker/`. Adapted from a skill by Theo Browne.
