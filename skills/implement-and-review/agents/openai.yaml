@@ -3,4 +3,4 @@ interface:
   short_description: "Take an approved plan through implementation, QA, and PR review"
   default_prompt: "Use $implement-and-review to implement the approved plan, QA it, file the PR, work the review loop, and report back."
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true
