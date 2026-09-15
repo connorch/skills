@@ -1,9 +1,10 @@
 ---
 name: implement-and-review
 description: >-
-  Use when the user approves a plan and says to implement it. Takes the plan
-  through implementation, browser QA, and the PR review loop to a PR that is
-  ready to look at.
+  Take an approved plan through implementation, browser QA, and the PR review
+  loop to a PR that is ready to look at. Connor invokes this manually; agents
+  must not trigger it on their own.
+disable-model-invocation: true
 metadata:
   harness: [claude, codex]
   platform: [darwin, linux]
