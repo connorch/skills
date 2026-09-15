@@ -1,12 +1,9 @@
 ---
 name: implement-and-review
 description: >-
-  Take an approved plan all the way to a reviewed, QA'd pull request:
-  implement, run browser QA and fix what it finds, file the PR, work the
-  review-bot loop with scope discipline, step back every three Codex rounds,
-  re-QA after the fix loop, and report back. Use when the user approves a plan
-  and says to implement it, asks to "take this through to a PR", or wants the
-  full implement, QA, PR, and review cycle run end to end.
+  Use when the user approves a plan and says to implement it. Takes the plan
+  through implementation, browser QA, and the PR review loop to a PR that is
+  ready to look at.
 metadata:
   harness: [claude, codex]
   platform: [darwin, linux]
