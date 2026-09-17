@@ -1,6 +1,6 @@
 ---
 name: wovn-file-hosting
-description: Use when a local file needs a public or private URL, or when the user asks to upload, host, share, list, or retrieve files through Wovn.
+description: Use whenever the user provides a link to files.wovn.org, when a local file needs a public or private URL, or when the user asks to upload, host, share, list, or retrieve files through Wovn.
 metadata:
   harness: [claude, codex]
   platform: [darwin, linux]
