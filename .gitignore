@@ -18,3 +18,6 @@ skills/wovn-file-hosting/cli/dist/
 # wovn-file-hosting browse UI build artifacts
 skills/wovn-file-hosting/ui/node_modules/
 skills/wovn-file-hosting/ui/dist/
+
+# Fleet tooling dependencies
+/node_modules/
