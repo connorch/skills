@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { outcomeOf } from "./fleet.ts";
-import type { MachineReport } from "./report.ts";
+import { formatReport, parseReport, type MachineReport } from "./report.ts";
 import { parseTailnet } from "./tailnet.ts";
 
 const report: MachineReport = {
@@ -36,6 +36,14 @@ describe("outcomeOf", () => {
       source: "-",
       reason: "ERR_PNPM_OUTDATED_LOCKFILE",
     });
+  });
+});
+
+describe("parseReport", () => {
+  it("reads a full report and ignores one cut off mid-line", () => {
+    const line = formatReport(report);
+    expect(parseReport(line)).toEqual(report);
+    expect(parseReport(line.slice(0, 20))).toBeUndefined();
   });
 });
 

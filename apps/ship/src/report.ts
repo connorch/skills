@@ -21,10 +21,16 @@ export function formatReport(report: MachineReport): string {
   return `${REPORT_PREFIX}${JSON.stringify(report)}`;
 }
 
+// Undefined for ordinary output and for a report cut off mid-line (a dropped
+// connection), which then counts as a Machine that never reported.
 export function parseReport(line: string): MachineReport | undefined {
   if (!line.startsWith(REPORT_PREFIX)) return undefined;
-  const parsed = MachineReport.safeParse(JSON.parse(line.slice(REPORT_PREFIX.length)));
-  return parsed.success ? parsed.data : undefined;
+  try {
+    const parsed = MachineReport.safeParse(JSON.parse(line.slice(REPORT_PREFIX.length)));
+    return parsed.success ? parsed.data : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 // One-line change summary, e.g. "14 skills (+1 -2), wovn-cli".
