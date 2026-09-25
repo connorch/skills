@@ -18,19 +18,21 @@ export type Outcome =
 // `tailscale ssh` exits 255 when it cannot connect or the policy denies the login.
 const SSH_FAILURE = 255;
 
+// `errors` is the Machine's non-empty stderr lines.
 export function outcomeOf(
   exitCode: number | null,
   report: MachineReport | undefined,
-  lastError: string,
+  errors: string[],
 ): Outcome {
   if (report) {
     return report.failures.length === 0
       ? { kind: "ok", report }
       : { kind: "failed", source: report.source, reason: report.failures[0]?.split("\n")[0] ?? "" };
   }
+  // ssh explains a refused login first; a failed script explains itself last.
   if (exitCode === SSH_FAILURE)
-    return { kind: "skipped", reason: `ssh: ${lastError || "connection failed"}` };
-  return { kind: "failed", source: "-", reason: lastError || `exited ${exitCode}` };
+    return { kind: "skipped", reason: `ssh: ${errors[0] ?? "connection failed"}` };
+  return { kind: "failed", source: "-", reason: errors.at(-1) ?? `exited ${exitCode}` };
 }
 
 // The script a remote Machine runs in its login shell. Written for both zsh
@@ -72,19 +74,19 @@ function shipTo(
 
   const prefix = `${machine.name.padEnd(width)} | `;
   let report: MachineReport | undefined;
-  let lastError = "";
+  const errors: string[] = [];
   createInterface({ input: child.stdout }).on("line", (line) => {
     const parsed = parseReport(line);
     if (parsed) report = parsed;
     else console.log(prefix + line);
   });
   createInterface({ input: child.stderr }).on("line", (line) => {
-    if (line.trim()) lastError = line.trim();
+    if (line.trim()) errors.push(line.trim());
     console.error(prefix + line);
   });
   return new Promise((resolve) => {
     child.on("error", (error) => resolve({ kind: "failed", source: "-", reason: error.message }));
-    child.on("close", (code) => resolve(outcomeOf(code, report, lastError)));
+    child.on("close", (code) => resolve(outcomeOf(code, report, errors)));
   });
 }
 

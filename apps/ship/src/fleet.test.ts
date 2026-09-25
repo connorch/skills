@@ -15,8 +15,8 @@ const report: MachineReport = {
 
 describe("outcomeOf", () => {
   it("trusts the Machine's report over its exit code", () => {
-    expect(outcomeOf(0, report, "")).toEqual({ kind: "ok", report });
-    expect(outcomeOf(1, { ...report, failures: ["wovn-cli: exited 1\nmore"] }, "")).toEqual({
+    expect(outcomeOf(0, report, [])).toEqual({ kind: "ok", report });
+    expect(outcomeOf(1, { ...report, failures: ["wovn-cli: exited 1\nmore"] }, [])).toEqual({
       kind: "failed",
       source: report.source,
       reason: "wovn-cli: exited 1",
@@ -25,11 +25,13 @@ describe("outcomeOf", () => {
 
   it("skips Machines that ssh cannot reach, and fails ones that broke before reporting", () => {
     const denied = 'tailscale: tailnet policy does not permit you to SSH as user "connorchevli"';
-    expect(outcomeOf(255, undefined, denied)).toEqual({
+    expect(outcomeOf(255, undefined, [denied, "Connection closed by 100.64.0.1 port 22"])).toEqual({
       kind: "skipped",
       reason: `ssh: ${denied}`,
     });
-    expect(outcomeOf(1, undefined, "ERR_PNPM_OUTDATED_LOCKFILE")).toEqual({
+    expect(
+      outcomeOf(1, undefined, ["Lockfile is up to date", "ERR_PNPM_OUTDATED_LOCKFILE"]),
+    ).toEqual({
       kind: "failed",
       source: "-",
       reason: "ERR_PNPM_OUTDATED_LOCKFILE",
