@@ -28,6 +28,9 @@ result in one terminal.
   re-authentication prompt would stall a scripted Ship. Agent hosts such as
   `hermes-agent` are tagged so they fall outside `autogroup:member` and cannot SSH
   into the Macs.
+- Tailscale SSH on macOS reports exit code 0 even when the remote command fails. A
+  Ship counts a Machine as successful only when it sends back its report line, never
+  by exit code.
 - A Machine that is asleep or offline misses the Ship and stays behind until the next
   one. There is no background catch-up.
 - Every Machine needs `git`, `node`, and `pnpm`, and network access to GitHub and npm.

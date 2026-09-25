@@ -16,6 +16,8 @@ export type Outcome =
   | { kind: "skipped"; reason: string };
 
 // `tailscale ssh` exits 255 when it cannot connect or the policy denies the login.
+// Past that, exit codes mean nothing: Tailscale SSH on macOS reports 0 even
+// when the remote command fails, so only the ship-report line counts as success.
 const SSH_FAILURE = 255;
 
 // `errors` is the Machine's non-empty stderr lines.
@@ -29,10 +31,12 @@ export function outcomeOf(
       ? { kind: "ok", report }
       : { kind: "failed", source: report.source, reason: report.failures[0]?.split("\n")[0] ?? "" };
   }
-  // ssh explains a refused login first; a failed script explains itself last.
+  // ssh explains a refused login first. A failed script explains itself in its
+  // last error line (Node prints its version after a crash, so not the last line).
   if (exitCode === SSH_FAILURE)
     return { kind: "skipped", reason: `ssh: ${errors[0] ?? "connection failed"}` };
-  return { kind: "failed", source: "-", reason: errors.at(-1) ?? `exited ${exitCode}` };
+  const reason = errors.findLast((line) => /error/i.test(line)) ?? errors.at(-1);
+  return { kind: "failed", source: "-", reason: reason ?? "exited without a ship report" };
 }
 
 // The script a remote Machine runs in its login shell. Written for both zsh
@@ -47,7 +51,9 @@ function remoteScript(slug: string, dryRun: boolean): string {
     "git reset --quiet --hard origin/main",
     "git clean --quiet -fd",
     'out=$(pnpm install --frozen-lockfile 2>&1) || { printf "%s\\n" "$out"; exit 1; }',
-    `exec pnpm --silent ship:machine --remote --report${dryRun ? " --dry-run" : ""}`,
+    // node directly, not `pnpm --silent ship:machine`, whose --silent also hides
+    // pnpm's own errors (such as a missing script).
+    `exec node apps/ship/src/machine.ts --remote --report${dryRun ? " --dry-run" : ""}`,
   ].join("\n");
 }
 

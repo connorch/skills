@@ -24,17 +24,28 @@ describe("outcomeOf", () => {
   });
 
   it("skips Machines that ssh cannot reach, and fails ones that broke before reporting", () => {
+    // Tailscale SSH on macOS exits 0 even when the remote command failed.
+    expect(outcomeOf(0, undefined, [])).toEqual({
+      kind: "failed",
+      source: "-",
+      reason: "exited without a ship report",
+    });
     const denied = 'tailscale: tailnet policy does not permit you to SSH as user "connorchevli"';
     expect(outcomeOf(255, undefined, [denied, "Connection closed by 100.64.0.1 port 22"])).toEqual({
       kind: "skipped",
       reason: `ssh: ${denied}`,
     });
     expect(
-      outcomeOf(1, undefined, ["Lockfile is up to date", "ERR_PNPM_OUTDATED_LOCKFILE"]),
+      outcomeOf(0, undefined, [
+        "node:internal/modules/cjs/loader:1386",
+        "Error: Cannot find module 'apps/ship/src/machine.ts'",
+        "  requireStack: []",
+        "Node.js v24.21.0",
+      ]),
     ).toEqual({
       kind: "failed",
       source: "-",
-      reason: "ERR_PNPM_OUTDATED_LOCKFILE",
+      reason: "Error: Cannot find module 'apps/ship/src/machine.ts'",
     });
   });
 });
