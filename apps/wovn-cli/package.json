@@ -1,10 +1,10 @@
 {
   "name": "wovn-cli",
   "private": true,
-  "type": "module",
   "bin": {
     "wovn": "./dist/wovn.mjs"
   },
+  "type": "module",
   "scripts": {
     "build": "vp pack",
     "typecheck": "tsc --noEmit"

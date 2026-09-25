@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query"
-import { Fragment, useState } from "react"
+import { useQuery } from "@tanstack/react-query";
+import { Fragment, useState } from "react";
 
 import {
   AlertDialog,
@@ -10,28 +10,23 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@/components/ui/empty"
-import { Skeleton } from "@/components/ui/skeleton"
-import { fileUrl, parentUrl, versionUrl } from "@/lib/api"
-import { formatSize, formatWhen } from "@/lib/format"
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
+import { fileUrl, parentUrl, versionUrl } from "@/lib/api";
+import { formatSize, formatWhen } from "@/lib/format";
 import {
   copyUrl,
   listingQuery,
   useDeleteFile,
   useSetVisibility,
   versionsQuery,
-} from "@/lib/queries"
-import { cn } from "@/lib/utils"
-import type { FileEntry, Listing } from "@/lib/types"
-import { versionStamp } from "@/lib/types"
+} from "@/lib/queries";
+import { cn } from "@/lib/utils";
+import type { FileEntry, Listing } from "@/lib/types";
+import { versionStamp } from "@/lib/types";
 
 // One directory level under `prefix` ("" = root), in classic-autoindex
 // spirit - a dense table of directories then Files. The body of a Directory
@@ -43,18 +38,18 @@ export function DirectoryView({
   initialListing,
   currentKey,
 }: {
-  prefix: string
-  initialListing?: Listing
-  currentKey?: string
+  prefix: string;
+  initialListing?: Listing;
+  currentKey?: string;
 }) {
   const listing = useQuery({
     ...listingQuery(prefix),
     initialData: initialListing,
-  })
-  const [deleting, setDeleting] = useState<FileEntry | null>(null)
+  });
+  const [deleting, setDeleting] = useState<FileEntry | null>(null);
   const remove = useDeleteFile((key) => {
-    if (key === currentKey) window.location.assign(parentUrl(key))
-  })
+    if (key === currentKey) window.location.assign(parentUrl(key));
+  });
 
   if (listing.isError) {
     return (
@@ -64,13 +59,13 @@ export function DirectoryView({
           retry
         </Button>
       </div>
-    )
+    );
   }
-  if (!listing.data) return <ListingSkeleton />
+  if (!listing.data) return <ListingSkeleton />;
 
-  const nameOf = (key: string) => key.slice(prefix.length)
-  const { directories, files } = listing.data
-  const parent = prefix === "" ? null : `/${prefix.replace(/[^/]+\/$/, "")}`
+  const nameOf = (key: string) => key.slice(prefix.length);
+  const { directories, files } = listing.data;
+  const parent = prefix === "" ? null : `/${prefix.replace(/[^/]+\/$/, "")}`;
 
   return (
     <>
@@ -116,15 +111,10 @@ export function DirectoryView({
         </table>
       )}
 
-      <AlertDialog
-        open={deleting !== null}
-        onOpenChange={(open) => !open && setDeleting(null)}
-      >
+      <AlertDialog open={deleting !== null} onOpenChange={(open) => !open && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              Delete {deleting && nameOf(deleting.key)}?
-            </AlertDialogTitle>
+            <AlertDialogTitle>Delete {deleting && nameOf(deleting.key)}?</AlertDialogTitle>
             <AlertDialogDescription>
               The File and all its Versions are deleted permanently.
             </AlertDialogDescription>
@@ -133,8 +123,8 @@ export function DirectoryView({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (deleting) remove.mutate(deleting.key)
-                setDeleting(null)
+                if (deleting) remove.mutate(deleting.key);
+                setDeleting(null);
               }}
             >
               Delete
@@ -143,7 +133,7 @@ export function DirectoryView({
         </AlertDialogContent>
       </AlertDialog>
     </>
-  )
+  );
 }
 
 function ListingHead() {
@@ -156,7 +146,7 @@ function ListingHead() {
         <th className="py-1.5 font-medium" />
       </tr>
     </thead>
-  )
+  );
 }
 
 function ListingSkeleton() {
@@ -182,7 +172,7 @@ function ListingSkeleton() {
         ))}
       </tbody>
     </table>
-  )
+  );
 }
 
 function FileRow({
@@ -191,28 +181,23 @@ function FileRow({
   current,
   onDelete,
 }: {
-  file: FileEntry
-  name: string
-  current: boolean
-  onDelete: () => void
+  file: FileEntry;
+  name: string;
+  current: boolean;
+  onDelete: () => void;
 }) {
-  const [expanded, setExpanded] = useState(false)
-  const flip = useSetVisibility()
+  const [expanded, setExpanded] = useState(false);
+  const flip = useSetVisibility();
   // Git context the File was uploaded with, shown as a native tooltip.
-  const context = [file.project, file.branch].filter(Boolean).join(" · ")
+  const context = [file.project, file.branch].filter(Boolean).join(" · ");
 
   return (
     <>
-      <tr
-        className={cn("border-b border-border/50", current && "bg-accent/60")}
-      >
+      <tr className={cn("border-b border-border/50", current && "bg-accent/60")}>
         <td className="py-1 pr-4">
           <span className="flex items-center gap-1.5">
             <a
-              className={cn(
-                "truncate hover:underline",
-                current && "font-semibold text-primary"
-              )}
+              className={cn("truncate hover:underline", current && "font-semibold text-primary")}
               href={fileUrl(file.key)}
               title={context || undefined}
             >
@@ -228,8 +213,7 @@ function FileRow({
                   onClick={() =>
                     flip.mutate({
                       key: file.key,
-                      visibility:
-                        file.visibility === "public" ? "private" : "public",
+                      visibility: file.visibility === "public" ? "private" : "public",
                     })
                   }
                 />
@@ -251,10 +235,7 @@ function FileRow({
           {file.stable && (
             <>
               {" · "}
-              <Action
-                label="history"
-                onClick={() => setExpanded((open) => !open)}
-              />
+              <Action label="history" onClick={() => setExpanded((open) => !open)} />
             </>
           )}
           {" · "}
@@ -263,25 +244,21 @@ function FileRow({
       </tr>
       {expanded && <VersionRows fileKey={file.key} />}
     </>
-  )
+  );
 }
 
 function Action({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button
-      type="button"
-      className="cursor-pointer text-primary hover:underline"
-      onClick={onClick}
-    >
+    <button type="button" className="cursor-pointer text-primary hover:underline" onClick={onClick}>
       {label}
     </button>
-  )
+  );
 }
 
 // Inline expansion under a stable File: its Versions, newest first, each
 // linking to its File Page.
 function VersionRows({ fileKey }: { fileKey: string }) {
-  const versions = useQuery(versionsQuery(fileKey))
+  const versions = useQuery(versionsQuery(fileKey));
 
   const note = (text: string) => (
     <tr className="border-b border-border/50">
@@ -289,8 +266,8 @@ function VersionRows({ fileKey }: { fileKey: string }) {
         {text}
       </td>
     </tr>
-  )
-  if (versions.isError) return note("failed to load history")
+  );
+  if (versions.isError) return note("failed to load history");
   if (!versions.data) {
     return (
       <tr className="border-b border-border/50">
@@ -298,9 +275,9 @@ function VersionRows({ fileKey }: { fileKey: string }) {
           <Skeleton className="h-3 w-48" />
         </td>
       </tr>
-    )
+    );
   }
-  if (versions.data.versions.length === 0) return note("no previous versions")
+  if (versions.data.versions.length === 0) return note("no previous versions");
   return (
     <Fragment>
       {versions.data.versions.map((version) => (
@@ -323,5 +300,5 @@ function VersionRows({ fileKey }: { fileKey: string }) {
         </tr>
       ))}
     </Fragment>
-  )
+  );
 }

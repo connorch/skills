@@ -4,6 +4,6 @@
 // the secret is set).
 declare namespace Cloudflare {
   interface Env {
-    WOVN_TOKEN?: string
+    WOVN_TOKEN?: string;
   }
 }

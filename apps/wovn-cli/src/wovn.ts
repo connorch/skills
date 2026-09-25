@@ -91,7 +91,8 @@ async function put(files: string[], opts: PutOptions): Promise<void> {
   if (opts.public && opts.private) fail("--public and --private are mutually exclusive");
   if (opts.name !== undefined && files.length > 1) fail("--name only applies to a single file");
   if (opts.at !== undefined && files.length > 1) fail("--at only applies to a single file");
-  if (opts.at !== undefined && opts.name !== undefined) fail("--at already names the file; drop --name");
+  if (opts.at !== undefined && opts.name !== undefined)
+    fail("--at already names the file; drop --name");
   if (opts.force && opts.at === undefined) fail("--force only applies to --at uploads");
 
   const headers: Record<string, string> = authHeaders();
@@ -127,8 +128,7 @@ async function put(files: string[], opts: PutOptions): Promise<void> {
     }
     // POST mints an immutable dated key; PUT (--at) writes the exact path.
     const method = opts.at === undefined ? "POST" : "PUT";
-    const path =
-      opts.at ?? (opts.name ?? basename(file)).replace(/[^a-zA-Z0-9._-]/g, "-");
+    const path = opts.at ?? (opts.name ?? basename(file)).replace(/[^a-zA-Z0-9._-]/g, "-");
     const res = await fetch(`${HOST}/${path}`, { method, headers, body: blob });
     const body = await res.text();
     if (res.status === 409) fail(`${HOST}/${path} already exists; pass --force to replace it`);
@@ -180,7 +180,9 @@ function collectTypes(value: string, previous: string[] = []): string[] {
     // Anything else is treated as a literal extension; reject values that
     // cannot be one rather than silently matching nothing.
     if (!/^[a-z0-9]+$/.test(entry)) {
-      fail(`unknown --type ${entry}; use a category (${TYPE_CATEGORIES.join(", ")}) or a file extension`);
+      fail(
+        `unknown --type ${entry}; use a category (${TYPE_CATEGORIES.join(", ")}) or a file extension`,
+      );
     }
   }
   return [...previous, ...values];
@@ -220,7 +222,8 @@ async function list(opts: ListOptions): Promise<void> {
     const value = opts[name];
     if (value === undefined) continue;
     const resolved = value === true ? inferred[name] : value;
-    if (!resolved) fail(`--${name} has no value and none can be inferred from the current directory`);
+    if (!resolved)
+      fail(`--${name} has no value and none can be inferred from the current directory`);
     query.set(name, resolved);
   }
   if (opts.type) query.set("type", opts.type.join(","));
@@ -263,7 +266,12 @@ async function read(target: string): Promise<void> {
   const key = resolveKey(target);
   const res = await fetch(`${HOST}/${key}`, { headers: authHeaders() });
   if (!res.ok) fail(`read failed (${res.status}): ${(await res.text()).trim()}`);
-  if (res.body) await pipeline(Readable.fromWeb(res.body as import("node:stream/web").ReadableStream), process.stdout, { end: false });
+  if (res.body)
+    await pipeline(
+      Readable.fromWeb(res.body as import("node:stream/web").ReadableStream),
+      process.stdout,
+      { end: false },
+    );
 }
 
 interface FileVersion {
@@ -303,14 +311,16 @@ async function history(target: string): Promise<void> {
 // archive/<stable-path>/<stamp>, so the name is the stable path's last segment.
 function displayName(key: string): string {
   const segments = key.split("/").filter(Boolean);
-  const name = segments[0] === "archive" && segments.length >= 3 ? segments.at(-2) : segments.at(-1);
+  const name =
+    segments[0] === "archive" && segments.length >= 3 ? segments.at(-2) : segments.at(-1);
   return name ?? "file";
 }
 
 async function fetchToFile(target: string, dir: string, side: "old" | "new"): Promise<string> {
   const key = resolveKey(target);
   const res = await fetch(`${HOST}/${key}`, { headers: authHeaders() });
-  if (!res.ok) fail(`fetch failed for ${HOST}/${key} (${res.status}): ${(await res.text()).trim()}`);
+  if (!res.ok)
+    fail(`fetch failed for ${HOST}/${key} (${res.status}): ${(await res.text()).trim()}`);
   const rel = join(side, displayName(key));
   mkdirSync(join(dir, side), { recursive: true });
   writeFileSync(join(dir, rel), Buffer.from(await res.arrayBuffer()));
@@ -333,7 +343,10 @@ async function diff(oldTarget: string, newTarget: string | undefined): Promise<v
     const oldRel = await fetchToFile(oldTarget, dir, "old");
     const newRel = await fetchToFile(newTarget, dir, "new");
     // git diff --no-index exits 0 when identical, 1 when the files differ.
-    const result = spawnSync("git", ["diff", "--no-index", oldRel, newRel], { cwd: dir, stdio: "inherit" });
+    const result = spawnSync("git", ["diff", "--no-index", oldRel, newRel], {
+      cwd: dir,
+      stdio: "inherit",
+    });
     if (result.status === 0) console.error("wovn: no differences");
     else if (result.status !== 1) fail("git diff failed");
   } finally {
@@ -390,7 +403,9 @@ function rotate(): void {
   mkdirSync(dirname(TOKEN_FILE), { recursive: true, mode: 0o700 });
   writeFileSync(TOKEN_FILE, `${next}\n`, { mode: 0o600 });
   console.log(`wovn: token rotated (${TOKEN_FILE} and the Worker secret are updated)`);
-  console.log("wovn: shells with a stale WOVN_TOKEN env var need restarting; wovn itself reads the file");
+  console.log(
+    "wovn: shells with a stale WOVN_TOKEN env var need restarting; wovn itself reads the file",
+  );
 }
 
 const program = new Command("wovn").description("CLI for the files.wovn.org file host");
@@ -402,7 +417,10 @@ program
   .option("--public", "make the upload publicly readable")
   .option("--private", "keep the upload private (the default; explicit on overwrites)")
   .option("--name <filename>", "filename for the generated URL (single file only)")
-  .option("--at <remote-path>", "write to a stable path instead of a generated key; the URL never changes")
+  .option(
+    "--at <remote-path>",
+    "write to a stable path instead of a generated key; the URL never changes",
+  )
   .option("--force", "with --at, replace an existing object at that path")
   .action(put);
 
@@ -412,9 +430,18 @@ program
   .option("--public", "only public files")
   .option("--private", "only private files")
   .option("-n, --limit <count>", "max files to show", "20")
-  .option("--project [name-or-path]", "only files uploaded from this project (default: the current one)")
-  .option("--branch [branch]", "only files uploaded from this git branch (default: the current one)")
-  .option("--worktree [path]", "only files uploaded from this git worktree (default: the current one)")
+  .option(
+    "--project [name-or-path]",
+    "only files uploaded from this project (default: the current one)",
+  )
+  .option(
+    "--branch [branch]",
+    "only files uploaded from this git branch (default: the current one)",
+  )
+  .option(
+    "--worktree [path]",
+    "only files uploaded from this git worktree (default: the current one)",
+  )
   .option("--dir [path]", "only files uploaded from this directory (default: the current one)")
   .option(
     "--type <types>",
@@ -443,7 +470,9 @@ program
 
 program
   .command("diff")
-  .description("git-diff two hosted files; with one argument, diff a stable path's previous version against its current one")
+  .description(
+    "git-diff two hosted files; with one argument, diff a stable path's previous version against its current one",
+  )
   .argument("<old>", "wovn URL or key path (the stable path, when used alone)")
   .argument("[new]", "wovn URL or key path")
   .action(diff);
@@ -466,7 +495,10 @@ visibility
 program
   .command("rm")
   .description("delete files, including all archived versions of a stable path")
-  .argument("<url-or-path...>", "wovn URL(s) or key path(s); an archive URL deletes just that version")
+  .argument(
+    "<url-or-path...>",
+    "wovn URL(s) or key path(s); an archive URL deletes just that version",
+  )
   .action(rm);
 
 const tokenCommand = program.command("token").description("manage the WOVN_TOKEN credential");

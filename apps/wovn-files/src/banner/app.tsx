@@ -1,11 +1,11 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { useState } from "react"
-import { createPortal } from "react-dom"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useState } from "react";
+import { createPortal } from "react-dom";
 
-import { PortalContainerProvider } from "@/components/portal-container"
-import { Toaster } from "@/components/ui/sonner"
-import type { FilePage } from "@/lib/types"
-import { Banner } from "./banner"
+import { PortalContainerProvider } from "@/components/portal-container";
+import { Toaster } from "@/components/ui/sonner";
+import type { FilePage } from "@/lib/types";
+import { Banner } from "./banner";
 
 // The Banner as mounted inside an HTML File (src/host/inject.server.tsx and
 // src/banner.tsx): its own query client, portals pointed at the shadow root,
@@ -17,11 +17,11 @@ export function BannerApp({
   portal = null,
   toasts = null,
 }: {
-  page: FilePage
-  portal?: ShadowRoot | null
-  toasts?: HTMLElement | null
+  page: FilePage;
+  portal?: ShadowRoot | null;
+  toasts?: HTMLElement | null;
 }) {
-  const [queryClient] = useState(() => new QueryClient())
+  const [queryClient] = useState(() => new QueryClient());
   return (
     <QueryClientProvider client={queryClient}>
       <PortalContainerProvider value={portal}>
@@ -31,5 +31,5 @@ export function BannerApp({
       </PortalContainerProvider>
       {toasts && createPortal(<Toaster />, toasts)}
     </QueryClientProvider>
-  )
+  );
 }

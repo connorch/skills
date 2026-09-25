@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query";
 import {
   useEffect,
   useRef,
@@ -6,9 +6,9 @@ import {
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
-} from "react"
+} from "react";
 
-import { Badge } from "@/components/ui/badge"
+import { Badge } from "@/components/ui/badge";
 import {
   Command,
   CommandDialog,
@@ -18,11 +18,11 @@ import {
   CommandItem,
   CommandList,
   CommandShortcut,
-} from "@/components/ui/command"
-import { fileUrl, parentUrl } from "@/lib/api"
-import { formatSize, formatWhen } from "@/lib/format"
-import { allFilesQuery, copyUrl } from "@/lib/queries"
-import { toast } from "sonner"
+} from "@/components/ui/command";
+import { fileUrl, parentUrl } from "@/lib/api";
+import { formatSize, formatWhen } from "@/lib/format";
+import { allFilesQuery, copyUrl } from "@/lib/queries";
+import { toast } from "sonner";
 import {
   parseToken,
   searchFiles,
@@ -31,11 +31,11 @@ import {
   TOKEN_NAMES,
   type Match,
   type Token,
-} from "@/lib/search"
+} from "@/lib/search";
 
 // Rendering hundreds of rows is pointless - the ranking puts the answer on top.
-const MAX_RESULTS = 100
-const MAX_SUGGESTIONS = 8
+const MAX_RESULTS = 100;
+const MAX_SUGGESTIONS = 8;
 
 // The ⌘K global search: one input over every File in the bucket, free text
 // fuzzy-matching the Key plus `name:value` filter tokens (see lib/search).
@@ -48,105 +48,97 @@ export function SearchPalette({
   onOpenChange,
   prefix,
 }: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   // The Directory Route the palette was opened from ("" at root), offered as
   // an `in:` chip so narrowing back to "this directory" is one click.
-  prefix: string
+  prefix: string;
 }) {
   // Refetched on every open (one cheap list call) so CLI uploads since the
   // last open show up; stale results stay visible while the fetch is in
   // flight.
-  const all = useQuery({ ...allFilesQuery, enabled: open, staleTime: 0 })
-  const files = all.data?.files ?? null
-  const [tokens, setTokens] = useState<Token[]>([])
-  const [text, setText] = useState("")
-  const [selected, setSelected] = useState("")
-  const inputRef = useRef<HTMLInputElement>(null)
+  const all = useQuery({ ...allFilesQuery, enabled: open, staleTime: 0 });
+  const files = all.data?.files ?? null;
+  const [tokens, setTokens] = useState<Token[]>([]);
+  const [text, setText] = useState("");
+  const [selected, setSelected] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (open && all.isError) toast.error(all.error.message)
-  }, [open, all.isError, all.error])
+    if (open && all.isError) toast.error(all.error.message);
+  }, [open, all.isError, all.error]);
 
   // Every open starts from a blank query (state adjusted during render, the
   // React-sanctioned way to reset on a prop change).
-  const [wasOpen, setWasOpen] = useState(open)
+  const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
-    setWasOpen(open)
+    setWasOpen(open);
     if (open) {
-      setTokens([])
-      setText("")
+      setTokens([]);
+      setText("");
     }
   }
 
-  const { words, pending } = splitInput(text)
-  const matches = files ? searchFiles(files, tokens, words) : []
+  const { words, pending } = splitInput(text);
+  const matches = files ? searchFiles(files, tokens, words) : [];
   const suggestions = pending
     ? suggestValues(
         matches.map((m) => m.file),
         pending.name,
-        pending.value
+        pending.value,
       ).slice(0, MAX_SUGGESTIONS)
-    : []
+    : [];
 
-  const close = () => onOpenChange(false)
+  const close = () => onOpenChange(false);
 
   const addToken = (token: Token) => {
-    setTokens((current) => [...current, token])
+    setTokens((current) => [...current, token]);
     // Drop the half-typed token word the chip replaces.
-    setText(
-      pending ? text.slice(0, text.lastIndexOf(`${pending.name}:`)) : text
-    )
-    inputRef.current?.focus()
-  }
+    setText(pending ? text.slice(0, text.lastIndexOf(`${pending.name}:`)) : text);
+    inputRef.current?.focus();
+  };
 
   const removeToken = (index: number) => {
-    setTokens((current) => current.filter((_, i) => i !== index))
-    inputRef.current?.focus()
-  }
+    setTokens((current) => current.filter((_, i) => i !== index));
+    inputRef.current?.focus();
+  };
 
   // A space after a complete `name:value` commits it as a chip.
   const onInput = (value: string) => {
-    const last = value.trimEnd().split(/\s+/).pop() ?? ""
-    const token = /\s$/.test(value) ? parseToken(last) : null
+    const last = value.trimEnd().split(/\s+/).pop() ?? "";
+    const token = /\s$/.test(value) ? parseToken(last) : null;
     if (token && token.value) {
-      setTokens((current) => [...current, token])
-      setText(value.trimEnd().slice(0, -last.length))
+      setTokens((current) => [...current, token]);
+      setText(value.trimEnd().slice(0, -last.length));
     } else {
-      setText(value)
+      setText(value);
     }
-  }
+  };
 
-  const selectedKey = selected.startsWith("file:")
-    ? selected.slice("file:".length)
-    : null
+  const selectedKey = selected.startsWith("file:") ? selected.slice("file:".length) : null;
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const input = inputRef.current
+    const input = inputRef.current;
     if (event.key === "Backspace" && text === "" && tokens.length > 0) {
-      event.preventDefault()
-      removeToken(tokens.length - 1)
-    } else if (
-      event.key === "Enter" &&
-      (event.metaKey || event.ctrlKey) &&
-      selectedKey
-    ) {
-      event.preventDefault()
-      copyUrl(fileUrl(selectedKey))
-      close()
+      event.preventDefault();
+      removeToken(tokens.length - 1);
+    } else if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && selectedKey) {
+      event.preventDefault();
+      copyUrl(fileUrl(selectedKey));
+      close();
     } else if (
       event.key === "ArrowRight" &&
       selectedKey &&
       input &&
       input.selectionStart === input.value.length
     ) {
-      event.preventDefault()
-      window.location.assign(parentUrl(selectedKey))
+      event.preventDefault();
+      window.location.assign(parentUrl(selectedKey));
     }
-  }
+  };
 
-  const empty = words.length === 0 && tokens.length === 0
-  const shown = matches.slice(0, MAX_RESULTS)
+  const empty = words.length === 0 && tokens.length === 0;
+  const shown = matches.slice(0, MAX_RESULTS);
 
   return (
     <CommandDialog
@@ -189,30 +181,24 @@ export function SearchPalette({
               <Chip
                 key={name}
                 onClick={() => {
-                  setText(`${name}:`)
-                  inputRef.current?.focus()
+                  setText(`${name}:`);
+                  inputRef.current?.focus();
                 }}
               >
                 {name}:
               </Chip>
             ))}
             {prefix !== "" && (
-              <Chip onClick={() => addToken({ name: "in", value: prefix })}>
-                in:{prefix}
-              </Chip>
+              <Chip onClick={() => addToken({ name: "in", value: prefix })}>in:{prefix}</Chip>
             )}
           </div>
         )}
 
         <CommandList className="max-h-96">
           {files === null ? (
-            <div className="py-6 text-center text-muted-foreground">
-              loading
-            </div>
+            <div className="py-6 text-center text-muted-foreground">loading</div>
           ) : (
-            <CommandEmpty className="text-muted-foreground">
-              no matches
-            </CommandEmpty>
+            <CommandEmpty className="text-muted-foreground">no matches</CommandEmpty>
           )}
           {pending && suggestions.length > 0 && (
             <CommandGroup heading={`${pending.name}:`}>
@@ -220,15 +206,11 @@ export function SearchPalette({
                 <CommandItem
                   key={suggestion.value}
                   value={`token:${pending.name}:${suggestion.value}`}
-                  onSelect={() =>
-                    addToken({ name: pending.name, value: suggestion.value })
-                  }
+                  onSelect={() => addToken({ name: pending.name, value: suggestion.value })}
                   className="py-1"
                 >
                   <span className="truncate">{suggestion.value}</span>
-                  <CommandShortcut className="tracking-normal">
-                    {suggestion.count}
-                  </CommandShortcut>
+                  <CommandShortcut className="tracking-normal">{suggestion.count}</CommandShortcut>
                 </CommandItem>
               ))}
             </CommandGroup>
@@ -254,39 +236,30 @@ export function SearchPalette({
           </span>
           {files !== null && (
             <span className="ml-auto">
-              {matches.length > MAX_RESULTS
-                ? `${MAX_RESULTS}+`
-                : matches.length}{" "}
-              match
+              {matches.length > MAX_RESULTS ? `${MAX_RESULTS}+` : matches.length} match
               {matches.length === 1 ? "" : "es"}
             </span>
           )}
         </div>
       </Command>
     </CommandDialog>
-  )
+  );
 }
 
 // A result row. The Key is a real link so the browser owns modified clicks
 // (⌘-click opens a new tab: the click stops before cmdk sees it); a plain
 // click or Enter reaches cmdk's onSelect and navigates this tab.
 function FileItem({ match }: { match: Match }) {
-  const { file } = match
-  const context = [file.project, file.branch].filter(Boolean).join(" · ")
-  const href = fileUrl(file.key)
+  const { file } = match;
+  const context = [file.project, file.branch].filter(Boolean).join(" · ");
+  const href = fileUrl(file.key);
   const onLinkClick = (event: MouseEvent) => {
-    if (
-      event.metaKey ||
-      event.ctrlKey ||
-      event.shiftKey ||
-      event.altKey ||
-      event.button !== 0
-    ) {
-      event.stopPropagation()
-      return
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
+      event.stopPropagation();
+      return;
     }
-    event.preventDefault()
-  }
+    event.preventDefault();
+  };
   return (
     <CommandItem
       value={`file:${file.key}`}
@@ -296,32 +269,22 @@ function FileItem({ match }: { match: Match }) {
       <a className="min-w-0 flex-1 truncate" href={href} onClick={onLinkClick}>
         <HighlightedKey fileKey={file.key} hits={match.hits} />
       </a>
-      {file.visibility === "public" && (
-        <Badge variant="secondary">public</Badge>
-      )}
+      {file.visibility === "public" && <Badge variant="secondary">public</Badge>}
       {file.stable && <Badge variant="outline">stable</Badge>}
       {/* Git context can be long; it yields to the Key and truncates. */}
       <CommandShortcut
         className="max-w-[45%] min-w-0 truncate tracking-normal"
         title={context || undefined}
       >
-        {[context, formatSize(file.size), formatWhen(file.uploaded)]
-          .filter(Boolean)
-          .join(" · ")}
+        {[context, formatSize(file.size), formatWhen(file.uploaded)].filter(Boolean).join(" · ")}
       </CommandShortcut>
     </CommandItem>
-  )
+  );
 }
 
 // The Key with its directory part muted and matched characters underlined.
-function HighlightedKey({
-  fileKey,
-  hits,
-}: {
-  fileKey: string
-  hits: Set<number>
-}) {
-  const nameStart = fileKey.lastIndexOf("/") + 1
+function HighlightedKey({ fileKey, hits }: { fileKey: string; hits: Set<number> }) {
+  const nameStart = fileKey.lastIndexOf("/") + 1;
   return (
     <>
       {[...fileKey].map((char, index) => (
@@ -336,16 +299,10 @@ function HighlightedKey({
         </span>
       ))}
     </>
-  )
+  );
 }
 
-function Chip({
-  children,
-  onClick,
-}: {
-  children: ReactNode
-  onClick: () => void
-}) {
+function Chip({ children, onClick }: { children: ReactNode; onClick: () => void }) {
   return (
     <button
       type="button"
@@ -354,13 +311,9 @@ function Chip({
     >
       {children}
     </button>
-  )
+  );
 }
 
 function Kbd({ children }: { children: ReactNode }) {
-  return (
-    <kbd className="rounded border border-border px-1 font-mono text-[11px]">
-      {children}
-    </kbd>
-  )
+  return <kbd className="rounded border border-border px-1 font-mono text-[11px]">{children}</kbd>;
 }

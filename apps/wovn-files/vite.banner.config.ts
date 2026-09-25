@@ -1,6 +1,6 @@
-import path from "node:path"
-import react from "@vitejs/plugin-react"
-import { defineConfig } from "vite"
+import path from "node:path";
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
 
 // The Banner bundle injected into HTML Files (docs/adr/0003). Start allows a
 // single client entry, so this is a separate build with fixed output names
@@ -25,4 +25,4 @@ export default defineConfig({
       },
     },
   },
-})
+});

@@ -1,9 +1,9 @@
-import path from "node:path"
-import { cloudflare } from "@cloudflare/vite-plugin"
-import tailwindcss from "@tailwindcss/vite"
-import { tanstackStart } from "@tanstack/react-start/plugin/vite"
-import react from "@vitejs/plugin-react"
-import { defineConfig } from "vite"
+import path from "node:path";
+import { cloudflare } from "@cloudflare/vite-plugin";
+import tailwindcss from "@tailwindcss/vite";
+import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
 
 // The files.wovn.org app: a TanStack Start app running inside the Cloudflare
 // Worker (docs/adr/0004). Everything the app serves for itself - client
@@ -24,4 +24,4 @@ export default defineConfig({
     alias: { "@": path.resolve(import.meta.dirname, "./src") },
   },
   build: { assetsDir: "_" },
-})
+});
