@@ -17,7 +17,10 @@ const skillNames = readdirSync(skillsRoot, { withFileTypes: true })
   .sort();
 
 const codexSkills = skillNames.filter((name) => name.startsWith("codex-"));
-const sharedSkills = skillNames.filter((name) => !name.startsWith("codex-"));
+const claudeSkills = skillNames.filter((name) => name.startsWith("claude-"));
+const sharedSkills = skillNames.filter(
+  (name) => !name.startsWith("codex-") && !name.startsWith("claude-"),
+);
 const universalCodexSkillPaths = codexSkills.map((name) =>
   join(process.env.HOME ?? "~", ".agents", "skills", name),
 );
@@ -46,6 +49,22 @@ if (codexSkills.length > 0) {
     bin: "skills",
     args: ["remove", "-g", "-a", "codex", "-s", ...codexSkills, "-y"],
     display: `skills remove -g -a codex -s ${codexSkills.join(" ")} -y`,
+  });
+}
+
+if (claudeSkills.length > 0) {
+  // Removing the Claude Code install also deletes the shared ~/.agents copy that
+  // Codex reads, so it has to run before the Codex install, not after.
+  commands.push({
+    bin: "skills",
+    args: ["remove", "-g", "-a", "claude-code", "-s", ...claudeSkills, "-y"],
+    display: `skills remove -g -a claude-code -s ${claudeSkills.join(" ")} -y`,
+  });
+
+  commands.push({
+    bin: "skills",
+    args: ["add", repoRoot, "-g", "-a", "codex", "-s", ...claudeSkills, "-y"],
+    display: `skills add ${repoRoot} -g -a codex -s ${claudeSkills.join(" ")} -y`,
   });
 }
 

@@ -17,13 +17,15 @@ function dryRun() {
   return result.stdout.trim().split("\n");
 }
 
-test("plans local skill installs with codex skills Claude-only and other skills shared", () => {
+test("plans local skill installs with codex skills Claude-only, claude skills Codex-only, and other skills shared", () => {
   const commands = dryRun();
 
   assert.deepEqual(commands, [
     `skills add ${repoRoot} -g -a claude-code -s codex-implementation codex-review -y`,
     "rm -rf ~/.agents/skills/codex-implementation ~/.agents/skills/codex-review",
     "skills remove -g -a codex -s codex-implementation codex-review -y",
+    "skills remove -g -a claude-code -s claude-code-subagent -y",
+    `skills add ${repoRoot} -g -a codex -s claude-code-subagent -y`,
     `skills add ${repoRoot} -g -a claude-code -a codex -s babysit-pr file-pr html-communication implement-and-review pull-upstream qa-ux-fix-loop qa-ux-plan qa-ux-verify sb-ingest sb-ingest-superwhisper-meeting step-back wovn-file-hosting -y`,
   ]);
 });

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Claude Code Subagent"
+  short_description: "Delegate bounded work to Claude Code"
+  default_prompt: "Use $claude-code-subagent to have Claude Code handle a bounded task and report back."
