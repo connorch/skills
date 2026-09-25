@@ -21,6 +21,7 @@ skills add connorch/skills --skill qa-ux-fix-loop
 skills add connorch/skills --skill qa-ux-verify
 skills add connorch/skills --skill codex-review
 skills add connorch/skills --skill codex-implementation
+skills add connorch/skills --skill claude-code-subagent
 skills add connorch/skills --skill step-back
 skills add connorch/skills --skill pull-upstream
 skills add connorch/skills --skill babysit-pr
@@ -35,7 +36,7 @@ skills add connorch/skills --skill sb-ingest-superwhisper-meeting
 You can also install multiple specific skills in one command:
 
 ```sh
-skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation step-back pull-upstream babysit-pr file-pr implement-and-review html-communication wovn-file-hosting sb-ingest sb-ingest-superwhisper-meeting
+skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr file-pr implement-and-review html-communication wovn-file-hosting sb-ingest sb-ingest-superwhisper-meeting
 ```
 
 Install the current local checkout with Conductor's agent targeting:
@@ -44,9 +45,9 @@ Install the current local checkout with Conductor's agent targeting:
 pnpm conductor:run
 ```
 
-This installs `codex-*` skills for Claude Code only, installs the remaining live
-skills for both Claude Code and Codex, and uses the local `skills/` directory
-rather than the repository's remote branch.
+This installs `codex-*` skills for Claude Code only, `claude-*` skills for Codex
+only, and the remaining live skills for both Claude Code and Codex. It uses the
+local `skills/` directory rather than the repository's remote branch.
 
 ## Development
 
@@ -57,6 +58,7 @@ These skills help you plan, verify, write, refactor, and fix code.
 - **qa-ux-fix-loop** — Execute QA UX plans, record issues, fix them serially, and require evaluator signoff.
 - **codex-review** — Ask Codex CLI for an independent review of uncommitted changes, branch diffs, commits, or specific implementations.
 - **codex-implementation** — Delegate bounded code changes to Codex CLI, then inspect the resulting diff and verification.
+- **claude-code-subagent** — For non-Claude agents (Codex, Hermes, etc.): delegate bounded implementation, review, or investigation to Claude Code CLI (`claude -p`) on the user's Claude subscription, then inspect the result and diff.
 - **step-back** — Step-back review of a branch after a batch of point fixes, finding and fixing the damage the iteration itself caused.
 - **pull-upstream** - Sync a fork with its upstream: inventory the fork's features, merge upstream in with upstream taking priority, re-apply the fork's work on top, and verify every feature survived - clean merges included.
 - **implement-and-review** - Take an approved plan through implementation, browser QA, PR filing, the review-bot loop with step-back every three Codex rounds, a final QA pass, and a handoff writeup of unplanned decisions and deferred findings.
