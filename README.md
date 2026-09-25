@@ -42,10 +42,22 @@ skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-
 ## Shipping to your machines
 
 `pnpm ship:fleet` installs this repo's skills and CLIs on every macOS and linux
-machine on your tailnet, in parallel, then prints a summary table. The machine
-you run it from ships your working copy; every other machine resets a clone of
-this repo at `~/.local/share/<owner>-<repo>` to `origin/main` over
-`tailscale ssh` and ships that. Offline machines are skipped with a warning.
+machine on your tailnet, in parallel. The machine you run it from ships your
+working copy; every other machine resets a clone of this repo at
+`~/.local/share/<owner>-<repo>` to `origin/main` over `tailscale ssh` and ships
+that. Offline machines are skipped with a warning.
+
+Output is one line per event, tagged `PLAN`, `RUN`, `SKIP`, `OK`, or `FAIL`, so
+`grep FAIL` works on a saved log. Build output is hidden unless that machine
+fails, in which case its full output prints under the `FAIL` line.
+
+```
+ 0.2s  connors-macbook-pro  PLAN  working copy 41c471d · 15 skills · +15 new · wovn-cli
+ 0.5s  connors-macbook-pro  RUN   ship:machine wovn-cli
+ 0.9s  connors-macbook-pro  OK    15 skills (+15) · wovn-cli
+ 1.2s  bluefin              SKIP  offline
+ 1.2s  fleet                DONE  ok 1  skipped 1  failed 0
+```
 
 ```sh
 pnpm ship:fleet                         # every machine

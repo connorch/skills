@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { outcomeOf } from "./fleet.ts";
-import { formatReport, parseReport, type MachineReport } from "./report.ts";
+import { formatEvent, formatReport, parseLine, type MachineReport } from "./report.ts";
 import { parseTailnet } from "./tailnet.ts";
 
 const report: MachineReport = {
@@ -16,45 +16,44 @@ const report: MachineReport = {
 describe("outcomeOf", () => {
   it("trusts the Machine's report over its exit code", () => {
     expect(outcomeOf(0, report, [])).toEqual({ kind: "ok", report });
-    expect(outcomeOf(1, { ...report, failures: ["wovn-cli: exited 1\nmore"] }, [])).toEqual({
+    expect(outcomeOf(0, { ...report, failures: ["wovn-cli: exited 1\nbuild log"] }, [])).toEqual({
       kind: "failed",
-      source: report.source,
-      reason: "wovn-cli: exited 1",
+      details: ["wovn-cli: exited 1", "build log"],
     });
   });
 
   it("skips Machines that ssh cannot reach, and fails ones that broke before reporting", () => {
-    // Tailscale SSH on macOS exits 0 even when the remote command failed.
-    expect(outcomeOf(0, undefined, [])).toEqual({
-      kind: "failed",
-      source: "-",
-      reason: "exited without a ship report",
-    });
     const denied = 'tailscale: tailnet policy does not permit you to SSH as user "connorchevli"';
     expect(outcomeOf(255, undefined, [denied, "Connection closed by 100.64.0.1 port 22"])).toEqual({
       kind: "skipped",
-      reason: `ssh: ${denied}`,
+      reason: 'ssh: tailnet policy does not permit you to SSH as user "connorchevli"',
     });
-    expect(
-      outcomeOf(0, undefined, [
-        "node:internal/modules/cjs/loader:1386",
-        "Error: Cannot find module 'apps/ship/src/machine.ts'",
-        "  requireStack: []",
-        "Node.js v24.21.0",
-      ]),
-    ).toEqual({
+    // Tailscale SSH on macOS exits 0 even when the remote command failed.
+    expect(outcomeOf(0, undefined, [])).toEqual({
       kind: "failed",
-      source: "-",
-      reason: "Error: Cannot find module 'apps/ship/src/machine.ts'",
+      details: ["exited without a ship report"],
+    });
+    const crash = [
+      "node:internal/modules/cjs/loader:1386",
+      "Error: Cannot find module 'apps/ship/src/machine.ts'",
+      "Node.js v24.21.0",
+    ];
+    expect(outcomeOf(0, undefined, crash)).toEqual({
+      kind: "failed",
+      details: ["Error: Cannot find module 'apps/ship/src/machine.ts'", ...crash],
     });
   });
 });
 
-describe("parseReport", () => {
-  it("reads a full report and ignores one cut off mid-line", () => {
+describe("parseLine", () => {
+  it("separates protocol lines from plain output, including a cut-off report", () => {
     const line = formatReport(report);
-    expect(parseReport(line)).toEqual(report);
-    expect(parseReport(line.slice(0, 20))).toBeUndefined();
+    expect(parseLine(line)).toEqual({ kind: "report", report });
+    expect(parseLine(formatEvent({ tag: "RUN", message: "ship:machine wovn-cli" }))).toEqual({
+      kind: "event",
+      event: { tag: "RUN", message: "ship:machine wovn-cli" },
+    });
+    expect(parseLine(line.slice(0, 20))).toEqual({ kind: "text", text: line.slice(0, 20) });
   });
 });
 

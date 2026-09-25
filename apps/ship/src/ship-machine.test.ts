@@ -30,7 +30,7 @@ function ship(overrides: Partial<ShipMachineOptions> = {}) {
     knownMachines: ["connors-mac-studio", "hermes-agent"],
     source: "test",
     dryRun: false,
-    log: () => {},
+    emit: () => {},
     ...overrides,
   });
 }

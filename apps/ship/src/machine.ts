@@ -1,10 +1,11 @@
-// `pnpm ship:machine`: ship this checkout to this Machine. ship:fleet runs it
-// here against the working copy and on every other Machine against its
-// Managed Clone (with --remote), and reads the ship-report line it asks for
-// with --report.
+// `pnpm ship:machine`: ship this checkout to this Machine, printing the event
+// ledger. ship:fleet runs it here against the working copy and on every other
+// Machine against its Managed Clone (with --remote), and with --report reads
+// its events and report as protocol lines instead.
 
 import { Command, Option } from "commander";
-import { formatReport, type MachineReport } from "./report.ts";
+import { createLedger } from "./ledger.ts";
+import { describeChanges, formatEvent, formatReport, type MachineReport } from "./report.ts";
 import { describeHead, manifestPath, REPO_ROOT, repoSlug } from "./repo.ts";
 import { shipMachine } from "./ship-machine.ts";
 import { ValidationError } from "./source.ts";
@@ -19,15 +20,16 @@ const options = new Command("ship:machine")
       .hideHelp(),
   )
   .addOption(
-    new Option("--report", "print a ship-report line for ship:fleet").default(false).hideHelp(),
+    new Option("--report", "print protocol lines for ship:fleet").default(false).hideHelp(),
   )
   .parse()
   .opts<{ dryRun: boolean; remote: boolean; report: boolean }>();
 
 const source = `${options.remote ? "origin/main" : "working copy"} ${describeHead()}`;
+const tailnet = readTailnet();
+const ledger = createLedger(tailnet.self.name.length);
 let report: MachineReport;
 try {
-  const tailnet = readTailnet();
   const slug = repoSlug();
   report = shipMachine({
     root: REPO_ROOT,
@@ -41,7 +43,10 @@ try {
     knownMachines: tailnet.fleet.map((machine) => machine.name),
     source,
     dryRun: options.dryRun,
-    log: (line) => console.log(line),
+    emit: (event) =>
+      options.report
+        ? console.log(formatEvent(event))
+        : ledger.line(tailnet.self.name, event.tag, event.message),
   });
 } catch (error) {
   // Validation errors are for the person shipping; anything else is a bug.
@@ -62,6 +67,8 @@ try {
   };
 }
 
-for (const failure of report.failures) console.error(`error: ${failure}`);
 if (options.report) console.log(formatReport(report));
+else if (report.failures.length > 0) {
+  ledger.fail(tailnet.self.name, report.failures.join("\n").split("\n"));
+} else if (!report.dryRun) ledger.line(tailnet.self.name, "OK", describeChanges(report));
 process.exitCode = report.failures.length > 0 ? 1 : 0;

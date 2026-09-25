@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { shipsTo, skillAgents, type MachineContext } from "./controls.ts";
 import { EMPTY_MANIFEST, Manifest, nextManifest, planSkills } from "./plan.ts";
-import type { MachineReport } from "./report.ts";
+import type { MachineReport, ShipEvent } from "./report.ts";
 import { addSkills, readLockSources, removeSkills, supportedAgents } from "./skills-cli.ts";
 import { readSource, ValidationError } from "./source.ts";
 
@@ -20,7 +20,7 @@ export interface ShipMachineOptions {
   knownMachines: string[];
   source: string;
   dryRun: boolean;
-  log: (line: string) => void;
+  emit: (event: ShipEvent) => void;
 }
 
 function readManifest(path: string): Manifest {
@@ -57,7 +57,7 @@ function checkNames(root: string, knownMachines: string[]) {
 }
 
 export function shipMachine(options: ShipMachineOptions): MachineReport {
-  const { root, machine, dryRun, log } = options;
+  const { root, machine, dryRun, emit } = options;
   const source = checkNames(root, options.knownMachines);
 
   const desired = new Map(
@@ -90,14 +90,31 @@ export function shipMachine(options: ShipMachineOptions): MachineReport {
     dryRun,
   };
 
+  // A real Ship plans in one line; a dry run spells the plan out.
   const reinstall = plan.remove.filter((name) => shipping.includes(name));
-  const remove = plan.remove.filter((name) => !shipping.includes(name));
-  if (remove.length > 0) log(`remove: ${remove.join(", ")}`);
-  if (reinstall.length > 0) log(`remove, then reinstall: ${reinstall.join(", ")}`);
-  for (const group of plan.install)
-    log(`install for ${group.agents.join(", ")}: ${group.skills.join(", ")}`);
-  for (const failure of failures) log(`conflict: ${failure}`);
-  for (const pkg of packages) log(`package: ${pkg.name}`);
+  const planLine = (message: string) => emit({ tag: "PLAN", message });
+  if (dryRun) {
+    planLine(options.source);
+    if (report.removed.length > 0) planLine(`remove ${report.removed.join(" ")}`);
+    if (reinstall.length > 0) planLine(`reinstall ${reinstall.join(" ")}`);
+    for (const group of plan.install) {
+      planLine(`install ${group.agents.join(" ")}: ${group.skills.join(" ")}`);
+    }
+    for (const pkg of packages) planLine(`package ${pkg.name}`);
+  } else {
+    planLine(
+      [
+        options.source,
+        `${shipping.length} skills`,
+        report.added.length > 0 ? `+${report.added.length} new` : "",
+        ...report.removed.map((name) => `-${name}`),
+        reinstall.length > 0 ? `reinstall ${reinstall.join(" ")}` : "",
+        ...packages.map((pkg) => pkg.name),
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    );
+  }
   if (dryRun) return report;
 
   let removed = true;
@@ -117,14 +134,19 @@ export function shipMachine(options: ShipMachineOptions): MachineReport {
     `${JSON.stringify(nextManifest(manifest, plan, removed), null, 2)}\n`,
   );
 
+  // Build output is only worth reading when the build fails.
   for (const pkg of packages) {
-    log(`running ship:machine in ${pkg.name}`);
+    emit({ tag: "RUN", message: `ship:machine ${pkg.name}` });
     const result = spawnSync("pnpm", ["run", "--silent", "ship:machine"], {
       cwd: pkg.dir,
-      stdio: "inherit",
+      encoding: "utf8",
     });
-    if (result.status !== 0)
-      failures.push(`${pkg.name}: ship:machine exited ${result.status ?? result.signal}`);
+    if (result.status !== 0) {
+      const output = `${result.stdout ?? ""}${result.stderr ?? ""}`.trimEnd();
+      failures.push(
+        `${pkg.name}: ship:machine exited ${result.status ?? result.signal}\n${output}`,
+      );
+    }
   }
   return report;
 }
