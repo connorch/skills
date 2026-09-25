@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+    "jsx": "react-jsx",
+    "paths": { "@/*": ["./src/*"] },
+    // Off until the host's index/regex-group reads are hardened for it; the
+    // auth and file-serving paths have ~11 sites that need real handling,
+    // not a move-time cast.
+    "noUncheckedIndexedAccess": false
+  },
+  "include": ["src", "vite.config.ts", "vite.banner.config.ts", "worker-configuration.d.ts"]
+}

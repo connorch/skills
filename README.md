@@ -64,7 +64,7 @@ These skills help you plan, verify, write, refactor, and fix code.
 - **implement-and-review** - Take an approved plan through implementation, browser QA, PR filing, the review-bot loop with step-back every three Codex rounds, a final QA pass, and a handoff writeup of unplanned decisions and deferred findings.
 - **babysit-pr** — Monitor a pull request through review and CI, verifying bot findings, fixing real failures, and dismissing false positives with reasons. Adapted from a skill by [Theo Browne](https://youtu.be/e1snsuY4lTI).
 - **html-communication** — Create self-contained HTML writeups (plans, specs, findings, UI mocks) and publish them privately to files.wovn.org with the wovn CLI. Adapted from a skill by Theo Browne.
-- **wovn-file-hosting** - Upload any local file to files.wovn.org and return a permanent URL (private by default, public on request), backed by the Cloudflare Worker in `skills/wovn-file-hosting/worker/`. Adapted from a skill by Theo Browne.
+- **wovn-file-hosting** - Upload any local file to files.wovn.org and return a permanent URL (private by default, public on request), backed by the Cloudflare Worker in `apps/wovn-files/` and the `wovn` CLI in `apps/wovn-cli/`. Adapted from a skill by Theo Browne.
 
 ## Second Brain
 
@@ -72,6 +72,28 @@ These skills feed Connor's second-brain Obsidian vault.
 
 - **sb-ingest** — File any pasted content (conversation, email, notes, transcript, or a file path) verbatim into the vault's `Sources/` directory so the vault automation ingests it.
 - **sb-ingest-superwhisper-meeting** — Find unprocessed superwhisper meeting recordings, build speaker-separated transcripts, identify speakers via calendar and transcript evidence, and file them into `Sources/`.
+
+## Workspace
+
+The repo is a pnpm workspace with [vite-plus](https://viteplus.dev) at the
+root. Skills live under `skills/` as plain directories; the code behind them
+lives in `apps/` (see [`CONTEXT-MAP.md`](CONTEXT-MAP.md) for each app's
+domain docs).
+
+- `apps/wovn-files` - the files.wovn.org Worker (TanStack Start on
+  Cloudflare).
+- `apps/wovn-cli` - the `wovn` CLI the `wovn-file-hosting` and
+  `html-communication` skills call.
+
+```sh
+pnpm install
+pnpm wovn:install     # build apps/wovn-cli and copy it to ~/.local/bin/wovn
+pnpm dev:wovn-files   # the host with HMR
+pnpm typecheck        # every workspace package
+pnpm lint             # oxlint via vp
+pnpm fmt              # oxfmt via vp (skills/ is left as written)
+pnpm test             # the conductor-run tests
+```
 
 ## Archived Skills
 
