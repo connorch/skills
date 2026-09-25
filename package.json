@@ -4,16 +4,16 @@
   "type": "module",
   "scripts": {
     "prepare": "vp config --no-agent",
-    "conductor:run": "node scripts/conductor-run.mjs",
     "dev:wovn-files": "vp run --filter wovn-files dev",
     "build": "vp run -r build",
     "typecheck": "vp run -r typecheck",
     "lint": "vp lint --report-unused-disable-directives",
     "fmt": "vp fmt",
     "fmt:check": "vp fmt --check",
-    "test": "node --test",
-    "wovn:install": "node scripts/install-wovn.mjs",
-    "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules apps/*/dist packages/*/dist .vite-plus apps/*/.vite-plus packages/*/.vite-plus"
+    "test": "vp run -r test",
+    "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules apps/*/dist packages/*/dist .vite-plus apps/*/.vite-plus packages/*/.vite-plus",
+    "ship:fleet": "node apps/ship/src/fleet.ts",
+    "ship:machine": "node apps/ship/src/machine.ts"
   },
   "devDependencies": {
     "@types/node": "catalog:",

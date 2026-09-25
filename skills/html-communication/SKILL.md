@@ -2,8 +2,6 @@
 name: html-communication
 description: When the user asks for an HTML writeup of work (NOT as part of the codebase), use this skill to create it and always publish it privately with the wovn-file-hosting skill's wovn CLI. Also useful for reading private files.wovn.org URLs back.
 metadata:
-  harness: [claude, codex]
-  platform: [darwin, linux]
   requires: "the wovn CLI on PATH (see the wovn-file-hosting skill)"
 ---
 

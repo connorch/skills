@@ -7,7 +7,8 @@
   "type": "module",
   "scripts": {
     "build": "vp pack",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "ship:machine": "vp pack && mkdir -p ~/.local/bin && install -m 755 dist/wovn.mjs ~/.local/bin/wovn"
   },
   "dependencies": {
     "commander": "^14.0.0"
