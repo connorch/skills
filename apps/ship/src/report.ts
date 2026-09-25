@@ -1,9 +1,9 @@
-// What a machine Ship reports back. ship:machine prints it as its last line;
-// ship:fleet reads it from each Machine's output to build the summary table.
+// What a machine Ship reports back. With --report, ship:machine prints it as
+// its last line; ship:fleet reads it from each Machine to build the summary.
 
 import { z } from "zod";
 
-export const REPORT_PREFIX = "ship-report ";
+const REPORT_PREFIX = "ship-report ";
 
 export const MachineReport = z.object({
   // e.g. "working copy 1a2b3c4+dirty" or "origin/main 1a2b3c4".

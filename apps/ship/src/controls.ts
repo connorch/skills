@@ -7,7 +7,7 @@
 
 import { z } from "zod";
 
-export const PLATFORMS = ["darwin", "linux"] as const;
+const PLATFORMS = ["darwin", "linux"] as const;
 export type Platform = (typeof PLATFORMS)[number];
 
 const DEFAULT_AGENTS = ["claude-code", "codex"];

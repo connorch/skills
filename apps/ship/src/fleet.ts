@@ -37,7 +37,7 @@ export function outcomeOf(
 
 // The script a remote Machine runs in its login shell. Written for both zsh
 // (macOS) and bash (linux).
-export function remoteScript(slug: string, dryRun: boolean): string {
+function remoteScript(slug: string, dryRun: boolean): string {
   const dir = `"$HOME/${managedCloneDir(slug)}"`;
   return [
     "set -e",
@@ -90,7 +90,7 @@ function shipTo(
   });
 }
 
-export function summaryTable(rows: { name: string; outcome: Outcome }[]): string {
+function summaryTable(rows: { name: string; outcome: Outcome }[]): string {
   const cells = rows.map(({ name, outcome }) => {
     switch (outcome.kind) {
       case "ok":

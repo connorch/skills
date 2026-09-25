@@ -15,7 +15,7 @@ const Node = z.object({
 });
 type Node = z.infer<typeof Node>;
 
-export const TailscaleStatus = z.object({
+const TailscaleStatus = z.object({
   Self: Node,
   Peer: z.record(z.string(), Node).nullish(),
 });
