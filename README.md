@@ -39,15 +39,57 @@ You can also install multiple specific skills in one command:
 skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr file-pr implement-and-review html-communication wovn-file-hosting sb-ingest sb-ingest-superwhisper-meeting
 ```
 
-Install the current local checkout with Conductor's agent targeting:
+## Shipping to your machines
 
-```sh
-pnpm conductor:run
+`pnpm ship:fleet` installs this repo's skills and CLIs on every macOS and linux
+machine on your tailnet, in parallel. The machine you run it from ships your
+working copy; every other machine resets a clone of this repo at
+`~/.local/share/<owner>-<repo>` to `origin/main` over `tailscale ssh` and ships
+that. Offline machines are skipped with a warning.
+
+Output is one line per event, tagged `PLAN`, `RUN`, `SKIP`, `OK`, or `FAIL`, so
+`grep FAIL` works on a saved log. Build output is hidden unless that machine
+fails, in which case its full output prints under the `FAIL` line.
+
+```
+ 0.2s  connors-macbook-pro  PLAN  working copy 41c471d · 15 skills · +15 new · wovn-cli
+ 0.5s  connors-macbook-pro  RUN   ship:machine wovn-cli
+ 0.9s  connors-macbook-pro  OK    15 skills (+15) · wovn-cli
+ 1.2s  bluefin              SKIP  offline
+ 1.2s  fleet                DONE  ok 1  skipped 1  failed 0
 ```
 
-This installs `codex-*` skills for Claude Code only, `claude-*` skills for Codex
-only, and the remaining live skills for both Claude Code and Codex. It uses the
-local `skills/` directory rather than the repository's remote branch.
+```sh
+pnpm ship:fleet                         # every machine
+pnpm ship:fleet --dry-run               # print each machine's plan, change nothing
+pnpm ship:fleet --only connors-mac-studio
+pnpm ship:machine                       # just this machine, from this checkout
+```
+
+Each machine needs `git`, `node` 24, and `pnpm`, and must accept Tailscale SSH:
+on macOS that means the open-source `tailscaled` rather than Tailscale.app (see
+[`docs/adr/0001-push-based-ship-over-tailscale-ssh.md`](docs/adr/0001-push-based-ship-over-tailscale-ssh.md)).
+
+A skill chooses where it ships with optional `metadata` in its `SKILL.md`
+frontmatter. The fields combine: a machine gets the skill only if it passes all
+of them.
+
+```yaml
+metadata:
+  agents: [claude-code] # skills CLI agent slugs. Default: [claude-code, codex]
+  platforms: [darwin] # darwin and/or linux. Default: both
+  machines: [connors-mac-studio] # tailnet names. Default: every machine
+  fleet: false # only the machine running the ship. Default: true
+```
+
+A workspace package ships by defining a `ship:machine` script, which installs it
+on the machine it runs on, and can restrict itself with the same fields (except
+`agents`) under a `ship` key in its `package.json`.
+
+Each machine records what ships have installed in
+`~/.local/state/<owner>-<repo>/manifest.json`, so skills deleted, archived, or
+retargeted in this repo are removed on the next ship. Skills installed from
+anywhere else are never touched.
 
 ## Development
 
@@ -84,15 +126,16 @@ domain docs).
   Cloudflare).
 - `apps/wovn-cli` - the `wovn` CLI the `wovn-file-hosting` and
   `html-communication` skills call.
+- `apps/ship` - `pnpm ship:fleet` and `pnpm ship:machine`.
 
 ```sh
 pnpm install
-pnpm wovn:install     # build apps/wovn-cli and copy it to ~/.local/bin/wovn
-pnpm dev:wovn-files   # the host with HMR
-pnpm typecheck        # every workspace package
-pnpm lint             # oxlint via vp
-pnpm fmt              # oxfmt via vp (skills/ is left as written)
-pnpm test             # the conductor-run tests
+pnpm ship:machine    # install skills and the wovn CLI on this machine
+pnpm dev:wovn-files  # the host with HMR
+pnpm typecheck       # every workspace package
+pnpm lint            # oxlint via vp
+pnpm fmt             # oxfmt via vp (skills/ is left as written)
+pnpm test            # every workspace package
 ```
 
 ## Archived Skills

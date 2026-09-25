@@ -3,8 +3,8 @@
 [scripts]
 run_mode = "nonconcurrent"
 
-[scripts.run.install-skills]
+[scripts.run.ship-fleet]
 available_in = ["local"]
-command = "pnpm conductor:run"
+command = "pnpm ship:fleet"
 default = true
 icon = "package"

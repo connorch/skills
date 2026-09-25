@@ -9,6 +9,8 @@ allowBuilds:
 
 catalog:
   "@types/node": 24.12.4
+  # The installer behind ship:machine. Pinned exactly: every Machine must run the same one.
+  skills: 1.7.0
   typescript: ~6.0.3
   vite: npm:@voidzero-dev/vite-plus-core@1.0.0-rc.0
   vite-plus: 1.0.0-rc.0

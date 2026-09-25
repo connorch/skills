@@ -1,9 +1,6 @@
 ---
 name: pull-upstream
 description: Sync a forked repository with its upstream. Use when asked to "pull upstream", "sync the fork", "merge upstream", "update the fork", or "catch up with upstream".
-metadata:
-  harness: [claude, codex]
-  platform: [darwin, linux]
 ---
 
 # Pull Upstream

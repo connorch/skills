@@ -1,6 +1,8 @@
 ---
 name: claude-code-subagent
 description: Delegate a bounded task to Claude Code CLI (`claude -p`) as a headless subagent, then review what it produced. Use when the user asks to hand work to Claude or Claude Code, when a multi-file implementation, refactor, investigation, or independent review would benefit from a second coding agent, or when heavy work should run on the user's Claude subscription. Not for use from inside Claude Code itself.
+metadata:
+  agents: [codex]
 ---
 
 # Claude Code Subagent

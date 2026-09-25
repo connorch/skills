@@ -3,8 +3,8 @@
   "iconPath": "assets/icon.png",
   "scripts": [
     {
-      "name": "install-skills",
-      "command": "pnpm conductor:run",
+      "name": "ship-fleet",
+      "command": "pnpm ship:fleet",
       "icon": "configure"
     }
   ]

@@ -9,7 +9,6 @@ const IGNORE_PATTERNS = [
   "**/worker-configuration.d.ts",
   "**/.wrangler/**",
   "output/**",
-  "skills-local/**",
   ".context/**",
 ];
 

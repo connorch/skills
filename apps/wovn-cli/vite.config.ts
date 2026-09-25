@@ -2,7 +2,7 @@ import { defineConfig, mergeConfig } from "vite-plus";
 
 import baseConfig from "../../vite.config.ts";
 
-// One self-contained file: `pnpm wovn:install` copies dist/wovn.mjs to
+// One self-contained file: the `ship:machine` script copies dist/wovn.mjs to
 // ~/.local/bin/wovn, so commander has to be inlined rather than resolved
 // from node_modules at run time.
 export default mergeConfig(

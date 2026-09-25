@@ -4,9 +4,6 @@ description: >-
   Use when the user approves a plan and says to implement it. Takes the plan
   through implementation, browser QA, and the PR review loop to a PR that is
   ready to look at.
-metadata:
-  harness: [claude, codex]
-  platform: [darwin, linux]
 ---
 
 # Implement and Review

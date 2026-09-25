@@ -149,9 +149,10 @@ with the git context it ran in; `wovn list` shows recent Files with a
 hosted Files (one argument = previous vs current); `wovn visibility get/set`
 reads and flips Visibility; `wovn rm` deletes a File and its archived
 history; `wovn token rotate` rotates the token. All management commands go
-through `/api`. Build and install with `pnpm wovn:install` from the repo
-root: it runs `vp pack` in `../wovn-cli` and copies the self-contained bundle
-to `~/.local/bin/wovn` (re-run after editing `../wovn-cli/src/wovn.ts`).
+through `/api`. Build and install with `pnpm ship:machine` from the repo root:
+`../wovn-cli`'s `ship:machine` script runs `vp pack` and copies the
+self-contained bundle to `~/.local/bin/wovn` (re-run after editing
+`../wovn-cli/src/wovn.ts`).
 
 ## Token rotation
 
