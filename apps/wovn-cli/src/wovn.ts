@@ -1,4 +1,5 @@
-// wovn - CLI for the files.wovn.org file host (see skills/wovn-file-hosting).
+// wovn - CLI for the files.wovn.org file host (apps/wovn-files). The agent-
+// facing usage guide is skills/wovn-file-hosting/SKILL.md.
 //
 // One host, one credential: every request authenticates with the WOVN_TOKEN
 // bearer token. Files are private by default; `--public` (or
@@ -302,8 +303,8 @@ async function history(target: string): Promise<void> {
 // archive/<stable-path>/<stamp>, so the name is the stable path's last segment.
 function displayName(key: string): string {
   const segments = key.split("/").filter(Boolean);
-  if (segments[0] === "archive" && segments.length >= 3) return segments[segments.length - 2];
-  return segments[segments.length - 1] ?? "file";
+  const name = segments[0] === "archive" && segments.length >= 3 ? segments.at(-2) : segments.at(-1);
+  return name ?? "file";
 }
 
 async function fetchToFile(target: string, dir: string, side: "old" | "new"): Promise<string> {
@@ -322,9 +323,10 @@ async function diff(oldTarget: string, newTarget: string | undefined): Promise<v
   if (newTarget === undefined) {
     const { key, history } = await fetchHistory(oldTarget);
     if (!history.current) fail(`${HOST}/${key} not found`);
-    if (history.versions.length === 0) fail(`${HOST}/${key} has no previous versions to diff against`);
+    const previous = history.versions[0];
+    if (!previous) fail(`${HOST}/${key} has no previous versions to diff against`);
     newTarget = history.current.key;
-    oldTarget = history.versions[0].key;
+    oldTarget = previous.key;
   }
   const dir = mkdtempSync(join(tmpdir(), "wovn-diff-"));
   try {

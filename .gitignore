@@ -5,16 +5,16 @@ output/
 skills-local/*
 !skills-local/.gitkeep
 
-# wovn-file-hosting worker build/dev artifacts
-skills/wovn-file-hosting/worker/node_modules/
-skills/wovn-file-hosting/worker/worker-configuration.d.ts
-skills/wovn-file-hosting/worker/.dev.vars
-skills/wovn-file-hosting/worker/.wrangler/
+# workspace
+node_modules
+.DS_Store
+*.log
+*.tsbuildinfo
+apps/*/dist
+packages/*/dist
+.vite-plus
 
-# wovn-file-hosting CLI build artifacts
-skills/wovn-file-hosting/cli/node_modules/
-skills/wovn-file-hosting/cli/dist/
-
-# wovn-file-hosting browse UI build artifacts
-skills/wovn-file-hosting/ui/node_modules/
-skills/wovn-file-hosting/ui/dist/
+# wovn-files worker dev artifacts (wrangler)
+.wrangler
+.dev.vars
+worker-configuration.d.ts

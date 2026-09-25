@@ -1,0 +1,30 @@
+packages:
+  - apps/*
+  - packages/*
+
+# true = allowed to run build scripts.
+allowBuilds:
+  esbuild: true
+  workerd: false
+
+catalog:
+  "@types/node": 24.12.4
+  typescript: ~6.0.3
+  vite: npm:@voidzero-dev/vite-plus-core@1.0.0-rc.0
+  vite-plus: 1.0.0-rc.0
+
+overrides:
+  "@types/node": "catalog:"
+  typescript: "catalog:"
+  vite: "catalog:"
+
+packageExtensions:
+  vite-plus@*:
+    dependencies:
+      vite: "catalog:"
+
+peerDependencyRules:
+  allowAny:
+    - vite
+  allowedVersions:
+    vite: "*"

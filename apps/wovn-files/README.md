@@ -5,9 +5,9 @@ Cloudflare Worker: the file host used by the `wovn-file-hosting` skill and
 the browser surface around it. One hostname, one R2 bucket (`wovn-files`);
 every File is private unless its customMetadata says `visibility: public`
 (fail closed), and `archive/` objects - Versions of Stable Paths - are always
-private. See `../docs/adr/0001` for why, `0002` for URL resolution and the
+private. See `docs/adr/0001` for why, `0002` for URL resolution and the
 API, `0003` for the Banner and the one wrap rule, `0004` for the Start
-layout, and `../CONTEXT.md` for the domain language.
+layout, and `CONTEXT.md` for the domain language.
 
 ## Layout
 
@@ -116,15 +116,17 @@ via `account_id` in `wrangler.jsonc`.
 
 ## Develop, verify, deploy
 
+From the repo root, `pnpm install` once; then in this directory:
+
 ```sh
-pnpm install
 pnpm dev          # app pages (Directory Routes, Previews) with HMR
 pnpm typecheck    # wrangler types && tsc
-pnpm lint
 pnpm build        # the Start build, then the Banner bundle
 pnpm preview      # the built Worker in workerd with a local bucket
 pnpm run deploy   # build + wrangler deploy
 ```
+
+Lint and format run from the root (`pnpm lint`, `pnpm fmt`).
 
 The injected Banner has no dev mode (ADR 0004): check it through
 `pnpm build && pnpm preview`. Put the bearer token in `.dev.vars`
@@ -136,7 +138,7 @@ For browser checks, open the preview with an injected
 
 ## The wovn CLI
 
-`../cli` is a TypeScript commander program that wraps the host for agents and
+`../wovn-cli` is a TypeScript commander program that wraps the host for agents and
 humans: `wovn put <file...>` uploads (private by default; `--public` to
 share, `--at` for Stable Paths, `--force` to replace), tagging each upload
 with the git context it ran in; `wovn list` shows recent Files with a
@@ -147,9 +149,9 @@ with the git context it ran in; `wovn list` shows recent Files with a
 hosted Files (one argument = previous vs current); `wovn visibility get/set`
 reads and flips Visibility; `wovn rm` deletes a File and its archived
 history; `wovn token rotate` rotates the token. All management commands go
-through `/api`. Build and install: `pnpm install && pnpm build` in `../cli`,
-then `cp ../cli/dist/wovn ~/.local/bin/wovn` (re-run after editing
-`../cli/src/wovn.ts`).
+through `/api`. Build and install with `pnpm wovn:install` from the repo
+root: it runs `vp pack` in `../wovn-cli` and copies the self-contained bundle
+to `~/.local/bin/wovn` (re-run after editing `../wovn-cli/src/wovn.ts`).
 
 ## Token rotation
 

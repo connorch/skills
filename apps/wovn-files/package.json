@@ -4,14 +4,12 @@
   "version": "0.0.2",
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
-    "build": "vite build && vite build -c vite.banner.config.ts",
-    "preview": "vite preview",
+    "dev": "vp dev",
+    "build": "vp build && vp build -c vite.banner.config.ts",
+    "preview": "vp preview",
     "deploy": "pnpm build && wrangler deploy",
     "types": "wrangler types",
-    "typecheck": "wrangler types && tsc --noEmit",
-    "lint": "eslint .",
-    "format": "prettier --write \"**/*.{ts,tsx}\""
+    "typecheck": "wrangler types && tsc --noEmit"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -36,20 +34,13 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.54.0",
-    "@eslint/js": "^10",
-    "@types/node": "^24",
+    "@types/node": "catalog:",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6",
-    "eslint": "^10",
-    "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.2",
-    "globals": "^17",
-    "prettier": "^3.8.3",
-    "prettier-plugin-tailwindcss": "^0.8.0",
-    "typescript": "~6",
-    "typescript-eslint": "^8",
-    "vite": "^8",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
     "wrangler": "^4.130.0"
   }
 }

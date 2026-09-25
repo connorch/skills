@@ -186,4 +186,6 @@ opens a File in the browser from the terminal.
 ## Where it runs
 
 files.wovn.org is a Cloudflare Worker in front of one R2 bucket. This skill
-is for using the CLI; changing the host is a separate job.
+is for using the CLI; changing the host is a separate job. Both live in the
+skills repo's workspace: the host in `apps/wovn-files`, the CLI in
+`apps/wovn-cli`, installed with `pnpm wovn:install` from the repo root.
