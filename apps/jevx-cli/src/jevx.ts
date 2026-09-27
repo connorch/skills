@@ -16,7 +16,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { choice, TypeSafeClient } from "@typesafe-ai/sdk";
-import { Command } from "commander";
+import { Command, InvalidArgumentError } from "commander";
 
 const KEY_FILE = join(homedir(), ".config", "typesafe", "api_key.txt");
 const JEV_ULTRAFAST = process.env.JEV_ULTRAFAST ?? join(homedir(), "Projects", "jev-ultrafast");
@@ -50,6 +50,12 @@ function parseOptions(raw: string): Record<string, string | null> {
       return [name.trim(), description.join("=").trim() || null];
     }),
   );
+}
+
+function positiveInt(value: string): number {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1) throw new InvalidArgumentError("expected a positive integer");
+  return n;
 }
 
 // Maps with at most `limit` calls in flight, keeping input order. Workers share one iterator.
@@ -181,7 +187,7 @@ program
   .option("--instructions <text>", "the question", "Which option best fits this item?")
   .option("--in <file>", "one item per line (default: stdin)")
   .option("--out <file>", "JSONL output (default: stdout)")
-  .option("--concurrency <n>", "requests in flight", (value) => Number.parseInt(value, 10), 16)
+  .option("--concurrency <n>", "requests in flight", positiveInt, 16)
   .option("--low <confidence>", "report rows below this confidence", Number.parseFloat, 0.5)
   .action(classify);
 
