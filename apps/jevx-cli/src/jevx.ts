@@ -58,6 +58,14 @@ function positiveInt(value: string): number {
   return n;
 }
 
+function probability(value: string): number {
+  const n = Number(value);
+  if (value.trim() === "" || !(n >= 0 && n <= 1)) {
+    throw new InvalidArgumentError("expected a number from 0 to 1");
+  }
+  return n;
+}
+
 // Maps with at most `limit` calls in flight, keeping input order. Workers share one iterator.
 async function mapPool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>) {
   const results: R[] = [];
@@ -151,7 +159,10 @@ if agent:
         target_id=agent.browser.target if opts["keepOpen"] else None,
     )
     if not opts["keepOpen"]:
-        agent.close()
+        try:
+            agent.close()
+        except Exception:  # A lost connection must not replace the report with a traceback.
+            pass
 print(json.dumps({"status": "error", **report}, ensure_ascii=False, indent=2))
 sys.exit(0 if report.get("status") == "done" else 1)
 `;
@@ -188,7 +199,7 @@ program
   .option("--in <file>", "one item per line (default: stdin)")
   .option("--out <file>", "JSONL output (default: stdout)")
   .option("--concurrency <n>", "requests in flight", positiveInt, 16)
-  .option("--low <confidence>", "report rows below this confidence", Number.parseFloat, 0.5)
+  .option("--low <confidence>", "report rows below this confidence", probability, 0.5)
   .action(classify);
 
 program
