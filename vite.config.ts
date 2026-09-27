@@ -24,6 +24,8 @@ export default defineConfig({
       // keep every file in them exactly as written.
       "skills/**",
       "archived/**",
+      // Agent instructions ship as written too.
+      "instructions/*.md",
     ],
     sortPackageJson: {},
   },

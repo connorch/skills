@@ -1,13 +1,17 @@
 # Agent Skills
 
-Connor's agent skills and the CLIs they depend on, plus the tooling that ships
-them to every machine he works on.
+Connor's agent skills, Agent Instructions, and the CLIs they depend on, plus
+the tooling that ships them to every machine he works on.
 
 ## Language
 
 **Live Skill**:
 A skill directory under `skills/` with a `SKILL.md`; the only skills a Ship installs.
 _Avoid_: active skill, published skill
+
+**Agent Instructions**:
+The global instructions under `instructions/` that every agent loads: a shared `AGENTS.md`, plus a `*_ONLY.md` that a Ship appends to it for one harness.
+_Avoid_: memory, rules, system prompt
 
 **Archived Skill**:
 A retired skill under `archived/`, kept for reference and never installed.
@@ -21,7 +25,7 @@ One member of the Fleet, identified by its tailnet hostname (e.g. `connors-mac-s
 _Avoid_: device, host, box
 
 **Ship**:
-A manual run that brings Machines' skills and CLIs in line with a source tree; a fleet Ship covers every reachable Machine, a machine Ship covers one.
+A manual run that brings Machines' skills, Agent Instructions, and CLIs in line with a source tree; a fleet Ship covers every reachable Machine, a machine Ship covers one.
 _Avoid_: deploy, install, publish, sync, rollout
 
 **Managed Clone**:

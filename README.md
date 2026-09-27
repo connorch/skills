@@ -39,9 +39,9 @@ skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-
 
 ## Shipping to your machines
 
-`pnpm ship:fleet` installs this repo's skills and CLIs on every macOS and linux
-machine on your tailnet, in parallel. The machine you run it from ships your
-working copy; every other machine resets a clone of this repo at
+`pnpm ship:fleet` installs this repo's skills, agent instructions, and CLIs on
+every macOS and linux machine on your tailnet, in parallel. The machine you run
+it from ships your working copy; every other machine resets a clone of this repo at
 `~/.local/share/<owner>-<repo>` to `origin/main` over `tailscale ssh` and ships
 that. Offline machines are skipped with a warning.
 
@@ -89,6 +89,24 @@ Each machine records what ships have installed in
 retargeted in this repo are removed on the next ship. Skills installed from
 anywhere else are never touched.
 
+## Agent instructions
+
+`instructions/` holds the global instructions every agent loads. `AGENTS.md` is
+shared by every harness, and each harness gets it with its own `*_ONLY.md`
+appended. A ship writes, overwriting what was there:
+
+- `~/.agents/AGENTS.md` - `AGENTS.md`, for any other harness
+- `~/.claude/CLAUDE.md` - `AGENTS.md` + `CLAUDE_ONLY.md`
+- `~/.codex/AGENTS.md` - `AGENTS.md` + `CODEX_ONLY.md`
+
+Edit them here, not on a machine. To review exactly what a ship would write,
+a dry run writes the files under `instructions/dry-run/` (gitignored) instead,
+and reports whether each is new, changed, or unchanged on this machine:
+
+```sh
+pnpm --dir instructions ship:machine --dry-run
+```
+
 ## Development
 
 These skills help you plan, verify, write, refactor, and fix code.
@@ -118,10 +136,11 @@ domain docs).
 - `apps/wovn-cli` - the `wovn` CLI the `wovn-file-hosting` and
   `html-communication` skills call.
 - `apps/ship` - `pnpm ship:fleet` and `pnpm ship:machine`.
+- `instructions` - the global agent instructions (see above).
 
 ```sh
 pnpm install
-pnpm ship:machine    # install skills and the wovn CLI on this machine
+pnpm ship:machine    # install skills, instructions, and the wovn CLI here
 pnpm dev:wovn-files  # the host with HMR
 pnpm typecheck       # every workspace package
 pnpm lint            # oxlint via vp

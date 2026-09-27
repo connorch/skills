@@ -1,0 +1,16 @@
+{
+  "name": "agent-instructions",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "ship:machine": "node ship.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^14.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}
