@@ -29,14 +29,12 @@ skills add connorch/skills --skill file-pr
 skills add connorch/skills --skill implement-and-review
 skills add connorch/skills --skill html-communication
 skills add connorch/skills --skill wovn-file-hosting
-skills add connorch/skills --skill sb-ingest
-skills add connorch/skills --skill sb-ingest-superwhisper-meeting
 ```
 
 You can also install multiple specific skills in one command:
 
 ```sh
-skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr file-pr implement-and-review html-communication wovn-file-hosting sb-ingest sb-ingest-superwhisper-meeting
+skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr file-pr implement-and-review html-communication wovn-file-hosting
 ```
 
 ## Shipping to your machines
@@ -108,13 +106,6 @@ These skills help you plan, verify, write, refactor, and fix code.
 - **html-communication** — Create self-contained HTML writeups (plans, specs, findings, UI mocks) and publish them privately to files.wovn.org with the wovn CLI. Adapted from a skill by Theo Browne.
 - **wovn-file-hosting** - Upload any local file to files.wovn.org and return a permanent URL (private by default, public on request), backed by the Cloudflare Worker in `apps/wovn-files/` and the `wovn` CLI in `apps/wovn-cli/`. Adapted from a skill by Theo Browne.
 
-## Second Brain
-
-These skills feed Connor's second-brain Obsidian vault.
-
-- **sb-ingest** — File any pasted content (conversation, email, notes, transcript, or a file path) verbatim into the vault's `Sources/` directory so the vault automation ingests it.
-- **sb-ingest-superwhisper-meeting** — Find unprocessed superwhisper meeting recordings, build speaker-separated transcripts, identify speakers via calendar and transcript evidence, and file them into `Sources/`.
-
 ## Workspace
 
 The repo is a pnpm workspace with [vite-plus](https://viteplus.dev) at the
@@ -146,3 +137,5 @@ rename `SKILL.archived.md` to `SKILL.md`.
 
 - **code-trust-pragma** — Archived because it is no longer part of the live skill set.
 - **codex-computer-use** — Archived because it is no longer part of the live skill set.
+- **sb-ingest** - Archived because it is no longer part of the live skill set.
+- **sb-ingest-superwhisper-meeting** - Archived because it is no longer part of the live skill set.
