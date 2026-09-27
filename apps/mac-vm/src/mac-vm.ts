@@ -250,6 +250,11 @@ async function init(vm: string, image: string, cpu: number, memory: number, user
       KEY,
     ]);
     if (keygen.status !== 0) fail("ssh-keygen failed");
+  } else if (!existsSync(`${KEY}.pub`)) {
+    // Private key without its sidecar (e.g. restored alone): derive it.
+    const derive = spawnSync("ssh-keygen", ["-y", "-f", KEY], { encoding: "utf8" });
+    if (derive.status !== 0) fail(`could not derive ${KEY}.pub: ${derive.stderr.trim()}`);
+    writeFileSync(`${KEY}.pub`, derive.stdout);
   }
   await withVm(vm, async (started) => {
     authorizeKey(vm, user);
