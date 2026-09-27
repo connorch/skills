@@ -30,12 +30,13 @@ skills add connorch/skills --skill implement-and-review
 skills add connorch/skills --skill html-communication
 skills add connorch/skills --skill wovn-file-hosting
 skills add connorch/skills --skill fleet-exec
+skills add connorch/skills --skill jev
 ```
 
 You can also install multiple specific skills in one command:
 
 ```sh
-skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr file-pr implement-and-review html-communication wovn-file-hosting fleet-exec
+skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr file-pr implement-and-review html-communication wovn-file-hosting fleet-exec jev
 ```
 
 ## Shipping to your machines
@@ -124,6 +125,7 @@ These skills help you plan, verify, write, refactor, and fix code.
 - **babysit-pr** — Monitor a pull request through review and CI, verifying bot findings, fixing real failures, and dismissing false positives with reasons. Adapted from a skill by [Theo Browne](https://youtu.be/e1snsuY4lTI).
 - **html-communication** — Create self-contained HTML writeups (plans, specs, findings, UI mocks) and publish them privately to files.wovn.org with the wovn CLI. Adapted from a skill by Theo Browne.
 - **wovn-file-hosting** - Upload any local file to files.wovn.org and return a permanent URL (private by default, public on request), backed by the Cloudflare Worker in `apps/wovn-files/` and the `wovn` CLI in `apps/wovn-cli/`. Adapted from a skill by Theo Browne.
+- **jev** - Use TypeSafe's Jev decision model for bulk classification and fast Jev-driven browsing in the Agents Chrome, through the `jevx` CLI in `apps/jevx-cli/`. Ships only to connors-mac-studio.
 
 ## Fleet
 
@@ -140,6 +142,7 @@ domain docs).
   Cloudflare).
 - `apps/wovn-cli` - the `wovn` CLI the `wovn-file-hosting` and
   `html-communication` skills call.
+- `apps/jevx-cli` - the `jevx` CLI the `jev` skill calls (Mac Studio only).
 - `apps/ship` - `pnpm ship:fleet` and `pnpm ship:machine`.
 - `instructions` - the global agent instructions (see above).
 

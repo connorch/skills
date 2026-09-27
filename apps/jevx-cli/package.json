@@ -1,0 +1,30 @@
+{
+  "name": "jevx-cli",
+  "private": true,
+  "bin": {
+    "jevx": "./dist/jevx.mjs"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "vp pack",
+    "typecheck": "tsc --noEmit",
+    "ship:machine": "vp pack && mkdir -p ~/.local/bin && install -m 755 dist/jevx.mjs ~/.local/bin/jevx"
+  },
+  "dependencies": {
+    "@typesafe-ai/sdk": "^0.6.0",
+    "commander": "^14.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "ship": {
+    "platforms": [
+      "darwin"
+    ],
+    "machines": [
+      "connors-mac-studio"
+    ]
+  }
+}
