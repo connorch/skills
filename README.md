@@ -29,12 +29,13 @@ skills add connorch/skills --skill file-pr
 skills add connorch/skills --skill implement-and-review
 skills add connorch/skills --skill html-communication
 skills add connorch/skills --skill wovn-file-hosting
+skills add connorch/skills --skill fleet-exec
 ```
 
 You can also install multiple specific skills in one command:
 
 ```sh
-skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr file-pr implement-and-review html-communication wovn-file-hosting
+skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr file-pr implement-and-review html-communication wovn-file-hosting fleet-exec
 ```
 
 ## Shipping to your machines
@@ -123,6 +124,10 @@ These skills help you plan, verify, write, refactor, and fix code.
 - **babysit-pr** — Monitor a pull request through review and CI, verifying bot findings, fixing real failures, and dismissing false positives with reasons. Adapted from a skill by [Theo Browne](https://youtu.be/e1snsuY4lTI).
 - **html-communication** — Create self-contained HTML writeups (plans, specs, findings, UI mocks) and publish them privately to files.wovn.org with the wovn CLI. Adapted from a skill by Theo Browne.
 - **wovn-file-hosting** - Upload any local file to files.wovn.org and return a permanent URL (private by default, public on request), backed by the Cloudflare Worker in `apps/wovn-files/` and the `wovn` CLI in `apps/wovn-cli/`. Adapted from a skill by Theo Browne.
+
+## Fleet
+
+- **fleet-exec** - Run commands on your other machines over Tailscale SSH ("make sure main is pulled on my MacBook Pro"), with the gotchas agents would otherwise hit: exit codes that always read 0, a locked keychain, and repo paths that differ per machine.
 
 ## Workspace
 
