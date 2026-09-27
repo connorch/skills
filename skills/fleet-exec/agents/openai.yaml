@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fleet Exec"
+  short_description: "Run commands on other machines in the Fleet"
+  default_prompt: "Use $fleet-exec to make sure main is pulled on my MacBook Pro."
