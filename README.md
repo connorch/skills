@@ -31,12 +31,14 @@ skills add connorch/skills --skill html-communication
 skills add connorch/skills --skill wovn-file-hosting
 skills add connorch/skills --skill fleet-exec
 skills add connorch/skills --skill jev
+skills add connorch/skills --skill mac-vm
+skills add connorch/skills --skill bambu-print
 ```
 
 You can also install multiple specific skills in one command:
 
 ```sh
-skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr file-pr implement-and-review html-communication wovn-file-hosting fleet-exec jev
+skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr file-pr implement-and-review html-communication wovn-file-hosting fleet-exec jev mac-vm bambu-print
 ```
 
 ## Shipping to your machines
@@ -130,6 +132,8 @@ These skills help you plan, verify, write, refactor, and fix code.
 ## Fleet
 
 - **fleet-exec** - Run commands on your other machines over Tailscale SSH ("make sure main is pulled on my MacBook Pro"), with the gotchas agents would otherwise hit: exit codes that always read 0, a locked keychain, and repo paths that differ per machine.
+- **mac-vm** - Boot an on-demand macOS VM (Tart) whose desktop is always unlocked, so agents can drive GUI apps while the host Mac is locked, then shut it down. Backed by the `mac-vm` CLI in `apps/mac-vm/`. Ships only to connors-mac-studio.
+- **bambu-print** - Check on, slice for, and start prints on the Bambu Lab P1S: status and camera over the LAN, headless slicing that refuses bad profiles, a plate check before every print, and printing through Bambu Studio (in the mac-vm VM when the Mac is locked). Backed by the `bambu` CLI in `apps/bambu-cli/`. Ships only to connors-mac-studio.
 
 ## Workspace
 
@@ -143,12 +147,14 @@ domain docs).
 - `apps/wovn-cli` - the `wovn` CLI the `wovn-file-hosting` and
   `html-communication` skills call.
 - `apps/jevx-cli` - the `jevx` CLI the `jev` skill calls (Mac Studio only).
+- `apps/mac-vm` - the `mac-vm` CLI the `mac-vm` skill calls (connors-mac-studio only).
+- `apps/bambu-cli` - the `bambu` CLI for the P1S on the home LAN (connors-mac-studio only).
 - `apps/ship` - `pnpm ship:fleet` and `pnpm ship:machine`.
 - `instructions` - the global agent instructions (see above).
 
 ```sh
 pnpm install
-pnpm ship:machine    # install skills, instructions, and the wovn CLI here
+pnpm ship:machine    # install skills, instructions, and CLIs here
 pnpm dev:wovn-files  # the host with HMR
 pnpm typecheck       # every workspace package
 pnpm lint            # oxlint via vp
