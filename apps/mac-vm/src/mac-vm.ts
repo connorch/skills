@@ -105,9 +105,22 @@ function ip(vm: string): string {
 
 // Boot headless if needed, then wait until `tart exec` works (the guest has
 // logged in and its agent is up).
-async function boot(vm: string): Promise<boolean> {
+// Boot the VM if needed and run `work` against it. If this call started the VM
+// and anything fails (including the boot itself), shut it back down: an
+// always-unlocked VM must never be left running by a failed command.
+async function withVm<T>(vm: string, work: (started: boolean) => Promise<T>): Promise<T> {
   const started = !isRunning(vm);
-  if (started) {
+  try {
+    await boot(vm, started);
+    return await work(started);
+  } catch (error) {
+    if (started) await down(vm, 60);
+    throw error;
+  }
+}
+
+async function boot(vm: string, start: boolean) {
+  if (start) {
     mkdirSync(STATE_DIR, { recursive: true });
     const log = openSync(join(STATE_DIR, `${vm}.log`), "a");
     spawn("tart", ["run", "--no-graphics", vm], {
@@ -120,18 +133,10 @@ async function boot(vm: string): Promise<boolean> {
     tart("exec", vm, "sh", "-c", '[ "$(stat -f %Su /dev/console)" != root ]').status === 0;
   if (!(await waitFor(BOOT_TIMEOUT_S, loggedIn)))
     fail(`timed out after ${BOOT_TIMEOUT_S}s waiting for the guest desktop login`);
-  return started;
 }
 
-async function up(vm: string, user: string, forwards: number[]) {
-  const started = await boot(vm);
-  try {
-    await forward(vm, user, forwards);
-  } catch (error) {
-    // Never leave an always-unlocked VM running after a failed `up` that started it.
-    if (started) await down(vm, 60);
-    throw error;
-  }
+function up(vm: string, user: string, forwards: number[]) {
+  return withVm(vm, () => forward(vm, user, forwards));
 }
 
 async function forward(vm: string, user: string, forwards: number[]) {
@@ -246,7 +251,15 @@ async function init(vm: string, image: string, cpu: number, memory: number, user
     ]);
     if (keygen.status !== 0) fail("ssh-keygen failed");
   }
-  const started = await boot(vm);
+  await withVm(vm, async (started) => {
+    authorizeKey(vm, user);
+    // Leave a VM that was already running (another task may be using it) up.
+    if (started) await down(vm, 60);
+  });
+  console.log(`${vm} ready: ${cpu} CPUs, ${memory} MB, SSH key ${KEY}`);
+}
+
+function authorizeKey(vm: string, user: string) {
   const pub = readFileSync(`${KEY}.pub`, "utf8").trim();
   const home = user === "root" ? "/var/root" : `/Users/${user}`;
   const install = tart(
@@ -261,9 +274,6 @@ async function init(vm: string, image: string, cpu: number, memory: number, user
     `mkdir -p ${home}/.ssh && chmod 700 ${home}/.ssh && grep -qxF '${pub}' ${home}/.ssh/authorized_keys 2>/dev/null || echo '${pub}' >> ${home}/.ssh/authorized_keys; chmod 600 ${home}/.ssh/authorized_keys`,
   );
   if (install.status !== 0) fail(`authorizing SSH key failed: ${install.stderr.trim()}`);
-  // Leave a VM that was already running (another task may be using it) up.
-  if (started) await down(vm, 60);
-  console.log(`${vm} ready: ${cpu} CPUs, ${memory} MB, SSH key ${KEY}`);
 }
 
 // VM names become state file names, so keep them to one plain path segment.
