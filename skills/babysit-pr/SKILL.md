@@ -7,6 +7,8 @@ description: Use when the user asks to monitor, watch, or babysit a PR
 
 All the repos we work in have various AI review bots. They're helpful, even if they are not always right.
 
+If the PR doesn't exist yet, open one with the `file-pr` skill first.
+
 If your harness offers tools to monitor a PR, use them so you can respond when comments arrive. Otherwise, poll the PR for new comments and checks.
 
 Only act on checks and comments newer than the latest push. Verify every bot finding against the source before changing code. Fix real findings and CI failures, distinguish repository failures from infrastructure flakes, and reply with a written reason when dismissing false positives.

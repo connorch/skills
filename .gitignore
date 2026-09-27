@@ -9,6 +9,7 @@ node_modules
 apps/*/dist
 packages/*/dist
 .vite-plus
+vite.config.*.timestamp*
 
 # wovn-files worker dev artifacts (wrangler)
 .wrangler
