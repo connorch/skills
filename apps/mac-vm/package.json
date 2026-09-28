@@ -1,0 +1,26 @@
+{
+  "name": "mac-vm",
+  "private": true,
+  "bin": {
+    "mac-vm": "./dist/mac-vm.mjs"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "vp pack",
+    "typecheck": "tsc --noEmit",
+    "ship:machine": "vp pack && mkdir -p ~/.local/bin && install -m 755 dist/mac-vm.mjs ~/.local/bin/mac-vm"
+  },
+  "dependencies": {
+    "commander": "^14.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "ship": {
+    "machines": [
+      "connors-mac-studio"
+    ]
+  }
+}
