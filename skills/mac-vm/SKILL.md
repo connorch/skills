@@ -74,9 +74,10 @@ Grant Accessibility and Screen Recording to whatever drives the UI in the guest.
 
 ## Troubleshooting
 
-- `timed out waiting for the guest agent`: see `~/.local/state/mac-vm/<vm>.log`.
+- `timed out ... waiting for the guest desktop login`: see `~/.local/state/mac-vm/<vm>.log`.
   Boot once with a window (`tart run agent-vm`) to see what the guest is stuck on.
-- `reverse tunnel ... exited`: the port is already bound in the guest, or
-  `mac-vm init` never authorized the key. Re-run `mac-vm init` (it skips the clone).
+- `reverse tunnel ... exited` or `... never became reachable in the guest`: the
+  port is already bound in the guest, or `mac-vm init` never authorized the key.
+  Re-run `mac-vm init` (it skips the clone).
 - Screenshots come back black or fail: the guest must be logged in (auto-login
   on) and the capturing app needs Screen Recording in the guest.
