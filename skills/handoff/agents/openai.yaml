@@ -1,0 +1,6 @@
+interface:
+  display_name: "Handoff"
+  short_description: "Compact a conversation into a handoff document"
+  default_prompt: "Use $handoff to write a handoff document so a fresh agent can continue this work."
+policy:
+  allow_implicit_invocation: false

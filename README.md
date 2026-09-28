@@ -27,6 +27,7 @@ skills add connorch/skills --skill pull-upstream
 skills add connorch/skills --skill babysit-pr
 skills add connorch/skills --skill file-pr
 skills add connorch/skills --skill implement-and-review
+skills add connorch/skills --skill handoff
 skills add connorch/skills --skill html-communication
 skills add connorch/skills --skill wovn-file-hosting
 skills add connorch/skills --skill fleet-exec
@@ -38,7 +39,7 @@ skills add connorch/skills --skill bambu-print
 You can also install multiple specific skills in one command:
 
 ```sh
-skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr file-pr implement-and-review html-communication wovn-file-hosting fleet-exec jev mac-vm bambu-print
+skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr file-pr implement-and-review handoff html-communication wovn-file-hosting fleet-exec jev mac-vm bambu-print
 ```
 
 ## Shipping to your machines
@@ -124,6 +125,7 @@ These skills help you plan, verify, write, refactor, and fix code.
 - **step-back** — Step-back review of a branch after a batch of point fixes, finding and fixing the damage the iteration itself caused.
 - **pull-upstream** - Sync a fork with its upstream: inventory the fork's features, merge upstream in with upstream taking priority, re-apply the fork's work on top, and verify every feature survived - clean merges included.
 - **implement-and-review** - Take an approved plan through implementation, browser QA, PR filing, the review-bot loop with step-back every three Codex rounds, a final QA pass, and a handoff writeup of unplanned decisions and deferred findings.
+- **handoff** - Compact the current conversation into a handoff document in the OS temp directory so a fresh agent can pick up the work. Invoked by the user only. Adapted from a skill by [Matt Pocock](https://github.com/mattpocock/skills).
 - **babysit-pr** — Monitor a pull request through review and CI, verifying bot findings, fixing real failures, and dismissing false positives with reasons. Adapted from a skill by [Theo Browne](https://youtu.be/e1snsuY4lTI).
 - **html-communication** — Create self-contained HTML writeups (plans, specs, findings, UI mocks) and publish them privately to files.wovn.org with the wovn CLI. Adapted from a skill by Theo Browne.
 - **wovn-file-hosting** - Upload any local file to files.wovn.org and return a permanent URL (private by default, public on request), backed by the Cloudflare Worker in `apps/wovn-files/` and the `wovn` CLI in `apps/wovn-cli/`. Adapted from a skill by Theo Browne.
