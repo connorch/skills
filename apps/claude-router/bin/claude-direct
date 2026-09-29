@@ -1,0 +1,4 @@
+#!/bin/sh
+# claude-direct - run Claude Code straight at api.anthropic.com, bypassing
+# claude-router for this session. The --settings flag beats settings.json.
+exec claude --settings '{"env":{"ANTHROPIC_BASE_URL":"https://api.anthropic.com"}}' "$@"

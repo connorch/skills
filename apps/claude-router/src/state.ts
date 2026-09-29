@@ -1,0 +1,111 @@
+// On-disk state (bucket state, learned model buckets, pins) and the request
+// log. Both are optional so tests can run in memory.
+
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname } from "node:path";
+import { emptyAccountState, type AccountState } from "./buckets.ts";
+import type { Pin } from "./select.ts";
+
+interface Persisted {
+  accounts: Record<string, AccountState>;
+  pins: Record<string, Pin>;
+}
+
+export class RouterState {
+  accounts: Record<string, AccountState> = {};
+  pins: Record<string, Pin> = {};
+  private timer: NodeJS.Timeout | null = null;
+
+  constructor(private readonly path: string | null) {}
+
+  static load(path: string | null): RouterState {
+    const state = new RouterState(path);
+    if (path && existsSync(path)) {
+      const raw = JSON.parse(readFileSync(path, "utf8")) as Partial<Persisted>;
+      state.accounts = raw.accounts ?? {};
+      state.pins = raw.pins ?? {};
+    }
+    return state;
+  }
+
+  account(label: string): AccountState {
+    return (this.accounts[label] ??= emptyAccountState());
+  }
+
+  // Coalesce writes: a burst of requests changes state many times a second.
+  touch(): void {
+    if (!this.path || this.timer) return;
+    this.timer = setTimeout(() => {
+      this.timer = null;
+      this.save();
+    }, 500);
+    this.timer.unref();
+  }
+
+  save(): void {
+    if (!this.path) return;
+    mkdirSync(dirname(this.path), { recursive: true });
+    const data: Persisted = { accounts: this.accounts, pins: this.pins };
+    const tmp = `${this.path}.tmp`;
+    writeFileSync(tmp, JSON.stringify(data, null, 2));
+    renameSync(tmp, this.path);
+  }
+
+  prunePins(now: number, idleMs: number): void {
+    for (const [key, pin] of Object.entries(this.pins)) {
+      if (now - pin.lastSeen > idleMs) delete this.pins[key];
+    }
+  }
+}
+
+export interface LogEntry {
+  time: string;
+  kind: "routed" | "passthrough" | "router_error";
+  path: string;
+  model: string | null;
+  // sha256 prefix of metadata.user_id, never the id itself.
+  key: string | null;
+  entrypoint: string | null;
+  account?: string;
+  status: number;
+  // Accounts tried, in order, including the one that served.
+  attempts?: string[];
+  reason: string;
+  forced?: boolean;
+}
+
+// One JSON line per request. Rotates once to `<path>.1` past `maxBytes`.
+export class RequestLog {
+  private bytes = 0;
+  readonly entries: LogEntry[] = [];
+
+  constructor(
+    private readonly path: string | null,
+    private readonly maxBytes = 50 * 1024 * 1024,
+  ) {
+    if (path && existsSync(path)) this.bytes = statSync(path).size;
+  }
+
+  append(entry: LogEntry): void {
+    if (!this.path) {
+      this.entries.push(entry);
+      return;
+    }
+    const line = `${JSON.stringify(entry)}\n`;
+    if (this.bytes + line.length > this.maxBytes) {
+      renameSync(this.path, `${this.path}.1`);
+      this.bytes = 0;
+    }
+    mkdirSync(dirname(this.path), { recursive: true });
+    appendFileSync(this.path, line);
+    this.bytes += line.length;
+  }
+}
