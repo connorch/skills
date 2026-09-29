@@ -29,7 +29,13 @@ export class RouterState {
   static load(path: string | null): RouterState {
     const state = new RouterState(path);
     if (path && existsSync(path)) {
-      const raw = JSON.parse(readFileSync(path, "utf8")) as Partial<Persisted>;
+      // Best effort, like save(): a corrupt file must not crash-loop the service.
+      let raw: Partial<Persisted> = {};
+      try {
+        raw = JSON.parse(readFileSync(path, "utf8")) as Partial<Persisted>;
+      } catch (error) {
+        console.error(`state: ${(error as Error).message}; starting empty`);
+      }
       state.accounts = raw.accounts ?? {};
       state.pins = raw.pins ?? {};
       // A probe belongs to the process that started it.

@@ -20,7 +20,7 @@ import {
   type Account,
 } from "./accounts.ts";
 import { loadConfig, REQUEST_LOG_PATH, routerUrl, STATE_PATH, type Config } from "./config.ts";
-import { createRouter } from "./server.ts";
+import { createRouter, type Status } from "./server.ts";
 import { installService, PLIST_PATH, startService, stopService } from "./service.ts";
 import {
   BASE_URL_KEY,
@@ -93,26 +93,6 @@ const when = (ms: number) =>
     hour: "numeric",
     minute: "2-digit",
   });
-
-interface Status {
-  now: string;
-  missing: string[];
-  accounts: {
-    label: string;
-    expires: number | null;
-    broken: { reason: string } | null;
-    bench: { until: number; reason: string } | null;
-    buckets: Record<string, { status: string; utilization: number; resetAt: number }>;
-  }[];
-  ranking: Record<
-    string,
-    {
-      order: string[];
-      candidates: { label: string; eligible: boolean; why?: string; demoted: boolean }[];
-    }
-  >;
-  pins: { key: string; label: string; lastSeen: number }[];
-}
 
 program
   .command("status")

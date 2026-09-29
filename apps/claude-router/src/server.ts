@@ -108,6 +108,22 @@ interface Upstream {
   res: IncomingMessage;
 }
 
+// What `claude-router status` reads from GET /_router/status.
+export interface Status {
+  now: string;
+  upstream: string;
+  missing: string[];
+  accounts: {
+    label: string;
+    expires: number | null;
+    broken: AccountState["broken"];
+    bench: AccountState["bench"];
+    buckets: AccountState["buckets"];
+  }[];
+  ranking: Record<string, { order: string[]; candidates: Candidate[] }>;
+  pins: { key: string; label: string; lastSeen: number }[];
+}
+
 export function createRouter(deps: RouterDeps): Server {
   const { config, state, log } = deps;
   const now = deps.now ?? Date.now;
@@ -169,7 +185,7 @@ export function createRouter(deps: RouterDeps): Server {
   }
 
   // Stream an upstream response to the client. A client that goes away
-  // takes the upstream request down with it.
+  // takes the upstream request down with it through the Link.
   function relay(up: Upstream, res: ServerResponse): void {
     if (res.destroyed) {
       up.res.destroy();
@@ -181,9 +197,6 @@ export function createRouter(deps: RouterDeps): Server {
     // a response that will never end.
     up.res.on("close", () => {
       if (!up.res.complete) res.destroy();
-    });
-    res.on("close", () => {
-      if (!res.writableFinished) up.res.destroy();
     });
   }
 
@@ -449,7 +462,7 @@ export function createRouter(deps: RouterDeps): Server {
 
   // What `claude-router status` prints: per account buckets and token expiry,
   // the ranking for every model seen, and active pins.
-  function snapshot() {
+  function snapshot(): Status {
     const at = now();
     state.prunePins(at, config.pinIdleMs);
     const accounts = deps.accounts();
@@ -472,21 +485,17 @@ export function createRouter(deps: RouterDeps): Server {
         };
       }),
       ranking: Object.fromEntries(
-        models.map((model) => [
-          model,
-          candidatesFor(accounts, model, at).length > 0
-            ? {
-                order: select({
-                  candidates: candidatesFor(accounts, model, at),
-                  pin: undefined,
-                  forced: null,
-                  pinIdleMs: config.pinIdleMs,
-                  now: at,
-                }).order,
-                candidates: candidatesFor(accounts, model, at),
-              }
-            : { order: [], candidates: [] },
-        ]),
+        models.map((model) => {
+          const candidates = candidatesFor(accounts, model, at);
+          const { order } = select({
+            candidates,
+            pin: undefined,
+            forced: null,
+            pinIdleMs: config.pinIdleMs,
+            now: at,
+          });
+          return [model, { order, candidates }];
+        }),
       ),
       pins: Object.entries(state.pins).map(([key, pin]) => ({ key: hashKey(key), ...pin })),
     };

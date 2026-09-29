@@ -50,10 +50,6 @@ export function headerValue(headers: HeaderMap, name: string): string | undefine
   return Array.isArray(value) ? value[0] : value;
 }
 
-export function hasRateLimitHeaders(headers: HeaderMap): boolean {
-  return Object.keys(headers).some((key) => key.toLowerCase().startsWith("anthropic-ratelimit-"));
-}
-
 // Every complete bucket in a response. Partial buckets (a status without a
 // reset, say) are dropped rather than guessed at.
 export function parseBuckets(headers: HeaderMap, now: number): Record<string, Bucket> {

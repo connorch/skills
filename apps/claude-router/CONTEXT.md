@@ -30,7 +30,7 @@ _Avoid_: affinity, sticky session
 **Failover**:
 Resending the same request bytes to the next Account in rank after a limit
 error. Invisible to the client.
-_Avoid_: retry (that is the same Account, once, on a 5xx)
+_Avoid_: retry (that is the same Account, once, on a 5xx or a connection error)
 
 **Passthrough**:
 Forwarding a request unchanged with the client's own auth: non-inference
