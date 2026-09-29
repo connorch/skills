@@ -316,8 +316,14 @@ export function createRouter(deps: RouterDeps): Server {
           reason: "client went away",
         });
       }
-      log.append({ ...entry, kind: "router_error", status: 502 });
-      routerError(res, 502, "api_error", `upstream unreachable: ${(error as Error).message}.`);
+      const message = (error as Error).message;
+      log.append({
+        ...entry,
+        kind: "router_error",
+        status: 502,
+        reason: `upstream unreachable: ${message}`,
+      });
+      routerError(res, 502, "api_error", `upstream unreachable: ${message}.`);
     }
   }
 
@@ -467,10 +473,12 @@ export function createRouter(deps: RouterDeps): Server {
           if (verdict.kind === "failover") applyMark(st, verdict.mark, up.headers, now());
           // A forced account answers for itself, limit errors included (D12).
           if (verdict.kind === "commit" || forced) {
-            // A slower request must not snap a pin back that a faster one
-            // already moved (D6): only touch a pin that is still where this
-            // request found it.
-            if (pinKey && (state.pins[pinKey]?.label ?? pin?.label) === pin?.label) {
+            // A request that failed over always moves the pin (D6). One that
+            // did not must not snap a pin back that a faster request already
+            // moved: it only touches a pin still where it found it.
+            const movedByFailover = attempts.length > 1 && label !== attempts[0];
+            const pinUnchanged = (state.pins[pinKey ?? ""]?.label ?? pin?.label) === pin?.label;
+            if (pinKey && (movedByFailover || pinUnchanged)) {
               state.pins[pinKey] = { label, lastSeen: at };
             }
             state.touch();

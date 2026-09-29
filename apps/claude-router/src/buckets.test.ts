@@ -22,8 +22,14 @@ describe("parseBuckets", () => {
     expect(buckets["5h"]).toMatchObject({ status: "allowed", utilization: 0.12 });
   });
 
-  it("drops a bucket that is missing a field", () => {
+  it("drops a bucket that is missing a field or has an impossible reset", () => {
     expect(parseBuckets({ "anthropic-ratelimit-unified-5h-status": "rejected" }, NOW)).toEqual({});
+    const huge = {
+      "anthropic-ratelimit-unified-5h-status": "rejected",
+      "anthropic-ratelimit-unified-5h-utilization": "1",
+      "anthropic-ratelimit-unified-5h-reset": "1e306",
+    };
+    expect(parseBuckets(huge, NOW)).toEqual({});
   });
 });
 

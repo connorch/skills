@@ -53,7 +53,8 @@ export function headerValue(headers: HeaderMap, name: string): string | undefine
 // Every complete bucket in a response. Partial buckets (a status without a
 // reset, say) are dropped rather than guessed at.
 export function parseBuckets(headers: HeaderMap, now: number): Record<string, Bucket> {
-  const partial: Record<string, Partial<Record<Field, string>>> = {};
+  // Null prototype: a bucket named like an Object.prototype member is data.
+  const partial: Record<string, Partial<Record<Field, string>>> = Object.create(null);
   for (const [key, raw] of Object.entries(headers)) {
     const match = BUCKET_HEADER.exec(key.toLowerCase());
     const name = match?.[1];
@@ -66,9 +67,11 @@ export function parseBuckets(headers: HeaderMap, now: number): Record<string, Bu
   const buckets: Record<string, Bucket> = {};
   for (const [name, fields] of Object.entries(partial)) {
     const utilization = Number(fields.utilization);
-    const reset = Number(fields.reset);
-    if (!fields.status || !Number.isFinite(utilization) || !Number.isFinite(reset)) continue;
-    buckets[name] = { status: fields.status, utilization, resetAt: reset * 1000, seenAt: now };
+    const resetAt = Number(fields.reset) * 1000;
+    // A reset must be a time a Date can represent, or the bucket is noise.
+    if (!fields.status || !Number.isFinite(utilization) || !(Math.abs(resetAt) <= 8.64e15))
+      continue;
+    buckets[name] = { status: fields.status, utilization, resetAt, seenAt: now };
   }
   return buckets;
 }
