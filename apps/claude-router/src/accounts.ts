@@ -43,8 +43,11 @@ export function readKeychainAccounts(labels: readonly string[]): {
     try {
       const value = JSON.parse(result.stdout.trim()) as KeychainValue;
       if (typeof value.token !== "string" || value.token.length === 0) throw new Error("no token");
+      // A time a Date can represent, or unknown.
       const expires =
-        typeof value.expires === "number" && Number.isFinite(value.expires) ? value.expires : null;
+        typeof value.expires === "number" && Math.abs(value.expires) <= 8.64e15
+          ? value.expires
+          : null;
       accounts.push({ label, token: value.token, expires });
     } catch {
       missing.push(label);

@@ -221,7 +221,8 @@ export function createRouter(deps: RouterDeps): Server {
     // An upstream that drops mid-body must not leave the client hanging on
     // a response that will never end.
     up.res.on("close", () => {
-      if (up.res.complete) return;
+      // Complete, or cut short because the client left: not an upstream drop.
+      if (up.res.complete || res.destroyed) return;
       res.destroy();
       onUpstreamDrop?.();
     });
@@ -473,12 +474,11 @@ export function createRouter(deps: RouterDeps): Server {
           if (verdict.kind === "failover") applyMark(st, verdict.mark, up.headers, now());
           // A forced account answers for itself, limit errors included (D12).
           if (verdict.kind === "commit" || forced) {
-            // A request that failed over always moves the pin (D6). One that
-            // did not must not snap a pin back that a faster request already
-            // moved: it only touches a pin still where it found it.
-            const movedByFailover = attempts.length > 1 && label !== attempts[0];
-            const pinUnchanged = (state.pins[pinKey ?? ""]?.label ?? pin?.label) === pin?.label;
-            if (pinKey && (movedByFailover || pinUnchanged)) {
+            // The newest request decides where the session is pinned. A
+            // slower, older request that finishes late never moves a pin a
+            // newer one already set, whichever of them failed over (D6).
+            const existing = pinKey ? state.pins[pinKey] : undefined;
+            if (pinKey && (!existing || existing.lastSeen <= at)) {
               state.pins[pinKey] = { label, lastSeen: at };
             }
             state.touch();
@@ -493,7 +493,11 @@ export function createRouter(deps: RouterDeps): Server {
             });
             if (errorBody) respond(res, up.status, up.headers, errorBody);
             else
-              relay(up, res, () =>
+              relay(up, res, () => {
+                // Hold the account out briefly so the next request does not
+                // walk straight back into the same truncated stream.
+                applyMark(st, "transient", {}, now());
+                state.touch();
                 log.append({
                   ...entry,
                   kind: "router_error",
@@ -501,8 +505,8 @@ export function createRouter(deps: RouterDeps): Server {
                   status: 502,
                   attempts,
                   reason: "upstream stream ended early",
-                }),
-              );
+                });
+              });
             return;
           }
           firstError ??= {

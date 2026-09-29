@@ -77,6 +77,8 @@ let routerUrl: string;
 let state: RouterState;
 let log: RequestLog;
 let live = accounts;
+// The clock advances a millisecond per reading so request order is visible.
+let tick = 0;
 
 beforeEach(async () => {
   upstream = new Upstream();
@@ -90,7 +92,7 @@ beforeEach(async () => {
     reload: () => {},
     state,
     log,
-    now: () => NOW,
+    now: () => NOW + tick++,
   });
   routerUrl = `http://127.0.0.1:${await listen(router)}`;
 });
@@ -328,6 +330,7 @@ describe("routing", () => {
       kind: "router_error",
       reason: "upstream stream ended early",
     });
+    expect(state.account("personal").bench?.reason).toBe("transient");
   });
 
   it("treats an error body that aborts as one more failed attempt", async () => {
