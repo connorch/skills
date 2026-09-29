@@ -1,5 +1,5 @@
-// On-disk state (bucket state, learned model buckets, pins) and the request
-// log. Both are optional so tests can run in memory.
+// On-disk state (per-account state and pins) and the request log. Both are
+// optional so tests can run in memory.
 
 import {
   appendFileSync,

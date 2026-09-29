@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import type { Account } from "./accounts.ts";
 import { fixture } from "./buckets.test.ts";
 import { Config } from "./config.ts";
-import { createRouter } from "./server.ts";
+import { createRouter, hashKey } from "./server.ts";
 import { RequestLog, RouterState } from "./state.ts";
 
 type Handler = (req: IncomingMessage, res: ServerResponse, body: string) => void;
@@ -131,7 +131,7 @@ describe("routing", () => {
     // personal_2 has the sooner reset, so a fresh session lands there.
     await messages(session("fresh"));
     expect(upstream.seen.at(-1)?.auth).toBe("Bearer tok-personal_2");
-    expect(state.pins["user_x_session_fresh"]?.label).toBe("personal_2");
+    expect(state.pins[hashKey("user_x_session_fresh")]?.label).toBe("personal_2");
     expect(log.entries.at(-1)).toMatchObject({
       kind: "routed",
       account: "personal_2",
@@ -155,7 +155,7 @@ describe("routing", () => {
       "Bearer tok-personal",
       "Bearer tok-personal_2",
     ]);
-    expect(state.pins["user_x_session_s"]?.label).toBe("personal_2");
+    expect(state.pins[hashKey("user_x_session_s")]?.label).toBe("personal_2");
     expect(log.entries.at(-1)).toMatchObject({ attempts: ["personal", "personal_2"], status: 200 });
 
     // The Fable bucket on personal is now blocked; Sonnet on personal is not.
@@ -167,6 +167,42 @@ describe("routing", () => {
     };
     expect(status.ranking["claude-fable-5-1"]?.order).not.toContain("personal");
     expect(status.ranking["claude-sonnet-5-5"]?.order).toContain("personal");
+  });
+
+  it("still sends to a benched account when nothing else could serve, even without a session key", async () => {
+    for (const a of accounts) {
+      state.account(a.label).bench = {
+        until: NOW + 60_000,
+        reason: "transient",
+        attempts: 0,
+        probing: false,
+      };
+    }
+    upstream.fallback = (_req, res) => reply(res, 529, {}, "overloaded");
+    const res = await messages({ model: "claude-sonnet-5-5" });
+    expect(res.status).toBe(529);
+    expect(await res.text()).toBe("overloaded");
+    expect(upstream.seen.length).toBeGreaterThan(0);
+  });
+
+  it("does not let a slower request snap a pin back after a faster one moved it", async () => {
+    // Both requests select personal; the first fails over to personal_2 and
+    // re-pins; the second, still answered by personal, must leave that alone.
+    let releaseSlow: () => void = () => {};
+    const slow = new Promise<void>((r) => (releaseSlow = r));
+    upstream.queue.push(
+      (_req, res) =>
+        void slow.then(() => reply(res, 200, { "content-type": "application/json" }, "{}")),
+      fromFixture("fable-429-7d_oi-rejected"),
+    );
+    const first = messages(session("race", "claude-fable-5-1"));
+    await new Promise((r) => setTimeout(r, 30));
+    const second = await messages(session("race", "claude-fable-5-1"));
+    expect(second.status).toBe(200);
+    expect(state.pins[hashKey("user_x_session_race")]?.label).toBe("personal_2");
+    releaseSlow();
+    expect((await first).status).toBe(200);
+    expect(state.pins[hashKey("user_x_session_race")]?.label).toBe("personal_2");
   });
 
   it("returns the first upstream error unchanged when every account fails", async () => {

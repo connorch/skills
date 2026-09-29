@@ -15,7 +15,7 @@ export interface Bench {
   until: number;
   reason: "transient" | "org_block" | "retry_after";
   // org_block only: consecutive blocks (drives the backoff) and whether one
-  // probe request is in flight after the bench expired.
+  // probe request is in flight.
   attempts: number;
   probing: boolean;
 }

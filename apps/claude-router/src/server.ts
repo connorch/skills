@@ -366,9 +366,16 @@ export function createRouter(deps: RouterDeps): Server {
       );
     }
 
-    const pin = key ? state.pins[key] : undefined;
+    // Pins are keyed by the hashed session id: state.json never holds the
+    // raw id, and a client cannot pick a key that lands on the prototype.
+    const pinKey = key ? hashKey(key) : null;
+    const pin = pinKey ? state.pins[pinKey] : undefined;
+    const candidates = candidatesFor(accounts, model, at);
+    // Nothing eligible: selection falls back to the least-bad account on
+    // purpose, so the client gets a real upstream answer.
+    const fallback = !candidates.some((c) => c.eligible);
     const selection: Selection = select({
-      candidates: candidatesFor(accounts, model, at),
+      candidates,
       pin,
       forced,
       pinIdleMs: config.pinIdleMs,
@@ -387,19 +394,13 @@ export function createRouter(deps: RouterDeps): Server {
       const account = byLabel.get(label);
       if (!account) continue;
       const st = state.account(label);
-      // One probe through an expired org block. Whatever comes back other
-      // than another block ends the bench, so a 429 or an abort cannot leave
-      // the account marked "probe in flight" forever.
-      // A forced request answers for itself and takes no part in probing.
-      // Rechecked here, after earlier attempts awaited: another request may
-      // have benched this account or claimed its probe since this order was
-      // computed.
+      // Rechecked after earlier attempts awaited: state may have moved. Only
+      // one request probes an org block at a time; the fallback still goes
+      // through. A forced request answers for itself and never probes.
       let probe = false;
-      if (!forced && st.bench) {
-        // A benched account chosen on purpose (nothing else could serve)
-        // still gets the request, so the client sees a real upstream answer.
-        if (now() < st.bench.until && selection.reason !== "no eligible account") continue;
-        if (st.bench.reason === "org_block") {
+      if (!forced) {
+        if (!fallback && !candidate(label, st, model, config, now()).eligible) continue;
+        if (st.bench?.reason === "org_block") {
           if (st.bench.probing) continue;
           st.bench.probing = probe = true;
         }
@@ -469,8 +470,8 @@ export function createRouter(deps: RouterDeps): Server {
             // A slower request must not snap a pin back that a faster one
             // already moved (D6): only touch a pin that is still where this
             // request found it.
-            if (key && (state.pins[key]?.label ?? pin?.label) === pin?.label) {
-              state.pins[key] = { label, lastSeen: at };
+            if (pinKey && (state.pins[pinKey]?.label ?? pin?.label) === pin?.label) {
+              state.pins[pinKey] = { label, lastSeen: at };
             }
             state.touch();
             log.append({
@@ -563,7 +564,7 @@ export function createRouter(deps: RouterDeps): Server {
           return [model, { order, candidates }];
         }),
       ),
-      pins: Object.entries(state.pins).map(([key, pin]) => ({ key: hashKey(key), ...pin })),
+      pins: Object.entries(state.pins).map(([key, pin]) => ({ key, ...pin })),
     };
   }
 

@@ -19,17 +19,22 @@ export const Config = z
     // tokens in the clear.
     upstream: z
       .url({ protocol: /^https?$/ })
-      .refine((value) => {
+      .superRefine((value, ctx) => {
         const url = new URL(value);
-        return (
-          url.protocol === "https:" || ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)
-        );
-      }, "http upstreams must be loopback")
-      // Request paths are forwarded as-is, so a prefix would be silently dropped.
-      .refine((value) => {
-        const url = new URL(value);
-        return url.pathname === "/" && url.search === "" && url.hash === "";
-      }, "upstream must be an origin with no path, query, or fragment")
+        if (
+          url.protocol !== "https:" &&
+          !["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)
+        ) {
+          ctx.addIssue({ code: "custom", message: "http upstreams must be loopback" });
+        }
+        // Request paths are forwarded as-is, so a prefix would be silently dropped.
+        if (url.pathname !== "/" || url.search !== "" || url.hash !== "") {
+          ctx.addIssue({
+            code: "custom",
+            message: "upstream must be an origin with no path, query, or fragment",
+          });
+        }
+      })
       .default("https://api.anthropic.com"),
     // Keychain account labels, in the order `status` lists them.
     accounts: z
@@ -49,8 +54,7 @@ export const Config = z
   })
   .refine((config) => {
     const url = new URL(config.upstream);
-    const port = Number(url.port || (url.protocol === "https:" ? 443 : 80));
-    return url.protocol === "https:" || port !== config.port;
+    return url.protocol === "https:" || Number(url.port || 80) !== config.port;
   }, "upstream must not be the router itself");
 export type Config = z.infer<typeof Config>;
 
