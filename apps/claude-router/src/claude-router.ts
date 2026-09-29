@@ -9,7 +9,7 @@
 //   accounts import-openclaw   one-time OpenClaw -> 1Password
 //   service install|uninstall  the LaunchAgent (install is run by ship:machine)
 
-import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 import { createInterface } from "node:readline/promises";
 import { Command } from "commander";
@@ -34,7 +34,8 @@ import { RequestLog, RouterState } from "./state.ts";
 
 // Temp file plus rename: a failed write leaves settings.json untouched.
 function writeSettings(text: string): void {
-  writeFileSync(`${SETTINGS_PATH}.tmp`, text);
+  const mode = existsSync(SETTINGS_PATH) ? statSync(SETTINGS_PATH).mode & 0o777 : 0o644;
+  writeFileSync(`${SETTINGS_PATH}.tmp`, text, { mode });
   renameSync(`${SETTINGS_PATH}.tmp`, SETTINGS_PATH);
 }
 
@@ -82,10 +83,18 @@ program
         `claude-router listening on ${routerUrl(config)} with ${accounts.length} account(s)`,
       );
     });
+    // Save now and again once in-flight requests have drained, so what
+    // they learned is not lost across a restart.
     const stop = () => {
       state.save();
-      server.close(() => process.exit(0));
-      setTimeout(() => process.exit(0), 2000).unref();
+      server.close(() => {
+        state.save();
+        process.exit(0);
+      });
+      setTimeout(() => {
+        state.save();
+        process.exit(0);
+      }, 2000).unref();
     };
     process.on("SIGTERM", stop);
     process.on("SIGINT", stop);
@@ -253,7 +262,7 @@ accounts
       // service is down.
       const state = RouterState.load(STATE_PATH);
       for (const label of result.synced) state.account(label).broken = null;
-      state.save();
+      if (!state.save()) fail("could not write the persisted state; the 401 marks are unchanged");
       console.log("service not running; it will read the Keychain on start");
     }
     if (result.failed.length > 0) process.exit(1);

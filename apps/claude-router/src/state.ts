@@ -36,11 +36,18 @@ export class RouterState {
       } catch (error) {
         console.error(`state: ${(error as Error).message}; starting empty`);
       }
-      state.accounts = raw.accounts ?? {};
-      state.pins = raw.pins ?? {};
-      // A probe belongs to the process that started it.
-      for (const account of Object.values(state.accounts)) {
-        if (account.bench?.probing) account.bench.probing = false;
+      // Only entries with the expected shape survive; a probe belongs to
+      // the process that started it.
+      for (const [label, account] of Object.entries(raw.accounts ?? {})) {
+        if (!account || typeof account !== "object" || typeof account.buckets !== "object")
+          continue;
+        state.accounts[label] = { ...emptyAccountState(), ...account };
+        const bench = state.accounts[label]?.bench;
+        if (bench?.probing) bench.probing = false;
+      }
+      for (const [key, pin] of Object.entries(raw.pins ?? {})) {
+        if (pin && typeof pin.label === "string" && typeof pin.lastSeen === "number")
+          state.pins[key] = pin;
       }
     }
     return state;
@@ -62,16 +69,18 @@ export class RouterState {
 
   // Best effort: routing works without persistence, so a full disk must
   // not take the service down.
-  save(): void {
-    if (!this.path) return;
+  save(): boolean {
+    if (!this.path) return true;
     try {
       mkdirSync(dirname(this.path), { recursive: true });
       const data: Persisted = { accounts: this.accounts, pins: this.pins };
       const tmp = `${this.path}.tmp`;
       writeFileSync(tmp, JSON.stringify(data, null, 2));
       renameSync(tmp, this.path);
+      return true;
     } catch (error) {
       console.error(`state: ${(error as Error).message}`);
+      return false;
     }
   }
 

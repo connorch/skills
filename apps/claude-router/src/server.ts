@@ -205,7 +205,7 @@ export function createRouter(deps: RouterDeps): Server {
 
   // Stream an upstream response to the client. A client that goes away
   // takes the upstream request down with it through the Link.
-  function relay(up: Upstream, res: ServerResponse): void {
+  function relay(up: Upstream, res: ServerResponse, onUpstreamDrop?: () => void): void {
     if (res.destroyed) {
       up.res.destroy();
       return;
@@ -215,7 +215,9 @@ export function createRouter(deps: RouterDeps): Server {
     // An upstream that drops mid-body must not leave the client hanging on
     // a response that will never end.
     up.res.on("close", () => {
-      if (!up.res.complete) res.destroy();
+      if (up.res.complete) return;
+      res.destroy();
+      onUpstreamDrop?.();
     });
   }
 
@@ -375,7 +377,12 @@ export function createRouter(deps: RouterDeps): Server {
       // One probe through an expired org block. Whatever comes back other
       // than another block ends the bench, so a 429 or an abort cannot leave
       // the account marked "probe in flight" forever.
-      if (st.bench?.reason === "org_block" && at >= st.bench.until) st.bench.probing = true;
+      if (st.bench?.reason === "org_block" && at >= st.bench.until) {
+        // Rechecked here, after earlier attempts awaited: another request may
+        // have claimed the probe since this order was computed.
+        if (st.bench.probing) continue;
+        st.bench.probing = true;
+      }
       const gone = () => {
         log.append({
           ...entry,
@@ -447,7 +454,17 @@ export function createRouter(deps: RouterDeps): Server {
               forced: Boolean(forced),
             });
             if (errorBody) respond(res, up.status, up.headers, errorBody);
-            else relay(up, res);
+            else
+              relay(up, res, () =>
+                log.append({
+                  ...entry,
+                  kind: "router_error",
+                  account: label,
+                  status: 502,
+                  attempts,
+                  reason: "upstream stream ended early",
+                }),
+              );
             return;
           }
           firstError ??= {

@@ -314,6 +314,10 @@ describe("passthrough", () => {
     const res = await messages(session("drop"));
     expect(res.status).toBe(200);
     await expect(res.text()).rejects.toThrow();
+    expect(log.entries.at(-1)).toMatchObject({
+      kind: "router_error",
+      reason: "upstream stream ended early",
+    });
   });
 
   it("forwards non-inference paths and fails open with no accounts", async () => {

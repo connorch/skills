@@ -28,8 +28,15 @@ describe("RouterState", () => {
     const path = join(dir, "state.json");
     writeFileSync(path, "{not json");
     expect(RouterState.load(path).accounts).toEqual({});
+    writeFileSync(
+      path,
+      JSON.stringify({ accounts: { personal: null, work: { buckets: {} } }, pins: { k: 1 } }),
+    );
+    const loaded = RouterState.load(path);
+    expect(Object.keys(loaded.accounts)).toEqual(["work"]);
+    expect(loaded.pins).toEqual({});
     const blocked = new RouterState(join(path, "cannot", "nest", "under-a-file"));
-    expect(() => blocked.save()).not.toThrow();
+    expect(blocked.save()).toBe(false);
   });
 });
 
