@@ -28,6 +28,9 @@ export const Config = z
           ctx.addIssue({ code: "custom", message: "http upstreams must be loopback" });
         }
         // Request paths are forwarded as-is, so a prefix would be silently dropped.
+        if (url.username !== "" || url.password !== "") {
+          ctx.addIssue({ code: "custom", message: "upstream must not carry credentials" });
+        }
         if (url.pathname !== "/" || url.search !== "" || url.hash !== "") {
           ctx.addIssue({
             code: "custom",
@@ -44,10 +47,18 @@ export const Config = z
         z
           .string()
           .regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/, "labels are letters, digits, _ and -")
-          .refine((label) => !["router", "router-off", "direct"].includes(label), "reserved label"),
+          // Case-insensitive: macOS volumes usually are, so "Router" would
+          // overwrite the router binary itself.
+          .refine(
+            (label) => !["router", "router-off", "direct"].includes(label.toLowerCase()),
+            "reserved label",
+          ),
       )
       .nonempty()
-      .refine((labels) => new Set(labels).size === labels.length, "account labels must be unique")
+      .refine(
+        (labels) => new Set(labels.map((l) => l.toLowerCase())).size === labels.length,
+        "account labels must be unique",
+      )
       .default(["personal", "personal_2", "work"]),
     // The 1Password vault that holds the claude-router/<label> items.
     vault: z.string().min(1).default("Automation"),

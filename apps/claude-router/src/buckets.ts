@@ -91,7 +91,15 @@ export function recordResponse(
   const names = Object.keys(parsed);
   if (names.length === 0) return;
   Object.assign(state.buckets, parsed);
-  if (model) state.modelBuckets[model] = names;
+  // An own data property even for a model named like a prototype member.
+  if (model) {
+    Object.defineProperty(state.modelBuckets, model, {
+      value: names,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+  }
 }
 
 export const allowed = (status: string) => status === "allowed" || status === "allowed_warning";

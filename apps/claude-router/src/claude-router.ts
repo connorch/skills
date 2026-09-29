@@ -66,7 +66,8 @@ function fail(message: string): never {
 
 async function health(config: Config): Promise<{ ok: boolean; accounts: string[] } | null> {
   try {
-    const res = await fetch(`${routerUrl(config)}/health`);
+    // Bounded, so a wedged service cannot hang `on`.
+    const res = await fetch(`${routerUrl(config)}/health`, { signal: AbortSignal.timeout(3000) });
     return res.ok ? ((await res.json()) as { ok: boolean; accounts: string[] }) : null;
   } catch {
     return null;

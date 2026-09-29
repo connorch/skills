@@ -244,7 +244,10 @@ function planImport(
     plans.push({
       label,
       email: emailFor(label),
-      expires: profile.expires ? new Date(profile.expires).toISOString() : null,
+      expires:
+        typeof profile.expires === "number" && Math.abs(profile.expires) <= MAX_DATE_MS
+          ? new Date(profile.expires).toISOString()
+          : null,
     });
   }
   return plans;
