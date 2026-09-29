@@ -9,14 +9,16 @@ beforeEach(() => (dir = mkdtempSync(join(tmpdir(), "claude-router-"))));
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 describe("RouterState", () => {
-  it("round-trips through disk and drops a probe that belonged to the old process", () => {
+  it("round-trips through disk and drops what belonged to the old process", () => {
     const path = join(dir, "state.json");
     const state = new RouterState(path);
     state.account("a").bench = { until: 1, reason: "org_block", attempts: 1, probing: true };
+    state.account("a").broken = { reason: "401", since: 1 };
     state.pins["k"] = { label: "a", lastSeen: 5 };
     state.save();
     const loaded = RouterState.load(path);
     expect(loaded.pins).toEqual({ k: { label: "a", lastSeen: 5 } });
+    expect(loaded.account("a").broken).toBeNull();
     expect(loaded.account("a").bench).toMatchObject({
       reason: "org_block",
       attempts: 1,
@@ -56,7 +58,7 @@ describe("RouterState", () => {
     expect(loaded.account("work").modelBuckets).toEqual({});
     expect(loaded.pins).toEqual({});
     const blocked = new RouterState(join(path, "cannot", "nest", "under-a-file"));
-    expect(blocked.save()).toBe(false);
+    expect(() => blocked.save()).not.toThrow();
   });
 });
 

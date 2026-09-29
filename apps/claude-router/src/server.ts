@@ -33,10 +33,9 @@ import { classify, retryAfterSeconds, type Mark } from "./upstream-errors.ts";
 
 export interface RouterDeps {
   config: Config;
-  // Current accounts; re-read after `accounts sync` signals a reload with
-  // the labels whose tokens changed.
+  // Current accounts; re-read after `accounts sync` signals a reload.
   accounts: () => Account[];
-  reload: (synced: string[]) => void;
+  reload: () => void;
   state: RouterState;
   log: RequestLog;
   now?: () => number;
@@ -617,13 +616,7 @@ export function createRouter(deps: RouterDeps): Server {
       }
       if (req.method === "GET" && url === "/_router/status") return json(res, 200, snapshot());
       if (req.method === "POST" && url === "/_router/reload") {
-        const body = await readBody(req);
-        const synced =
-          body.length > 0
-            ? (JSON.parse(body.toString("utf8")) as { synced?: string[] }).synced
-            : undefined;
-        deps.reload(synced ?? deps.accounts().map((a) => a.label));
-        state.touch();
+        deps.reload();
         return json(res, 200, { ok: true, accounts: deps.accounts().map((a) => a.label) });
       }
       const body = await readBody(req);

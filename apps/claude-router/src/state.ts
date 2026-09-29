@@ -22,8 +22,9 @@ interface Persisted {
 
 // What load() accepts from disk. Anything malformed is dropped at the level
 // it appears: one bad bucket loses that bucket, one bad account loses that
-// account, a bad file starts empty. A probe belongs to the process that
-// started it, so it never survives a load.
+// account, a bad file starts empty. A probe and a 401 mark belong to the
+// process that saw them, so neither survives a load: a token that is still
+// dead earns its mark back on the first request, which failover hides.
 const finite = z.number().finite();
 const ms = finite.min(-MAX_DATE_MS).max(MAX_DATE_MS);
 const Bucket = z.object({
@@ -35,10 +36,6 @@ const Bucket = z.object({
 const Account = z.object({
   buckets: z.record(z.string(), Bucket.catch(undefined as never)).catch({}),
   modelBuckets: z.record(z.string(), z.array(z.string())).catch({}),
-  broken: z
-    .object({ reason: z.literal("401"), since: ms })
-    .nullable()
-    .catch(null),
   bench: z
     .object({
       until: ms,
@@ -78,7 +75,7 @@ export class RouterState {
     try {
       const file = PersistedFile.parse(JSON.parse(readFileSync(path, "utf8")));
       for (const [label, account] of Object.entries(compact(file.accounts))) {
-        state.accounts[label] = { ...account, buckets: compact(account.buckets) };
+        state.accounts[label] = { ...account, broken: null, buckets: compact(account.buckets) };
       }
       state.pins = compact(file.pins);
     } catch (error) {
@@ -105,18 +102,16 @@ export class RouterState {
 
   // Best effort: routing works without persistence, so a full disk must
   // not take the service down.
-  save(): boolean {
-    if (!this.path) return true;
+  save(): void {
+    if (!this.path) return;
     try {
       mkdirSync(dirname(this.path), { recursive: true });
       const data: Persisted = { accounts: this.accounts, pins: this.pins };
       const tmp = `${this.path}.tmp`;
       writeFileSync(tmp, JSON.stringify(data, null, 2));
       renameSync(tmp, this.path);
-      return true;
     } catch (error) {
       console.error(`state: ${(error as Error).message}`);
-      return false;
     }
   }
 

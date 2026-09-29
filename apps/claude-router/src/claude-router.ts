@@ -82,11 +82,12 @@ program
       accounts = found.accounts;
       for (const label of found.missing) console.error(`no Keychain token for ${label}`);
     };
-    // After `accounts sync`: a fresh token clears a 401 from the old one. A
-    // plain restart keeps the 401 until then.
-    const reload = (synced: string[]) => {
+    // After `accounts sync`: tokens may have changed, so every 401 mark is
+    // open to question again. A token that is still dead earns it back on
+    // its next request.
+    const reload = () => {
       read();
-      for (const label of synced) state.account(label).broken = null;
+      for (const account of accounts) state.account(account.label).broken = null;
     };
     const state = RouterState.load(STATE_PATH);
     read();
@@ -265,20 +266,12 @@ accounts
     const result = syncFromOnePassword(config.accounts, config.vault);
     for (const label of result.synced) console.log(`synced ${label}`);
     for (const { label, error } of result.failed) console.error(`failed ${label}: ${error}`);
-    const reload = await fetch(`${routerUrl(config)}/_router/reload`, {
-      method: "POST",
-      body: JSON.stringify({ synced: result.synced }),
-    }).catch(() => null);
-    if (reload?.ok) console.log("service reloaded");
-    else {
-      // Startup keeps a persisted 401 on purpose, so clear it here for the
-      // tokens that just changed. Nothing else writes the file while the
-      // service is down.
-      const state = RouterState.load(STATE_PATH);
-      for (const label of result.synced) state.account(label).broken = null;
-      if (!state.save()) fail("could not write the persisted state; the 401 marks are unchanged");
-      console.log("service not running; it will read the Keychain on start");
-    }
+    const reload = await fetch(`${routerUrl(config)}/_router/reload`, { method: "POST" }).catch(
+      () => null,
+    );
+    console.log(
+      reload?.ok ? "service reloaded" : "service not running; it will read the Keychain on start",
+    );
     if (result.failed.length > 0) process.exit(1);
   });
 

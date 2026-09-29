@@ -24,7 +24,7 @@ export interface AccountState {
   buckets: Record<string, Bucket>;
   // Bucket names seen on responses for each model: the block scope for it.
   modelBuckets: Record<string, string[]>;
-  // A 401: the token is dead until the next `accounts sync`.
+  // A 401: the token is dead. Cleared by `accounts sync` or a restart.
   broken: { reason: "401"; since: number } | null;
   bench: Bench | null;
 }

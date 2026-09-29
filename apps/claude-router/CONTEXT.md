@@ -52,7 +52,9 @@ short), an org permission block (with backoff and one probe at a time), or a
 429 that carries only `retry-after`.
 
 **Broken**:
-An Account whose token returned 401. Held out until the next `accounts sync`.
+An Account whose token returned 401. Held out until the next `accounts sync`
+or service restart; a token that is still dead is marked again on its next
+request, and that request fails over.
 
 ## Relationships
 
