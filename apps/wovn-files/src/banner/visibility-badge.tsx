@@ -43,13 +43,19 @@ export function VisibilityBadge({ file, readOnly }: { file: FileMeta; readOnly?:
 export function VisibilityLabel({ value }: { value: Visibility }) {
   return (
     <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-      <span
-        className={cn(
-          "inline-block size-[7px] rounded-full",
-          value === "public" ? "bg-public" : "bg-private",
-        )}
-      />
+      <VisibilityDot value={value} />
       {value}
     </span>
+  );
+}
+
+export function VisibilityDot({ value }: { value: Visibility }) {
+  return (
+    <span
+      className={cn(
+        "inline-block size-[7px] shrink-0 rounded-full",
+        value === "public" ? "bg-public" : "bg-private",
+      )}
+    />
   );
 }

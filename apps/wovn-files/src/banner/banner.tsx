@@ -1,16 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { fileUrl, rawUrl } from "@/lib/api";
-import { formatStamp } from "@/lib/format";
 import { fileQuery } from "@/lib/queries";
 import type { FilePage } from "@/lib/types";
 import { versionStamp } from "@/lib/types";
-import { Panel, type Tab } from "./panel";
+import { Finder } from "./finder";
 import { Crumbs, Dot, Strip } from "./strip";
+import { Time } from "./time";
 import { VisibilityBadge } from "./visibility-badge";
 
-// The Banner (CONTEXT.md): the strip and its panel above a File. One
+// The Banner (CONTEXT.md): the strip and its Finder panel above a File. One
 // component, two mounts - the React tree of an app page, and the shadow root
 // the host injects into an HTML File. The File's Visibility is read through
 // the query cache so a flip anywhere updates the badge.
@@ -20,14 +20,13 @@ export function Banner({ page }: { page: FilePage }) {
     initialData: page.file,
   }).data;
   const [open, setOpen] = useState(page.openVersions);
-  const [tab, setTab] = useState<Tab>(page.openVersions ? "versions" : "files");
+  // Bumped to reopen the Finder on the page's own File.
+  const [finderKey, setFinderKey] = useState(0);
+  const panelId = useId();
   const segments = file.key.split("/");
   const name = segments.pop() ?? file.key;
   const stamp = page.version ? versionStamp(page.version.key) : undefined;
-  const showTab = (next: Tab) => {
-    setTab(next);
-    setOpen(true);
-  };
+  const count = page.versions.length;
 
   const tail = page.version ? (
     <>
@@ -36,7 +35,7 @@ export function Banner({ page }: { page: FilePage }) {
       </a>
       <span className="text-muted-foreground/60">›</span>
       <span className="truncate font-semibold text-private">
-        version {formatStamp(page.version.uploaded)}
+        version <Time iso={page.version.uploaded} show="stamp" />
       </span>
       <span className="pl-1.5">
         <VisibilityBadge file={file} readOnly />
@@ -52,51 +51,56 @@ export function Banner({ page }: { page: FilePage }) {
     </>
   );
 
-  const chevron = (
-    <button
-      type="button"
-      aria-expanded={open}
-      aria-label={open ? "collapse" : "expand"}
-      className="cursor-pointer px-0.5 text-muted-foreground hover:text-foreground"
-      onClick={() => setOpen((value) => !value)}
-    >
-      {open ? "▴" : "▾"}
-    </button>
-  );
-
   return (
     <div className="text-foreground">
       <Strip
         crumbs={<Crumbs segments={segments} tail={tail} />}
         prefix={`${segments.join("/")}${segments.length ? "/" : ""}`}
-        after={chevron}
+        panel={{ open, onToggle: () => setOpen((value) => !value), id: panelId }}
       >
-        <a className="text-primary hover:underline" href={rawUrl(file.key, stamp)}>
-          raw
-        </a>
-        {page.version && (
+        {/* On a phone the File name needs the room, so the times and the
+            version count give way. */}
+        {page.version ? (
           <>
-            <Dot />
+            <span className="contents max-sm:hidden">
+              <span className="has-[[data-fresh]]:text-foreground">
+                uploaded <Time iso={page.version.uploaded} show="ago" />
+              </span>
+              <Dot />
+            </span>
             <a className="text-primary hover:underline" href={fileUrl(file.key)}>
               current
             </a>
+            <Dot />
           </>
-        )}
-        <Dot />
-        {file.stable ? (
-          <button
-            type="button"
-            className="cursor-pointer text-primary hover:underline"
-            onClick={() => showTab("versions")}
-          >
-            versions {page.versions.length}
-          </button>
         ) : (
-          <span>no versions</span>
+          <span className="contents max-sm:hidden">
+            <span className="has-[[data-fresh]]:text-foreground">
+              {count ? "updated" : "uploaded"} <Time iso={file.uploaded} show="ago" />
+            </span>
+            {file.stable && (
+              <>
+                <Dot />
+                <button
+                  type="button"
+                  className="cursor-pointer text-primary hover:underline"
+                  onClick={() => {
+                    setOpen(true);
+                    setFinderKey((key) => key + 1);
+                  }}
+                >
+                  {count} version{count === 1 ? "" : "s"}
+                </button>
+              </>
+            )}
+            <Dot />
+          </span>
         )}
-        <Dot />
+        <a className="text-primary hover:underline" href={rawUrl(file.key, stamp)}>
+          raw
+        </a>
       </Strip>
-      {open && <Panel page={page} file={file} tab={tab} onTab={setTab} />}
+      {open && <Finder key={finderKey} id={panelId} page={page} file={file} />}
     </div>
   );
 }

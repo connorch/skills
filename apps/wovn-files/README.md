@@ -17,7 +17,7 @@ src/server.ts          the Worker entry: the file host runs first, Start only
 src/host/*.server.ts   auth, R2 data functions, /api, URL resolution, and the
                        Banner injection for HTML Files
 src/routes/            __root.tsx (shell) and $.tsx (every app page)
-src/banner/            the Banner: strip, panel, tabs, visibility select, and
+src/banner/            the Banner: strip, Finder panel, visibility select, and
                        the two mounts (page-view.tsx, app.tsx)
 src/banner.tsx         the module that hydrates the injected Banner
 src/components/        listing, search palette, previews, shadcn ui/
@@ -52,7 +52,7 @@ Versions have three URL spellings for the same object: the storage Key
 `/<key>?version=<stamp>`. Raw serves all three; a Document Navigation to
 either path form 302s to the query form, so the File's own path stays the
 document base URL. `/<key>/archive` 302s to `/<key>?versions`, which opens
-the Banner's versions tab.
+the Banner's panel, where the File's uploads are listed.
 
 ## Uploads
 

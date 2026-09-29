@@ -61,8 +61,8 @@ already made the query the app's control channel. A Document Navigation to
 `/<key>/archive`, `/<key>/archive/<stamp>`, or the storage Key
 `archive/<key>/<stamp>` 302s to the query form; every other request to those
 URLs still gets Raw, so `wovn read`, `wovn history`, and `wovn diff` are
-unchanged. The remaining Banner state (collapsed or open, active tab) is
-client-only.
+unchanged. The remaining Banner state (collapsed or open, the Finder's open
+folder and selected File) is client-only.
 
 ## No sandbox, no content origin
 

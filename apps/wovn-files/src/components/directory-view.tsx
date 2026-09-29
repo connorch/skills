@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
-import { fileUrl, parentUrl, versionUrl } from "@/lib/api";
+import { fileUrl, versionUrl } from "@/lib/api";
 import { formatSize, formatWhen } from "@/lib/format";
 import {
   copyUrl,
@@ -24,32 +24,25 @@ import {
   useSetVisibility,
   versionsQuery,
 } from "@/lib/queries";
-import { cn } from "@/lib/utils";
 import type { FileEntry, Listing } from "@/lib/types";
 import { versionStamp } from "@/lib/types";
 
 // One directory level under `prefix` ("" = root), in classic-autoindex
 // spirit - a dense table of directories then Files. The body of a Directory
-// Route page and the files tab of the Banner, where `currentKey` marks the
-// File the page is showing. Every link is a real link (the path is the
-// state); deleting the current File leaves for its Directory Route.
+// Route page. Every link is a real link (the path is the state).
 export function DirectoryView({
   prefix,
   initialListing,
-  currentKey,
 }: {
   prefix: string;
   initialListing?: Listing;
-  currentKey?: string;
 }) {
   const listing = useQuery({
     ...listingQuery(prefix),
     initialData: initialListing,
   });
   const [deleting, setDeleting] = useState<FileEntry | null>(null);
-  const remove = useDeleteFile((key) => {
-    if (key === currentKey) window.location.assign(parentUrl(key));
-  });
+  const remove = useDeleteFile();
 
   if (listing.isError) {
     return (
@@ -103,7 +96,6 @@ export function DirectoryView({
                 key={file.key}
                 file={file}
                 name={nameOf(file.key)}
-                current={file.key === currentKey}
                 onDelete={() => setDeleting(file)}
               />
             ))}
@@ -178,12 +170,10 @@ function ListingSkeleton() {
 function FileRow({
   file,
   name,
-  current,
   onDelete,
 }: {
   file: FileEntry;
   name: string;
-  current: boolean;
   onDelete: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -193,11 +183,11 @@ function FileRow({
 
   return (
     <>
-      <tr className={cn("border-b border-border/50", current && "bg-accent/60")}>
+      <tr className="border-b border-border/50">
         <td className="py-1 pr-4">
           <span className="flex items-center gap-1.5">
             <a
-              className={cn("truncate hover:underline", current && "font-semibold text-primary")}
+              className="truncate hover:underline"
               href={fileUrl(file.key)}
               title={context || undefined}
             >
