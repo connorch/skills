@@ -32,6 +32,10 @@ export class RouterState {
       const raw = JSON.parse(readFileSync(path, "utf8")) as Partial<Persisted>;
       state.accounts = raw.accounts ?? {};
       state.pins = raw.pins ?? {};
+      // A probe belongs to the process that started it.
+      for (const account of Object.values(state.accounts)) {
+        if (account.bench?.probing) account.bench = null;
+      }
     }
     return state;
   }

@@ -259,9 +259,16 @@ accounts
       method: "POST",
       body: JSON.stringify({ synced: result.synced }),
     }).catch(() => null);
-    console.log(
-      reload?.ok ? "service reloaded" : "service not running; it will read the Keychain on start",
-    );
+    if (reload?.ok) console.log("service reloaded");
+    else {
+      // Startup keeps a persisted 401 on purpose, so clear it here for the
+      // tokens that just changed. Nothing else writes the file while the
+      // service is down.
+      const state = RouterState.load(STATE_PATH);
+      for (const label of result.synced) state.account(label).broken = null;
+      state.save();
+      console.log("service not running; it will read the Keychain on start");
+    }
     if (result.failed.length > 0) process.exit(1);
   });
 

@@ -14,7 +14,8 @@ export const SERVICE_LOG_PATH = join(STATE_DIR, "service.log");
 
 export const Config = z.object({
   port: z.number().int().positive().default(47880),
-  upstream: z.url().default("https://api.anthropic.com"),
+  // https, or http for a local mock. Anything else would send tokens in the clear.
+  upstream: z.url({ protocol: /^https?$/ }).default("https://api.anthropic.com"),
   // Keychain account labels, in the order `status` lists them.
   accounts: z.array(z.string().min(1)).nonempty().default(["personal", "personal_2", "work"]),
   // The bucket whose reset time ranks accounts (D4).

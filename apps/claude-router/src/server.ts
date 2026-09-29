@@ -495,6 +495,16 @@ export function createRouter(deps: RouterDeps): Server {
   return createServer(async (req, res) => {
     const url = req.url ?? "/";
     try {
+      // Claude Code never sends an Origin. A web page that can reach
+      // loopback does, and must get nothing: no token, no reload.
+      if (req.headers.origin !== undefined) {
+        return routerError(
+          res,
+          403,
+          "permission_error",
+          "browser-originated requests are not served.",
+        );
+      }
       if (req.method === "GET" && url === "/health") {
         return json(res, 200, {
           ok: true,
@@ -512,16 +522,6 @@ export function createRouter(deps: RouterDeps): Server {
         deps.reload(synced ?? deps.accounts().map((a) => a.label));
         state.touch();
         return json(res, 200, { ok: true, accounts: deps.accounts().map((a) => a.label) });
-      }
-      // Claude Code never sends an Origin. A web page that can reach
-      // loopback does, and must not get an account's token attached.
-      if (req.headers.origin !== undefined) {
-        return routerError(
-          res,
-          403,
-          "permission_error",
-          "browser-originated requests are not served.",
-        );
       }
       const body = await readBody(req);
       if (req.method === "POST" && url.startsWith("/v1/messages"))

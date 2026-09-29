@@ -10,7 +10,12 @@ const verdict = (
 
 describe("classify", () => {
   it("fails over on a limit 429 and on a bare request-scoped 429", () => {
-    expect(verdict(429, { "anthropic-ratelimit-unified-5h-status": "rejected" })).toEqual({
+    const rejected = {
+      "anthropic-ratelimit-unified-5h-status": "rejected",
+      "anthropic-ratelimit-unified-5h-utilization": "1.0",
+      "anthropic-ratelimit-unified-5h-reset": "1790644200",
+    };
+    expect(verdict(429, rejected)).toEqual({
       kind: "failover",
       mark: "limit",
     });
@@ -20,6 +25,10 @@ describe("classify", () => {
       mark: "retry_after",
     });
     expect(verdict(429)).toEqual({ kind: "failover", mark: null });
+    // Bucket headers that reject nothing do not count as a limit.
+    expect(
+      verdict(429, { "anthropic-ratelimit-unified-5h-status": "allowed", "retry-after": "30" }),
+    ).toEqual({ kind: "failover", mark: "retry_after" });
   });
 
   it("marks a 401 broken", () => {

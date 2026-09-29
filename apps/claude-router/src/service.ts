@@ -63,17 +63,24 @@ export function installService(nodePath: string, binPath: string): void {
   writeFileSync(PLIST_PATH, plist(nodePath, binPath));
   launchctl("bootout", `${DOMAIN}/${LABEL}`);
   for (let i = 0; i < 20 && launchctl("print", `${DOMAIN}/${LABEL}`).status === 0; i++) pause(250);
+  const boot = bootstrap();
+  if (boot.status !== 0) throw new Error(`launchctl bootstrap failed: ${boot.stderr.trim()}`);
+  launchctl("kickstart", "-k", `${DOMAIN}/${LABEL}`);
+}
+
+function bootstrap() {
   let boot = launchctl("bootstrap", DOMAIN, PLIST_PATH);
   for (let i = 0; i < 5 && boot.status !== 0; i++) {
     pause(500);
     boot = launchctl("bootstrap", DOMAIN, PLIST_PATH);
   }
-  if (boot.status !== 0) throw new Error(`launchctl bootstrap failed: ${boot.stderr.trim()}`);
-  launchctl("kickstart", "-k", `${DOMAIN}/${LABEL}`);
+  return boot;
 }
 
+// After `off`, for `on`. Same retry as install: a bootout may still be
+// finishing.
 export function startService(): boolean {
-  return launchctl("bootstrap", DOMAIN, PLIST_PATH).status === 0;
+  return bootstrap().status === 0;
 }
 
 export function stopService(): void {

@@ -2,7 +2,7 @@
 // (plan section 6). Classification reads status, headers, and, only for the
 // statuses that need it, the JSON error type. Never message text.
 
-import { hasRateLimitHeaders, headerValue, type HeaderMap } from "./buckets.ts";
+import { headerValue, parseBuckets, type HeaderMap } from "./buckets.ts";
 
 export type Mark =
   // Bucket headers already say which buckets are rejected; nothing extra.
@@ -52,7 +52,12 @@ const TRANSIENT = new Set([500, 502, 503, 504, 529]);
 
 export function classify({ status, headers, body, retried }: UpstreamResult): Verdict {
   if (status === 429) {
-    if (hasRateLimitHeaders(headers)) return { kind: "failover", mark: "limit" };
+    // A rejected bucket blocks by itself. Bucket headers that reject nothing
+    // (partial, or all allowed) say nothing, so fall through to retry-after.
+    const rejected = Object.values(parseBuckets(headers, 0)).some(
+      (b) => b.status !== "allowed" && b.status !== "allowed_warning",
+    );
+    if (rejected) return { kind: "failover", mark: "limit" };
     if (headerValue(headers, "retry-after") !== undefined) {
       return { kind: "failover", mark: "retry_after" };
     }

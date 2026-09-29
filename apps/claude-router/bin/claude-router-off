@@ -20,7 +20,8 @@ function run(argv) {
   const indent = indentMatch ? indentMatch[1].length : 2;
   let out = JSON.stringify(settings, null, indent);
   if (text.endsWith("\n")) out += "\n";
-  $(out).writeToFileAtomicallyEncodingError(path, true, $.NSUTF8StringEncoding, null);
+  const ok = $(out).writeToFileAtomicallyEncodingError(path, true, $.NSUTF8StringEncoding, null);
+  if (!ok) throw new Error("could not write " + path + "; the service was left running");
   return "settings.json: removed env.ANTHROPIC_BASE_URL";
 }
 JXA
