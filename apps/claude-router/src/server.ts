@@ -294,7 +294,14 @@ export function createRouter(deps: RouterDeps): Server {
         null,
       );
       log.append({ ...entry, kind: "passthrough", status: up.status });
-      relay(up, res);
+      relay(up, res, () =>
+        log.append({
+          ...entry,
+          kind: "router_error",
+          status: 502,
+          reason: "upstream stream ended early",
+        }),
+      );
     } catch (error) {
       if (res.destroyed) {
         return log.append({
@@ -378,11 +385,13 @@ export function createRouter(deps: RouterDeps): Server {
       // One probe through an expired org block. Whatever comes back other
       // than another block ends the bench, so a 429 or an abort cannot leave
       // the account marked "probe in flight" forever.
-      if (st.bench?.reason === "org_block" && at >= st.bench.until) {
+      // A forced request answers for itself and takes no part in probing.
+      let probe = false;
+      if (!forced && st.bench?.reason === "org_block" && at >= st.bench.until) {
         // Rechecked here, after earlier attempts awaited: another request may
         // have claimed the probe since this order was computed.
         if (st.bench.probing) continue;
-        st.bench.probing = true;
+        st.bench.probing = probe = true;
       }
       const gone = () => {
         log.append({
@@ -479,9 +488,10 @@ export function createRouter(deps: RouterDeps): Server {
           break;
         }
       } finally {
-        // The probe is over. applyMark("org_block") already replaced the
-        // bench with a fresh one (probing false); anything else lifts it.
-        if (st.bench?.probing) st.bench = null;
+        // Only the request that claimed the probe ends it. applyMark("org_block")
+        // already replaced the bench with a fresh one (probing false); anything
+        // else lifts it.
+        if (probe && st.bench?.probing) st.bench = null;
       }
     }
 

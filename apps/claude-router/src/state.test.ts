@@ -24,7 +24,7 @@ describe("RouterState", () => {
     });
   });
 
-  it("starts empty from a corrupt file and survives an unwritable path", () => {
+  it("starts empty from a corrupt file, keeps only well-shaped entries, and reports an unwritable path", () => {
     const path = join(dir, "state.json");
     writeFileSync(path, "{not json");
     expect(RouterState.load(path).accounts).toEqual({});

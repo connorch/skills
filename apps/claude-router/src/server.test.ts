@@ -248,7 +248,8 @@ describe("routing", () => {
     const bench = state.account("personal").bench;
     expect(bench).toMatchObject({ reason: "org_block", attempts: 1, probing: false });
 
-    // Past the bench: the probe goes through, and a limit 429 must not strand it.
+    // Past the bench: ranked selection claims the probe (personal sorts first
+    // with no bucket data), and a limit 429 must not strand it.
     router.close();
     const port = (upstream.server.address() as AddressInfo).port;
     router = createRouter({
@@ -261,7 +262,8 @@ describe("routing", () => {
     });
     routerUrl = `http://127.0.0.1:${await listen(router)}`;
     upstream.queue.push(fromFixture("fable-429-7d_oi-rejected"));
-    await messages(session("p2", "claude-fable-5-1"), { "x-claude-router-account": "personal" });
+    await messages(session("p2", "claude-fable-5-1"));
+    expect(upstream.seen.at(-2)?.auth).toBe("Bearer tok-personal");
     expect(state.account("personal").bench).toBeNull();
   });
 
@@ -275,6 +277,52 @@ describe("routing", () => {
     expect(res.status).toBe(200);
     expect(upstream.seen).toHaveLength(2);
     expect(Object.values(state.accounts).some((a) => a.bench?.reason === "org_block")).toBe(true);
+  });
+
+  it("closes the client response when upstream drops mid-body", async () => {
+    upstream.fallback = (_req, res) => {
+      res.writeHead(200, { "content-type": "text/event-stream" });
+      res.write("event: message_start\ndata: {}\n\n");
+      setTimeout(() => res.destroy(), 20);
+    };
+    const res = await messages(session("drop"));
+    expect(res.status).toBe(200);
+    await expect(res.text()).rejects.toThrow();
+    expect(log.entries.at(-1)).toMatchObject({
+      kind: "router_error",
+      reason: "upstream stream ended early",
+    });
+  });
+
+  it("treats an error body that aborts as one more failed attempt", async () => {
+    const partial = (_req: IncomingMessage, res: ServerResponse) => {
+      res.writeHead(429, { "content-type": "application/json" });
+      res.write('{"partial');
+      setTimeout(() => res.destroy(), 10);
+    };
+    upstream.queue.push(partial, partial);
+    const res = await messages(session("aborted-body"));
+    expect(res.status).toBe(200);
+    expect(upstream.seen.map((s) => s.auth)).toEqual([
+      "Bearer tok-personal",
+      "Bearer tok-personal",
+      "Bearer tok-personal_2",
+    ]);
+    expect(state.account("personal").bench?.reason).toBe("transient");
+  });
+
+  it("lets a forced request through while another request holds the org-block probe", async () => {
+    state.account("work").bench = {
+      until: NOW - 1,
+      reason: "org_block",
+      attempts: 1,
+      probing: true,
+    };
+    const res = await messages(session("forced-probe"), { "x-claude-router-account": "work" });
+    expect(res.status).toBe(200);
+    expect(upstream.seen[0]?.auth).toBe("Bearer tok-work");
+    // The other request's probe is untouched.
+    expect(state.account("work").bench?.probing).toBe(true);
   });
 
   it("marks a 401 broken until reload clears it", async () => {
@@ -303,21 +351,6 @@ describe("passthrough", () => {
     const res = await messages(session("web"), { origin: "https://evil.example" });
     expect(res.status).toBe(403);
     expect(upstream.seen).toHaveLength(0);
-  });
-
-  it("closes the client response when upstream drops mid-body", async () => {
-    upstream.fallback = (_req, res) => {
-      res.writeHead(200, { "content-type": "text/event-stream" });
-      res.write("event: message_start\ndata: {}\n\n");
-      setTimeout(() => res.destroy(), 20);
-    };
-    const res = await messages(session("drop"));
-    expect(res.status).toBe(200);
-    await expect(res.text()).rejects.toThrow();
-    expect(log.entries.at(-1)).toMatchObject({
-      kind: "router_error",
-      reason: "upstream stream ended early",
-    });
   });
 
   it("forwards non-inference paths and fails open with no accounts", async () => {

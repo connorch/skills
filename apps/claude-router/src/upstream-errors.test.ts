@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { classify } from "./upstream-errors.ts";
+import { classify, retryAfterSeconds } from "./upstream-errors.ts";
 
 const verdict = (
   status: number,
@@ -61,5 +61,12 @@ describe("classify", () => {
     expect(verdict(200)).toEqual({ kind: "commit" });
     expect(verdict(400)).toEqual({ kind: "commit" });
     expect(verdict(404)).toEqual({ kind: "commit" });
+  });
+
+  it("reads Retry-After as seconds, zero included, and ignores dates", () => {
+    expect(retryAfterSeconds({ "retry-after": "0" })).toBe(0);
+    expect(retryAfterSeconds({ "retry-after": "30" })).toBe(30);
+    expect(retryAfterSeconds({ "retry-after": "Wed, 21 Oct 2026 07:28:00 GMT" })).toBeNull();
+    expect(retryAfterSeconds({})).toBeNull();
   });
 });

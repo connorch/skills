@@ -42,9 +42,9 @@ export class RouterState {
       for (const [label, account] of Object.entries(raw.accounts ?? {})) {
         if (!account || typeof account !== "object" || typeof account.buckets !== "object")
           continue;
-        state.accounts[label] = { ...emptyAccountState(), ...account };
-        const bench = state.accounts[label]?.bench;
-        if (bench?.probing) bench.probing = false;
+        const st = { ...emptyAccountState(), ...account };
+        if (st.bench?.probing) st.bench.probing = false;
+        state.accounts[label] = st;
       }
       for (const [key, pin] of Object.entries(raw.pins ?? {})) {
         if (pin && typeof pin.label === "string" && typeof pin.lastSeen === "number")
