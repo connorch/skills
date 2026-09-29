@@ -77,11 +77,8 @@ let routerUrl: string;
 let state: RouterState;
 let log: RequestLog;
 let live = accounts;
-// The clock advances a millisecond per reading so request order is visible.
-let tick = 0;
 
 beforeEach(async () => {
-  tick = 0;
   upstream = new Upstream();
   const port = await listen(upstream.server);
   state = new RouterState(null);
@@ -93,7 +90,8 @@ beforeEach(async () => {
     reload: () => {},
     state,
     log,
-    now: () => NOW + tick++,
+    // A frozen clock: pin ordering must not depend on timestamps differing.
+    now: () => NOW,
   });
   routerUrl = `http://127.0.0.1:${await listen(router)}`;
 });
@@ -217,7 +215,6 @@ describe("routing", () => {
     upstream.queue.push(fromFixture("fable-429-7d_oi-rejected"));
     const older = await messages(session("race2", "claude-fable-5-1"));
     expect(older.status).toBe(200);
-    const olderSeen = state.pins[hashKey("user_x_session_race2")]?.lastSeen ?? 0;
     upstream.queue.push(
       (_req, res) =>
         void slow.then(() => reply(res, 200, { "content-type": "application/json" }, "{}")),
@@ -226,9 +223,7 @@ describe("routing", () => {
     await new Promise((r) => setTimeout(r, 30));
     releaseSlow();
     expect((await newer).status).toBe(200);
-    const pin = state.pins[hashKey("user_x_session_race2")];
-    expect(pin?.label).toBe("personal_2");
-    expect(pin?.lastSeen).toBeGreaterThan(olderSeen);
+    expect(state.pins[hashKey("user_x_session_race2")]?.label).toBe("personal_2");
   });
 
   it("returns the first upstream error unchanged when every account fails", async () => {

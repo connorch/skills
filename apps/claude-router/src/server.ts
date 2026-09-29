@@ -159,6 +159,11 @@ export function createRouter(deps: RouterDeps): Server {
   const secure = upstream.protocol === "https:";
   const agent = secure ? new HttpsAgent({ keepAlive: true }) : new HttpAgent({ keepAlive: true });
   const request = secure ? httpsRequest : httpRequest;
+  // Request arrival order within this process, and the order of the request
+  // that last wrote each pin. Timestamps tie within a millisecond; this does
+  // not. In memory only: after a restart every pin is open to the next writer.
+  let arrivals = 0;
+  const pinOrder = new Map<string, number>();
 
   // The client's response: while it is open, `inflight` is the upstream
   // request feeding it, so an abort can cancel that request. A client that
@@ -341,6 +346,7 @@ export function createRouter(deps: RouterDeps): Server {
 
   async function route(req: IncomingMessage, res: ServerResponse, body: Buffer) {
     const at = now();
+    const order = ++arrivals;
     const { model, key } = parseRequest(body);
     const entrypoint = entrypointOf(req.headers["user-agent"]);
     const entry = {
@@ -384,6 +390,8 @@ export function createRouter(deps: RouterDeps): Server {
     const pin = pinKey ? state.pins[pinKey] : undefined;
     // After the read, so an idle pin is reported as expired, not as absent.
     state.prunePins(at, config.pinIdleMs);
+    for (const k of pinOrder.keys())
+      if (!Object.hasOwn(state.pins, k) && k !== pinKey) pinOrder.delete(k);
     const candidates = candidatesFor(accounts, model, at);
     // Nothing eligible: selection falls back to the least-bad account on
     // purpose, so the client gets a real upstream answer.
@@ -484,8 +492,8 @@ export function createRouter(deps: RouterDeps): Server {
             // The newest request decides where the session is pinned. A
             // slower, older request that finishes late never moves a pin a
             // newer one already set, whichever of them failed over (D6).
-            const existing = pinKey ? state.pins[pinKey] : undefined;
-            if (pinKey && (!existing || existing.lastSeen <= at)) {
+            if (pinKey && (pinOrder.get(pinKey) ?? 0) < order) {
+              pinOrder.set(pinKey, order);
               state.pins[pinKey] = { label, lastSeen: at };
             }
             state.touch();

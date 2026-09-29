@@ -170,7 +170,8 @@ export function candidate(
       ...base,
       eligible: false,
       why: `bench (${inFlight ? "org_block probe in flight" : bench.reason})`,
-      unavailableUntil: inFlight ? null : bench.until,
+      // Free again only once both the bench and any rejected bucket clear.
+      unavailableUntil: inFlight ? null : Math.max(bench.until, blockedUntil ?? 0),
     };
   }
   if (blockedUntil !== null) {

@@ -91,6 +91,11 @@ describe("candidate", () => {
       why: "bench (transient)",
     });
     expect(candidate("a", state, "m", config, NOW + 1001).eligible).toBe(true);
+    // Benched for a second but bucket-blocked for longer: the later one counts.
+    const blocked = emptyAccountState();
+    recordResponse(blocked, "m", fixture("fable-429-7d_oi-rejected").headers, NOW);
+    blocked.bench = { until: NOW + 1000, reason: "transient", attempts: 0, probing: false };
+    expect(candidate("a", blocked, "m", config, NOW).unavailableUntil).toBe(1790877600 * 1000);
     state.broken = { reason: "401", since: NOW };
     expect(candidate("a", state, "m", config, NOW).why).toBe("broken (401)");
   });
