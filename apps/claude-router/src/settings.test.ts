@@ -33,6 +33,12 @@ describe("settings", () => {
     expect(withoutRouter(on)).toBe(four);
   });
 
+  it("refuses to replace a base URL that is not the router's", () => {
+    const foreign = `{"env":{"ANTHROPIC_BASE_URL":"https://proxy.example"}}`;
+    expect(() => withRouter(foreign, URL)).toThrow(/already sets env.ANTHROPIC_BASE_URL/);
+    expect(withRouter(withRouter("", URL), URL)).toBe(withRouter("", URL));
+  });
+
   it("handles a missing file and a settings.json without a trailing newline", () => {
     expect(withRouter("", URL)).toBe(`{\n  "env": {\n    "ANTHROPIC_BASE_URL": "${URL}"\n  }\n}\n`);
     expect(withoutRouter(withRouter(`{"theme":"dark"}`, URL))).toBe(`{\n  "theme": "dark"\n}`);

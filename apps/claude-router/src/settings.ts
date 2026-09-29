@@ -29,8 +29,16 @@ export function currentBaseUrl(text: string): string | null {
   return typeof value === "string" ? value : null;
 }
 
+// Refuses to replace a base URL that is not ours: `off` removes the key,
+// so overwriting would lose a setting it cannot restore.
 export function withRouter(text: string, baseUrl: string): string {
   const settings = parse(text);
+  const existing = currentBaseUrl(text);
+  if (existing !== null && existing !== baseUrl) {
+    throw new Error(
+      `settings.json already sets env.${BASE_URL_KEY} to ${existing}; remove it first if claude-router should replace it`,
+    );
+  }
   settings.env = { ...settings.env, [BASE_URL_KEY]: baseUrl };
   return format(settings, text);
 }

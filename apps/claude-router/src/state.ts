@@ -50,13 +50,19 @@ export class RouterState {
     this.timer.unref();
   }
 
+  // Best effort: routing works without persistence, so a full disk must
+  // not take the service down.
   save(): void {
     if (!this.path) return;
-    mkdirSync(dirname(this.path), { recursive: true });
-    const data: Persisted = { accounts: this.accounts, pins: this.pins };
-    const tmp = `${this.path}.tmp`;
-    writeFileSync(tmp, JSON.stringify(data, null, 2));
-    renameSync(tmp, this.path);
+    try {
+      mkdirSync(dirname(this.path), { recursive: true });
+      const data: Persisted = { accounts: this.accounts, pins: this.pins };
+      const tmp = `${this.path}.tmp`;
+      writeFileSync(tmp, JSON.stringify(data, null, 2));
+      renameSync(tmp, this.path);
+    } catch (error) {
+      console.error(`state: ${(error as Error).message}`);
+    }
   }
 
   prunePins(now: number, idleMs: number): void {

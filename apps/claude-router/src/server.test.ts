@@ -286,6 +286,23 @@ describe("passthrough", () => {
     expect(log.entries[0]).toMatchObject({ kind: "passthrough", entrypoint: "claude-desktop" });
   });
 
+  it("rejects browser-originated requests before attaching any token", async () => {
+    const res = await messages(session("web"), { origin: "https://evil.example" });
+    expect(res.status).toBe(403);
+    expect(upstream.seen).toHaveLength(0);
+  });
+
+  it("closes the client response when upstream drops mid-body", async () => {
+    upstream.fallback = (_req, res) => {
+      res.writeHead(200, { "content-type": "text/event-stream" });
+      res.write("event: message_start\ndata: {}\n\n");
+      setTimeout(() => res.destroy(), 20);
+    };
+    const res = await messages(session("drop"));
+    expect(res.status).toBe(200);
+    await expect(res.text()).rejects.toThrow();
+  });
+
   it("forwards non-inference paths and fails open with no accounts", async () => {
     await fetch(`${routerUrl}/api/hello`, {
       method: "HEAD",

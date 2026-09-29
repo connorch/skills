@@ -25,9 +25,10 @@ import { classify, retryAfterSeconds, type Mark } from "./upstream-errors.ts";
 
 export interface RouterDeps {
   config: Config;
-  // Current accounts; re-read after `accounts sync` signals a reload.
+  // Current accounts; re-read after `accounts sync` signals a reload with
+  // the labels whose tokens changed.
   accounts: () => Account[];
-  reload: () => void;
+  reload: (synced: string[]) => void;
   state: RouterState;
   log: RequestLog;
   now?: () => number;
@@ -176,6 +177,11 @@ export function createRouter(deps: RouterDeps): Server {
     }
     res.writeHead(up.status, filterHeaders(up.headers, DROP_RESPONSE));
     up.res.pipe(res);
+    // An upstream that drops mid-body must not leave the client hanging on
+    // a response that will never end.
+    up.res.on("close", () => {
+      if (!up.res.complete) res.destroy();
+    });
     res.on("close", () => {
       if (!res.writableFinished) up.res.destroy();
     });
@@ -498,8 +504,24 @@ export function createRouter(deps: RouterDeps): Server {
       }
       if (req.method === "GET" && url === "/_router/status") return json(res, 200, snapshot());
       if (req.method === "POST" && url === "/_router/reload") {
-        deps.reload();
+        const body = await readBody(req);
+        const synced =
+          body.length > 0
+            ? (JSON.parse(body.toString("utf8")) as { synced?: string[] }).synced
+            : undefined;
+        deps.reload(synced ?? deps.accounts().map((a) => a.label));
+        state.touch();
         return json(res, 200, { ok: true, accounts: deps.accounts().map((a) => a.label) });
+      }
+      // Claude Code never sends an Origin. A web page that can reach
+      // loopback does, and must not get an account's token attached.
+      if (req.headers.origin !== undefined) {
+        return routerError(
+          res,
+          403,
+          "permission_error",
+          "browser-originated requests are not served.",
+        );
       }
       const body = await readBody(req);
       if (req.method === "POST" && url.startsWith("/v1/messages"))
