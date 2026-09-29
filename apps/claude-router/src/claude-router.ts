@@ -11,12 +11,14 @@
 
 import {
   existsSync,
+  mkdirSync,
   readFileSync,
   realpathSync,
   renameSync,
   statSync,
   writeFileSync,
 } from "node:fs";
+import { dirname } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { createInterface } from "node:readline/promises";
 import { Command } from "commander";
@@ -45,6 +47,7 @@ function writeSettings(text: string): void {
   const exists = existsSync(SETTINGS_PATH);
   const target = exists ? realpathSync(SETTINGS_PATH) : SETTINGS_PATH;
   const mode = exists ? statSync(target).mode & 0o777 : 0o644;
+  mkdirSync(dirname(target), { recursive: true });
   writeFileSync(`${target}.tmp`, text, { mode });
   renameSync(`${target}.tmp`, target);
 }

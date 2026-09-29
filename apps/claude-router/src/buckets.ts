@@ -103,7 +103,9 @@ function sharedBuckets(state: AccountState): string[] {
 // Buckets that still say something about `model`. A bucket whose reset has
 // passed is unknown and is left out.
 function applicable(state: AccountState, model: string | null, now: number): Bucket[] {
-  const names = (model && state.modelBuckets[model]) || sharedBuckets(state);
+  const learned =
+    model && Object.hasOwn(state.modelBuckets, model) ? state.modelBuckets[model] : undefined;
+  const names = learned ?? sharedBuckets(state);
   return names.flatMap((name) => {
     const bucket = state.buckets[name];
     return bucket && bucket.resetAt > now ? [bucket] : [];

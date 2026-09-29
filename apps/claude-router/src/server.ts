@@ -63,6 +63,8 @@ const ORG_BLOCK_BASE_MS = 5 * 60_000;
 const ORG_BLOCK_MAX_MS = 6 * 3_600_000;
 const TRANSIENT_BENCH_MS = 60_000;
 const RETRY_AFTER_MAX_MS = 10 * 60_000;
+// Idle time on the upstream socket before an attempt is abandoned.
+const UPSTREAM_TIMEOUT_MS = 10 * 60_000;
 
 function filterHeaders(headers: IncomingHttpHeaders, drop: Set<string>): OutgoingHttpHeaders {
   const out: OutgoingHttpHeaders = {};
@@ -196,6 +198,9 @@ export function createRouter(deps: RouterDeps): Server {
         (res) => resolve({ status: res.statusCode ?? 502, headers: res.headers, res }),
       );
       req.on("error", reject);
+      // A stalled upstream must not hold the attempt forever; destroying the
+      // request surfaces as a transport error and the loop moves on.
+      req.setTimeout(UPSTREAM_TIMEOUT_MS, () => req.destroy(new Error("upstream timed out")));
       req.on("close", () => {
         if (l.inflight === req) l.inflight = null;
       });
@@ -461,7 +466,12 @@ export function createRouter(deps: RouterDeps): Server {
           if (verdict.kind === "failover") applyMark(st, verdict.mark, up.headers, now());
           // A forced account answers for itself, limit errors included (D12).
           if (verdict.kind === "commit" || forced) {
-            if (key) state.pins[key] = { label, lastSeen: at };
+            // A slower request must not snap a pin back that a faster one
+            // already moved (D6): only touch a pin that is still where this
+            // request found it.
+            if (key && (state.pins[key]?.label ?? pin?.label) === pin?.label) {
+              state.pins[key] = { label, lastSeen: at };
+            }
             state.touch();
             log.append({
               ...entry,
