@@ -195,11 +195,13 @@ program
     const config = loadConfig();
     const before = existsSync(SETTINGS_PATH) ? readFileSync(SETTINGS_PATH, "utf8") : "";
     const after = withRouter(before, routerUrl(config));
-    if (after === before)
-      return console.log(`${SETTINGS_PATH} already routes through claude-router`);
-    console.log(`${SETTINGS_PATH}:`);
-    for (const line of diff(before, after)) console.log(`  ${line}`);
-    if (!opts.yes) {
+    const configured = after === before;
+    if (configured) console.log(`${SETTINGS_PATH} already routes through claude-router`);
+    else {
+      console.log(`${SETTINGS_PATH}:`);
+      for (const line of diff(before, after)) console.log(`  ${line}`);
+    }
+    if (!configured && !opts.yes) {
       const rl = createInterface({ input: process.stdin, output: process.stdout });
       const answer = await rl.question("apply? [y/N] ");
       rl.close();
@@ -218,6 +220,7 @@ program
       console.log(
         "warning: no accounts in the Keychain; the router will pass everything through until `accounts sync` runs",
       );
+    if (configured) return console.log("service running");
     writeSettings(after);
     console.log(
       "applied. new Claude Code sessions go through claude-router; `claude-router off` reverts.",

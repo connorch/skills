@@ -187,7 +187,8 @@ export function createRouter(deps: RouterDeps): Server {
         {
           agent,
           method,
-          hostname: upstream.hostname,
+          // URL keeps IPv6 brackets; http.request wants the bare address.
+          hostname: upstream.hostname.replace(/^\[(.*)\]$/, "$1"),
           port: upstream.port || (secure ? 443 : 80),
           path,
           headers: outgoing,
@@ -397,8 +398,15 @@ export function createRouter(deps: RouterDeps): Server {
         for (;;) {
           attempts.push(label);
           let up: Upstream;
+          let errorBody: Buffer | null = null;
           try {
             up = await send(l, method, path, headers, body, account.token);
+            recordResponse(st, model, up.headers, at);
+            const needsBody =
+              up.status === 401 || up.status === 403 || up.status === 429 || up.status >= 500;
+            // Read here so a body that aborts or fails to decode is one
+            // more failed attempt on this account, not a router failure.
+            errorBody = needsBody ? await readErrorBody(up) : null;
           } catch (error) {
             if (res.destroyed) return gone();
             if (!retried) {
@@ -421,14 +429,10 @@ export function createRouter(deps: RouterDeps): Server {
             };
             break;
           }
-          recordResponse(st, model, up.headers, at);
           if (res.destroyed) {
             up.res.destroy();
             return gone();
           }
-          const needsBody =
-            up.status === 401 || up.status === 403 || up.status === 429 || up.status >= 500;
-          const errorBody = needsBody ? await readErrorBody(up) : null;
           const verdict = classify({
             status: up.status,
             headers: up.headers,

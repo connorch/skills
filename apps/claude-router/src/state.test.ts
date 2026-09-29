@@ -28,6 +28,8 @@ describe("RouterState", () => {
     const path = join(dir, "state.json");
     writeFileSync(path, "{not json");
     expect(RouterState.load(path).accounts).toEqual({});
+    writeFileSync(path, "null");
+    expect(RouterState.load(path).accounts).toEqual({});
     writeFileSync(
       path,
       JSON.stringify({ accounts: { personal: null, work: { buckets: {} } }, pins: { k: 1 } }),

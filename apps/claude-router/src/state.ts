@@ -32,7 +32,8 @@ export class RouterState {
       // Best effort, like save(): a corrupt file must not crash-loop the service.
       let raw: Partial<Persisted> = {};
       try {
-        raw = JSON.parse(readFileSync(path, "utf8")) as Partial<Persisted>;
+        const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+        if (parsed && typeof parsed === "object") raw = parsed as Partial<Persisted>;
       } catch (error) {
         console.error(`state: ${(error as Error).message}; starting empty`);
       }
