@@ -391,7 +391,9 @@ export function createRouter(deps: RouterDeps): Server {
       // computed.
       let probe = false;
       if (!forced && st.bench) {
-        if (now() < st.bench.until) continue;
+        // A benched account chosen on purpose (nothing else could serve)
+        // still gets the request, so the client sees a real upstream answer.
+        if (now() < st.bench.until && selection.reason !== "no eligible account") continue;
         if (st.bench.reason === "org_block") {
           if (st.bench.probing) continue;
           st.bench.probing = probe = true;

@@ -13,7 +13,7 @@ export const REQUEST_LOG_PATH = join(STATE_DIR, "requests.jsonl");
 export const SERVICE_LOG_PATH = join(STATE_DIR, "service.log");
 
 export const Config = z.object({
-  port: z.number().int().positive().default(47880),
+  port: z.number().int().min(1).max(65535).default(47880),
   // https, or http to loopback for a local mock. Anything else would send
   // tokens in the clear.
   upstream: z
@@ -24,6 +24,8 @@ export const Config = z.object({
         url.protocol === "https:" || ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)
       );
     }, "http upstreams must be loopback")
+    // Request paths are forwarded as-is, so a prefix would be silently dropped.
+    .refine((value) => new URL(value).pathname === "/", "upstream must not have a path")
     .default("https://api.anthropic.com"),
   // Keychain account labels, in the order `status` lists them.
   accounts: z

@@ -54,6 +54,7 @@ describe("classify", () => {
 
   it("retries a 5xx once on the same account, then benches and fails over", () => {
     expect(verdict(529)).toEqual({ kind: "retry" });
+    expect(verdict(522)).toEqual({ kind: "retry" });
     expect(verdict(503, {}, null, true)).toEqual({ kind: "failover", mark: "transient" });
   });
 

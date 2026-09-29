@@ -45,8 +45,11 @@ export class RouterState {
         if (!a) continue;
         const st = emptyAccountState();
         if (record(a.buckets)) st.buckets = a.buckets as AccountState["buckets"];
-        if (record(a.modelBuckets))
-          st.modelBuckets = a.modelBuckets as AccountState["modelBuckets"];
+        for (const [model, names] of Object.entries(record(a.modelBuckets) ?? {})) {
+          if (Array.isArray(names) && names.every((n) => typeof n === "string")) {
+            st.modelBuckets[model] = names;
+          }
+        }
         if (record(a.broken)) st.broken = a.broken as AccountState["broken"];
         if (record(a.bench))
           st.bench = { ...(a.bench as NonNullable<AccountState["bench"]>), probing: false };
@@ -60,8 +63,10 @@ export class RouterState {
     return state;
   }
 
+  // Own properties only: a label like "constructor" must not read the prototype.
   account(label: string): AccountState {
-    return (this.accounts[label] ??= emptyAccountState());
+    if (!Object.hasOwn(this.accounts, label)) this.accounts[label] = emptyAccountState();
+    return this.accounts[label] as AccountState;
   }
 
   // Coalesce writes: a burst of requests changes state many times a second.

@@ -48,8 +48,6 @@ function errorBody(body: string | null): ErrorBody["error"] | undefined {
   return undefined;
 }
 
-const TRANSIENT = new Set([500, 502, 503, 504, 529]);
-
 export function classify({ status, headers, body, retried }: UpstreamResult): Verdict {
   if (status === 429) {
     // A rejected bucket blocks by itself. Bucket headers that reject nothing
@@ -72,7 +70,7 @@ export function classify({ status, headers, body, retried }: UpstreamResult): Ve
       (error.error_code === undefined || error.error_code === "oauth_not_allowed_for_organization");
     return orgBlock ? { kind: "failover", mark: "org_block" } : { kind: "commit" };
   }
-  if (TRANSIENT.has(status))
+  if (status >= 500 && status <= 599)
     return retried ? { kind: "failover", mark: "transient" } : { kind: "retry" };
   return { kind: "commit" };
 }

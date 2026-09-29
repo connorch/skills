@@ -4,6 +4,8 @@
 # itself is broken. Same effect as `claude-router off`.
 set -eu
 settings="$HOME/.claude/settings.json"
+# A dotfile-managed symlink is replaced at its target, like `claude-router off`.
+[ -L "$settings" ] && settings="$(readlink -f "$settings")"
 label="ai.connorch.claude-router"
 
 if [ -f "$settings" ]; then

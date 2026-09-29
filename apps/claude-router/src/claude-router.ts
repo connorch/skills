@@ -205,7 +205,7 @@ program
     const config = loadConfig();
     const before = existsSync(SETTINGS_PATH) ? readFileSync(SETTINGS_PATH, "utf8") : "";
     const after = withRouter(before, routerUrl(config));
-    const configured = after === before;
+    const configured = currentBaseUrl(before) === routerUrl(config);
     if (configured) console.log(`${SETTINGS_PATH} already routes through claude-router`);
     else {
       console.log(`${SETTINGS_PATH}:`);
