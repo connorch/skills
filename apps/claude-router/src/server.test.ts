@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
+import { gzipSync } from "node:zlib";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import type { Account } from "./accounts.ts";
 import { fixture } from "./buckets.test.ts";
@@ -262,6 +263,18 @@ describe("routing", () => {
     upstream.queue.push(fromFixture("fable-429-7d_oi-rejected"));
     await messages(session("p2", "claude-fable-5-1"), { "x-claude-router-account": "personal" });
     expect(state.account("personal").bench).toBeNull();
+  });
+
+  it("decodes a compressed error body before classifying it", async () => {
+    const block = gzipSync(JSON.stringify({ type: "error", error: { type: "permission_error" } }));
+    upstream.queue.push((_req, res) => {
+      res.writeHead(403, { "content-type": "application/json", "content-encoding": "gzip" });
+      res.end(block);
+    });
+    const res = await messages(session("gz"));
+    expect(res.status).toBe(200);
+    expect(upstream.seen).toHaveLength(2);
+    expect(Object.values(state.accounts).some((a) => a.bench?.reason === "org_block")).toBe(true);
   });
 
   it("marks a 401 broken until reload clears it", async () => {

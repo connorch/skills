@@ -17,7 +17,11 @@ describe("RouterState", () => {
     state.save();
     const loaded = RouterState.load(path);
     expect(loaded.pins).toEqual({ k: { label: "a", lastSeen: 5 } });
-    expect(loaded.account("a").bench).toBeNull();
+    expect(loaded.account("a").bench).toMatchObject({
+      reason: "org_block",
+      attempts: 1,
+      probing: false,
+    });
   });
 
   it("starts empty from a corrupt file and survives an unwritable path", () => {

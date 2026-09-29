@@ -40,7 +40,7 @@ export class RouterState {
       state.pins = raw.pins ?? {};
       // A probe belongs to the process that started it.
       for (const account of Object.values(state.accounts)) {
-        if (account.bench?.probing) account.bench = null;
+        if (account.bench?.probing) account.bench.probing = false;
       }
     }
     return state;

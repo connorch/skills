@@ -80,5 +80,5 @@ export function classify({ status, headers, body, retried }: UpstreamResult): Ve
 // Seconds from a retry-after header, if it is a plain number.
 export function retryAfterSeconds(headers: HeaderMap): number | null {
   const value = Number(headerValue(headers, "retry-after"));
-  return Number.isFinite(value) && value > 0 ? value : null;
+  return Number.isFinite(value) && value >= 0 ? value : null;
 }

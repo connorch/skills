@@ -9,7 +9,7 @@
 //   accounts import-openclaw   one-time OpenClaw -> 1Password
 //   service install|uninstall  the LaunchAgent (install is run by ship:machine)
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 import { createInterface } from "node:readline/promises";
 import { Command } from "commander";
@@ -31,6 +31,12 @@ import {
   withRouter,
 } from "./settings.ts";
 import { RequestLog, RouterState } from "./state.ts";
+
+// Temp file plus rename: a failed write leaves settings.json untouched.
+function writeSettings(text: string): void {
+  writeFileSync(`${SETTINGS_PATH}.tmp`, text);
+  renameSync(`${SETTINGS_PATH}.tmp`, SETTINGS_PATH);
+}
 
 const program = new Command()
   .name("claude-router")
@@ -178,18 +184,6 @@ program
   .option("-y, --yes", "apply without asking")
   .action(async (opts: { yes?: boolean }) => {
     const config = loadConfig();
-    let up = await health(config);
-    if (!up && existsSync(PLIST_PATH) && startService()) {
-      await sleep(1500);
-      up = await health(config);
-    }
-    if (!up)
-      fail(`claude-router is not running at ${routerUrl(config)}; run pnpm ship:machine first`);
-    if (up.accounts.length === 0)
-      console.log(
-        "warning: no accounts in the Keychain; the router will pass everything through until `accounts sync` runs",
-      );
-
     const before = existsSync(SETTINGS_PATH) ? readFileSync(SETTINGS_PATH, "utf8") : "";
     const after = withRouter(before, routerUrl(config));
     if (after === before)
@@ -202,7 +196,20 @@ program
       rl.close();
       if (!/^y(es)?$/i.test(answer.trim())) return console.log("left unchanged");
     }
-    writeFileSync(SETTINGS_PATH, after);
+
+    // Only now touch the service: a "no" above must leave it as it was.
+    let up = await health(config);
+    if (!up && existsSync(PLIST_PATH) && startService()) {
+      await sleep(1500);
+      up = await health(config);
+    }
+    if (!up)
+      fail(`claude-router is not running at ${routerUrl(config)}; run pnpm ship:machine first`);
+    if (up.accounts.length === 0)
+      console.log(
+        "warning: no accounts in the Keychain; the router will pass everything through until `accounts sync` runs",
+      );
+    writeSettings(after);
     console.log(
       "applied. new Claude Code sessions go through claude-router; `claude-router off` reverts.",
     );
@@ -217,7 +224,7 @@ program
       const after = withoutRouter(before);
       if (after === before) console.log("settings.json: nothing to remove");
       else {
-        writeFileSync(SETTINGS_PATH, after);
+        writeSettings(after);
         console.log(`settings.json: removed env.${BASE_URL_KEY}`);
       }
     }

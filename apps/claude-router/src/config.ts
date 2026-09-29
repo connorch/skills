@@ -17,7 +17,11 @@ export const Config = z.object({
   // https, or http for a local mock. Anything else would send tokens in the clear.
   upstream: z.url({ protocol: /^https?$/ }).default("https://api.anthropic.com"),
   // Keychain account labels, in the order `status` lists them.
-  accounts: z.array(z.string().min(1)).nonempty().default(["personal", "personal_2", "work"]),
+  accounts: z
+    .array(z.string().min(1))
+    .nonempty()
+    .refine((labels) => new Set(labels).size === labels.length, "account labels must be unique")
+    .default(["personal", "personal_2", "work"]),
   // The bucket whose reset time ranks accounts (D4).
   rankBucket: z.string().default("7d"),
   // Utilization at which an account moves to the back of the ranking.

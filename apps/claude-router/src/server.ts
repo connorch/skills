@@ -4,6 +4,7 @@
 // does not fail over, so a failover is invisible to it.
 
 import { createHash } from "node:crypto";
+import { brotliDecompressSync, gunzipSync, inflateSync } from "node:zlib";
 import {
   Agent as HttpAgent,
   type ClientRequest,
@@ -100,6 +101,24 @@ function readBody(stream: IncomingMessage): Promise<Buffer> {
     stream.on("end", () => resolve(Buffer.concat(chunks)));
     stream.on("error", reject);
   });
+}
+
+// An error body the router has to read: decoded so classify() can parse it,
+// with the encoding header dropped so the bytes handed on stay consistent.
+async function readErrorBody(up: Upstream): Promise<Buffer> {
+  const raw = await readBody(up.res);
+  const encoding = up.headers["content-encoding"];
+  const decode =
+    encoding === "gzip"
+      ? gunzipSync
+      : encoding === "br"
+        ? brotliDecompressSync
+        : encoding === "deflate"
+          ? inflateSync
+          : null;
+  if (!decode) return raw;
+  delete up.headers["content-encoding"];
+  return decode(raw);
 }
 
 interface Upstream {
@@ -379,7 +398,7 @@ export function createRouter(deps: RouterDeps): Server {
               retried = true;
               continue;
             }
-            applyMark(st, "transient", {}, at);
+            applyMark(st, "transient", {}, now());
             firstError ??= {
               status: 502,
               headers: { "content-type": "application/json" },
@@ -402,7 +421,7 @@ export function createRouter(deps: RouterDeps): Server {
           }
           const needsBody =
             up.status === 401 || up.status === 403 || up.status === 429 || up.status >= 500;
-          const errorBody = needsBody ? await readBody(up.res) : null;
+          const errorBody = needsBody ? await readErrorBody(up) : null;
           const verdict = classify({
             status: up.status,
             headers: up.headers,
@@ -413,7 +432,7 @@ export function createRouter(deps: RouterDeps): Server {
             retried = true;
             continue;
           }
-          if (verdict.kind === "failover") applyMark(st, verdict.mark, up.headers, at);
+          if (verdict.kind === "failover") applyMark(st, verdict.mark, up.headers, now());
           // A forced account answers for itself, limit errors included (D12).
           if (verdict.kind === "commit" || forced) {
             if (key) state.pins[key] = { label, lastSeen: at };
