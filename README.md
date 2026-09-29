@@ -151,6 +151,7 @@ domain docs).
 - `apps/jevx-cli` - the `jevx` CLI the `jev` skill calls (Mac Studio only).
 - `apps/mac-vm` - the `mac-vm` CLI the `mac-vm` skill calls (connors-mac-studio only).
 - `apps/bambu-cli` - the `bambu` CLI for the P1S on the home LAN (connors-mac-studio only).
+- `apps/claude-router` - the `claude-router` proxy and CLI the `claude-router` skill describes (both Macs).
 - `apps/ship` - `pnpm ship:fleet` and `pnpm ship:machine`.
 - `instructions` - the global agent instructions (see above).
 

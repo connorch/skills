@@ -1,0 +1,32 @@
+{
+  "name": "claude-router",
+  "private": true,
+  "bin": {
+    "claude-router": "./dist/claude-router.mjs"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "vp pack",
+    "test": "vp test run",
+    "typecheck": "tsc --noEmit",
+    "ship:machine": "vp pack && mkdir -p ~/.local/bin && install -m 755 dist/claude-router.mjs ~/.local/bin/claude-router && install -m 755 bin/claude-direct bin/claude-router-off ~/.local/bin && ~/.local/bin/claude-router wrappers && ~/.local/bin/claude-router service install"
+  },
+  "dependencies": {
+    "commander": "^14.0.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "ship": {
+    "platforms": [
+      "darwin"
+    ],
+    "machines": [
+      "connors-mac-studio",
+      "connors-macbook-pro"
+    ]
+  }
+}

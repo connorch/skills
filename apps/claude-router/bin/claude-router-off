@@ -1,0 +1,34 @@
+#!/bin/sh
+# claude-router-off - take the router out of ~/.claude/settings.json and stop
+# the service using only macOS built-ins, so it works when Node or the router
+# itself is broken. Same effect as `claude-router off`.
+set -eu
+settings="$HOME/.claude/settings.json"
+# A dotfile-managed symlink is replaced at its target, like `claude-router off`.
+[ -L "$settings" ] && settings="$(readlink -f "$settings")"
+label="ai.connorch.claude-router"
+
+if [ -f "$settings" ]; then
+  osascript -l JavaScript - "$settings" <<'JXA'
+ObjC.import("Foundation");
+function run(argv) {
+  const path = argv[0];
+  const text = ObjC.unwrap($.NSString.stringWithContentsOfFileEncodingError(path, $.NSUTF8StringEncoding, null));
+  const settings = JSON.parse(text);
+  if (!settings.env || !("ANTHROPIC_BASE_URL" in settings.env)) return "settings.json: nothing to remove";
+  delete settings.env.ANTHROPIC_BASE_URL;
+  if (Object.keys(settings.env).length === 0) delete settings.env;
+  const indentMatch = text.match(/^( +)"/m);
+  const indent = indentMatch ? indentMatch[1].length : 2;
+  let out = JSON.stringify(settings, null, indent);
+  if (text.endsWith("\n")) out += "\n";
+  const ok = $(out).writeToFileAtomicallyEncodingError(path, true, $.NSUTF8StringEncoding, null);
+  if (!ok) throw new Error("could not write " + path + "; the service was left running");
+  return "settings.json: removed env.ANTHROPIC_BASE_URL";
+}
+JXA
+else
+  echo "no $settings; nothing to remove"
+fi
+
+launchctl bootout "gui/$(id -u)/$label" 2>/dev/null && echo "stopped $label" || echo "$label was not running"
