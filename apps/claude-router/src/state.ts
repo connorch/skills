@@ -11,12 +11,58 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname } from "node:path";
+import { z } from "zod";
 import { emptyAccountState, type AccountState } from "./buckets.ts";
 import type { Pin } from "./select.ts";
 
 interface Persisted {
   accounts: Record<string, AccountState>;
   pins: Record<string, Pin>;
+}
+
+// What load() accepts from disk. Anything malformed is dropped at the level
+// it appears: one bad bucket loses that bucket, one bad account loses that
+// account, a bad file starts empty. A probe belongs to the process that
+// started it, so it never survives a load.
+const finite = z.number().finite();
+// Epoch milliseconds a Date can represent; anything else breaks toISOString.
+const ms = finite.min(-8.64e15).max(8.64e15);
+const Bucket = z.object({
+  status: z.string(),
+  utilization: finite,
+  resetAt: ms,
+  seenAt: ms,
+});
+const Account = z.object({
+  buckets: z.record(z.string(), Bucket.catch(undefined as never)).default({}),
+  modelBuckets: z.record(z.string(), z.array(z.string())).catch({}),
+  broken: z
+    .object({ reason: z.literal("401"), since: ms })
+    .nullable()
+    .catch(null),
+  bench: z
+    .object({
+      until: ms,
+      reason: z.enum(["transient", "org_block", "retry_after"]),
+      attempts: finite,
+      probing: z.boolean(),
+    })
+    .transform((bench) => ({ ...bench, probing: false }))
+    .nullable()
+    .catch(null),
+});
+const PersistedFile = z.object({
+  accounts: z.record(z.string(), Account.catch(undefined as never)).catch({}),
+  pins: z
+    .record(z.string(), z.object({ label: z.string(), lastSeen: ms }).catch(undefined as never))
+    .catch({}),
+});
+
+// Entries a `.catch(undefined)` dropped leave holes; strip them.
+function compact<T>(record: Record<string, T | undefined>): Record<string, T> {
+  return Object.fromEntries(
+    Object.entries(record).filter((e): e is [string, T] => e[1] !== undefined),
+  );
 }
 
 export class RouterState {
@@ -28,37 +74,20 @@ export class RouterState {
 
   static load(path: string | null): RouterState {
     const state = new RouterState(path);
-    if (path && existsSync(path)) {
-      // Best effort, like save(): a corrupt file must not crash-loop the service.
-      let raw: Partial<Persisted> = {};
-      try {
-        const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
-        if (parsed && typeof parsed === "object") raw = parsed as Partial<Persisted>;
-      } catch (error) {
-        console.error(`state: ${(error as Error).message}; starting empty`);
+    if (!path || !existsSync(path)) return state;
+    // Best effort, like save(): a corrupt file must not crash-loop the service.
+    try {
+      const file = PersistedFile.parse(JSON.parse(readFileSync(path, "utf8")));
+      for (const [label, account] of Object.entries(compact(file.accounts))) {
+        state.accounts[label] = {
+          ...emptyAccountState(),
+          ...account,
+          buckets: compact(account.buckets),
+        };
       }
-      // Only entries with the expected shape survive; a probe belongs to
-      // the process that started it.
-      const record = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? v : null);
-      for (const [label, account] of Object.entries(raw.accounts ?? {})) {
-        const a = record(account) as Partial<AccountState> | null;
-        if (!a) continue;
-        const st = emptyAccountState();
-        if (record(a.buckets)) st.buckets = a.buckets as AccountState["buckets"];
-        for (const [model, names] of Object.entries(record(a.modelBuckets) ?? {})) {
-          if (Array.isArray(names) && names.every((n) => typeof n === "string")) {
-            st.modelBuckets[model] = names;
-          }
-        }
-        if (record(a.broken)) st.broken = a.broken as AccountState["broken"];
-        if (record(a.bench))
-          st.bench = { ...(a.bench as NonNullable<AccountState["bench"]>), probing: false };
-        state.accounts[label] = st;
-      }
-      for (const [key, pin] of Object.entries(raw.pins ?? {})) {
-        if (pin && typeof pin.label === "string" && typeof pin.lastSeen === "number")
-          state.pins[key] = pin;
-      }
+      state.pins = compact(file.pins);
+    } catch (error) {
+      console.error(`state: ${(error as Error).message}; starting empty`);
     }
     return state;
   }
