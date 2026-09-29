@@ -19,6 +19,7 @@ describe("classify", () => {
       kind: "failover",
       mark: "retry_after",
     });
+    expect(verdict(429)).toEqual({ kind: "failover", mark: null });
   });
 
   it("marks a 401 broken", () => {

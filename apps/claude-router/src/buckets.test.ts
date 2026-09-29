@@ -94,6 +94,9 @@ describe("candidate", () => {
     state.bench = { until: NOW - 1, reason: "org_block", attempts: 1, probing: false };
     expect(candidate("a", state, "m", config, NOW).eligible).toBe(true);
     state.bench.probing = true;
-    expect(candidate("a", state, "m", config, NOW).why).toBe("bench (org_block probe in flight)");
+    expect(candidate("a", state, "m", config, NOW)).toMatchObject({
+      why: "bench (org_block probe in flight)",
+      unavailableUntil: null,
+    });
   });
 });

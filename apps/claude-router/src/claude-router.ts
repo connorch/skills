@@ -56,15 +56,19 @@ program
   .action(() => {
     const config = loadConfig();
     let accounts: Account[] = [];
+    const read = () => {
+      const found = readKeychainAccounts(config.accounts);
+      accounts = found.accounts;
+      for (const label of found.missing) console.error(`no Keychain token for ${label}`);
+    };
+    // After `accounts sync`: a fresh token clears a 401 from the old one. A
+    // plain restart keeps the 401 until then.
     const reload = () => {
-      const read = readKeychainAccounts(config.accounts);
-      accounts = read.accounts;
-      for (const label of read.missing) console.error(`no Keychain token for ${label}`);
-      // A fresh token clears a 401 from the old one.
+      read();
       for (const account of accounts) state.account(account.label).broken = null;
     };
     const state = RouterState.load(STATE_PATH);
-    reload();
+    read();
     const log = new RequestLog(REQUEST_LOG_PATH);
     const server = createRouter({ config, accounts: () => accounts, reload, state, log });
     server.listen(config.port, "127.0.0.1", () => {

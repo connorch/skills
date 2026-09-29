@@ -159,8 +159,15 @@ export function candidate(
   }
   const bench = state.bench;
   if (bench && (now < bench.until || (bench.reason === "org_block" && bench.probing))) {
-    const why = bench.probing && now >= bench.until ? "org_block probe in flight" : bench.reason;
-    return { ...base, eligible: false, why: `bench (${why})`, unavailableUntil: bench.until };
+    const inFlight = bench.probing && now >= bench.until;
+    // A probe in flight has no known end, so the least-bad fallback must
+    // not pile concurrent requests onto it.
+    return {
+      ...base,
+      eligible: false,
+      why: `bench (${inFlight ? "org_block probe in flight" : bench.reason})`,
+      unavailableUntil: inFlight ? null : bench.until,
+    };
   }
   if (blockedUntil !== null) {
     return {

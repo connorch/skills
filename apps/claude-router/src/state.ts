@@ -99,13 +99,21 @@ export class RequestLog {
       this.entries.push(entry);
       return;
     }
+    try {
+      this.write(this.path, entry);
+    } catch (error) {
+      console.error(`request log: ${(error as Error).message}`);
+    }
+  }
+
+  private write(path: string, entry: LogEntry): void {
     const line = `${JSON.stringify(entry)}\n`;
     if (this.bytes + line.length > this.maxBytes) {
-      renameSync(this.path, `${this.path}.1`);
+      renameSync(path, `${path}.1`);
       this.bytes = 0;
     }
-    mkdirSync(dirname(this.path), { recursive: true });
-    appendFileSync(this.path, line);
+    mkdirSync(dirname(path), { recursive: true });
+    appendFileSync(path, line);
     this.bytes += line.length;
   }
 }

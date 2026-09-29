@@ -51,12 +51,13 @@ export function readKeychainAccounts(labels: readonly string[]): {
   return { accounts, missing };
 }
 
-// Replace the item so the ACL is fresh: the creating `security` process is
-// what the service later runs to read it, so no prompt is needed.
+// `-U` updates an existing item in place, so a failed write leaves the old
+// token usable. The `security` binary that creates the item is the one the
+// service later runs to read it, so no prompt is needed.
 export function writeKeychainAccount(label: string, value: KeychainValue): void {
-  security(["delete-generic-password", "-s", SERVICE, "-a", label]);
   const result = security([
     "add-generic-password",
+    "-U",
     "-s",
     SERVICE,
     "-a",

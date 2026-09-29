@@ -338,11 +338,7 @@ export function createRouter(deps: RouterDeps): Server {
       // than another block ends the bench, so a 429 or an abort cannot leave
       // the account marked "probe in flight" forever.
       if (st.bench?.reason === "org_block" && at >= st.bench.until) st.bench.probing = true;
-      const endProbe = () => {
-        if (st.bench?.probing) st.bench = null;
-      };
       const gone = () => {
-        endProbe();
         log.append({
           ...entry,
           kind: "router_error",
@@ -352,77 +348,81 @@ export function createRouter(deps: RouterDeps): Server {
         });
       };
       let retried = false;
-      for (;;) {
-        attempts.push(label);
-        let up: Upstream;
-        try {
-          up = await send(l, method, path, headers, body, account.token);
-        } catch (error) {
-          if (res.destroyed) return gone();
-          if (!retried) {
+      try {
+        for (;;) {
+          attempts.push(label);
+          let up: Upstream;
+          try {
+            up = await send(l, method, path, headers, body, account.token);
+          } catch (error) {
+            if (res.destroyed) return gone();
+            if (!retried) {
+              retried = true;
+              continue;
+            }
+            applyMark(st, "transient", {}, at);
+            firstError ??= {
+              status: 502,
+              headers: { "content-type": "application/json" },
+              body: Buffer.from(
+                JSON.stringify({
+                  type: "error",
+                  error: {
+                    type: "api_error",
+                    message: `upstream unreachable: ${(error as Error).message}. ${HINT}`,
+                  },
+                }),
+              ),
+            };
+            break;
+          }
+          recordResponse(st, model, up.headers, at);
+          if (res.destroyed) {
+            up.res.destroy();
+            return gone();
+          }
+          const needsBody =
+            up.status === 401 || up.status === 403 || up.status === 429 || up.status >= 500;
+          const errorBody = needsBody ? await readBody(up.res) : null;
+          const verdict = classify({
+            status: up.status,
+            headers: up.headers,
+            body: errorBody?.toString("utf8") ?? null,
+            retried,
+          });
+          if (verdict.kind === "retry") {
             retried = true;
             continue;
           }
-          applyMark(st, "transient", {}, at);
-          endProbe();
+          if (verdict.kind === "failover") applyMark(st, verdict.mark, up.headers, at);
+          // A forced account answers for itself, limit errors included (D12).
+          if (verdict.kind === "commit" || forced) {
+            if (key) state.pins[key] = { label, lastSeen: at };
+            state.touch();
+            log.append({
+              ...entry,
+              kind: "routed",
+              account: label,
+              status: up.status,
+              attempts,
+              reason: selection.reason,
+              forced: Boolean(forced),
+            });
+            if (errorBody) respond(res, up.status, up.headers, errorBody);
+            else relay(up, res);
+            return;
+          }
           firstError ??= {
-            status: 502,
-            headers: { "content-type": "application/json" },
-            body: Buffer.from(
-              JSON.stringify({
-                type: "error",
-                error: {
-                  type: "api_error",
-                  message: `upstream unreachable: ${(error as Error).message}. ${HINT}`,
-                },
-              }),
-            ),
+            status: up.status,
+            headers: up.headers,
+            body: errorBody ?? Buffer.alloc(0),
           };
           break;
         }
-        recordResponse(st, model, up.headers, at);
-        if (res.destroyed) {
-          up.res.destroy();
-          return gone();
-        }
-        const needsBody =
-          up.status === 401 || up.status === 403 || up.status === 429 || up.status >= 500;
-        const errorBody = needsBody ? await readBody(up.res) : null;
-        const verdict = classify({
-          status: up.status,
-          headers: up.headers,
-          body: errorBody?.toString("utf8") ?? null,
-          retried,
-        });
-        if (verdict.kind === "retry") {
-          retried = true;
-          continue;
-        }
-        if (verdict.kind === "failover") applyMark(st, verdict.mark, up.headers, at);
-        endProbe();
-        // A forced account answers for itself, limit errors included (D12).
-        if (verdict.kind === "commit" || forced) {
-          if (key) state.pins[key] = { label, lastSeen: at };
-          state.touch();
-          log.append({
-            ...entry,
-            kind: "routed",
-            account: label,
-            status: up.status,
-            attempts,
-            reason: selection.reason,
-            forced: Boolean(forced),
-          });
-          if (errorBody) respond(res, up.status, up.headers, errorBody);
-          else relay(up, res);
-          return;
-        }
-        firstError ??= {
-          status: up.status,
-          headers: up.headers,
-          body: errorBody ?? Buffer.alloc(0),
-        };
-        break;
+      } finally {
+        // The probe is over. applyMark("org_block") already replaced the
+        // bench with a fresh one (probing false); anything else lifts it.
+        if (st.bench?.probing) st.bench = null;
       }
     }
 

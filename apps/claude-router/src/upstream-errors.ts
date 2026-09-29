@@ -56,8 +56,8 @@ export function classify({ status, headers, body, retried }: UpstreamResult): Ve
     if (headerValue(headers, "retry-after") !== undefined) {
       return { kind: "failover", mark: "retry_after" };
     }
-    if (headerValue(headers, "x-should-retry") === "true") return { kind: "failover", mark: null };
-    return { kind: "failover", mark: "retry_after" };
+    // Nothing to go on: request-scoped, hold nothing against the account.
+    return { kind: "failover", mark: null };
   }
   if (status === 401) return { kind: "failover", mark: "broken" };
   if (status === 403) {
