@@ -13,6 +13,7 @@ claude-router accounts sync               # 1Password -> Keychain, reload servic
 claude-router on                          # shows the settings.json diff, asks
 claude-router status
 claude-router off                         # or claude-router-off when Node is broken
+claude-work                               # one account only, no failover (claude-<label>)
 ```
 
 Tokens live in 1Password as API Credential items named

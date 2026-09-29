@@ -15,13 +15,15 @@ wired in through `env.ANTHROPIC_BASE_URL` in `~/.claude/settings.json`.
 ```sh
 claude-router status          # accounts, bucket usage, ranking per model, pins
 claude-direct [args]          # one Claude Code session straight at api.anthropic.com
+claude-work [args]            # through the router, only the work account, no failover
+                              # (one claude-<label> per account)
 claude-router-off             # zero-dependency: take it out of settings.json and stop it
 claude-router on              # put it back (shows the diff, asks)
 claude-router accounts sync   # refresh tokens from 1Password after a 401
 tail ~/.local/state/claude-router/requests.jsonl   # one line per request: account, attempts, reason
 ```
 
-Force one account, no failover: send the header
-`x-claude-router-account: <label>` via `ANTHROPIC_CUSTOM_HEADERS`, e.g.
-`claude --settings '{"env":{"ANTHROPIC_CUSTOM_HEADERS":"x-claude-router-account: work"}}'`.
+The `claude-<label>` commands set the header `x-claude-router-account: <label>`
+through `ANTHROPIC_CUSTOM_HEADERS` in the environment. Do not pass it with
+`--settings`: Claude Code keeps only the last `--settings` flag.
 The desktop app is never routed. Never print tokens.

@@ -7,6 +7,7 @@
 //   on / off              add or remove the router from ~/.claude/settings.json
 //   accounts sync         1Password -> Keychain, then reload the service
 //   accounts import-openclaw   one-time OpenClaw -> 1Password
+//   wrappers              claude-<label> commands that force one account
 //   service install|uninstall  the LaunchAgent (install is run by ship:machine)
 
 import {
@@ -32,6 +33,7 @@ import { allowed } from "./buckets.ts";
 import { loadConfig, REQUEST_LOG_PATH, routerUrl, STATE_PATH, type Config } from "./config.ts";
 import { createRouter, type Status } from "./server.ts";
 import { installService, PLIST_PATH, startService, stopService } from "./service.ts";
+import { installWrappers } from "./wrappers.ts";
 import {
   BASE_URL_KEY,
   currentBaseUrl,
@@ -289,6 +291,13 @@ accounts
     }
     for (const { label, error } of result.failed) console.error(`failed ${label}: ${error}`);
     if (result.failed.length > 0) process.exit(1);
+  });
+
+program
+  .command("wrappers")
+  .description("write a claude-<label> command per account (run by ship:machine)")
+  .action(() => {
+    for (const path of installWrappers(loadConfig().accounts)) console.log(`installed ${path}`);
   });
 
 const service = program.command("service").description("the LaunchAgent");

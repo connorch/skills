@@ -36,9 +36,16 @@ export const Config = z
         }
       })
       .default("https://api.anthropic.com"),
-    // Keychain account labels, in the order `status` lists them.
+    // Keychain account labels, in the order `status` lists them. Each also
+    // names a `claude-<label>` command, so it must be a plain word that does
+    // not shadow claude-router, claude-router-off, or claude-direct.
     accounts: z
-      .array(z.string().min(1))
+      .array(
+        z
+          .string()
+          .regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/, "labels are letters, digits, _ and -")
+          .refine((label) => !["router", "router-off", "direct"].includes(label), "reserved label"),
+      )
       .nonempty()
       .refine((labels) => new Set(labels).size === labels.length, "account labels must be unique")
       .default(["personal", "personal_2", "work"]),
