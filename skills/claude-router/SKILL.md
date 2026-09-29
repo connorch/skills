@@ -18,6 +18,7 @@ claude-direct [args]          # one Claude Code session straight at api.anthropi
 claude-router-off             # zero-dependency: take it out of settings.json and stop it
 claude-router on              # put it back (shows the diff, asks)
 claude-router accounts sync   # refresh tokens from 1Password after a 401
+tail ~/.local/state/claude-router/requests.jsonl   # one line per request: account, attempts, reason
 ```
 
 Force one account, no failover: send the header

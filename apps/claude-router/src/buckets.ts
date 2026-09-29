@@ -36,6 +36,10 @@ export const emptyAccountState = (): AccountState => ({
   bench: null,
 });
 
+// Largest epoch-millisecond magnitude a Date can represent; beyond it
+// toISOString throws.
+export const MAX_DATE_MS = 8.64e15;
+
 export type HeaderMap = Record<string, string | string[] | undefined>;
 
 const BUCKET_HEADER = /^anthropic-ratelimit-unified-(.+)-(status|utilization|reset)$/;
@@ -55,11 +59,11 @@ export function headerValue(headers: HeaderMap, name: string): string | undefine
 export function parseBuckets(headers: HeaderMap, now: number): Record<string, Bucket> {
   // Null prototype: a bucket named like an Object.prototype member is data.
   const partial: Record<string, Partial<Record<Field, string>>> = Object.create(null);
-  for (const [key, raw] of Object.entries(headers)) {
+  for (const key of Object.keys(headers)) {
     const match = BUCKET_HEADER.exec(key.toLowerCase());
     const name = match?.[1];
     const field = match?.[2];
-    const value = Array.isArray(raw) ? raw[0] : raw;
+    const value = headerValue(headers, key);
     if (!name || !field || !isField(field) || NOT_BUCKETS.has(name) || value === undefined)
       continue;
     (partial[name] ??= {})[field] = value;
@@ -68,8 +72,7 @@ export function parseBuckets(headers: HeaderMap, now: number): Record<string, Bu
   for (const [name, fields] of Object.entries(partial)) {
     const utilization = Number(fields.utilization);
     const resetAt = Number(fields.reset) * 1000;
-    // A reset must be a time a Date can represent, or the bucket is noise.
-    if (!fields.status || !Number.isFinite(utilization) || !(Math.abs(resetAt) <= 8.64e15))
+    if (!fields.status || !Number.isFinite(utilization) || !(Math.abs(resetAt) <= MAX_DATE_MS))
       continue;
     buckets[name] = { status: fields.status, utilization, resetAt, seenAt: now };
   }
@@ -91,7 +94,7 @@ export function recordResponse(
   if (model) state.modelBuckets[model] = names;
 }
 
-const allowed = (status: string) => status === "allowed" || status === "allowed_warning";
+export const allowed = (status: string) => status === "allowed" || status === "allowed_warning";
 
 // Bucket names for a model this account has never served: the ones every
 // known model shares (so a Fable-only rejection does not block Opus), or

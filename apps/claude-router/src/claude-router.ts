@@ -28,6 +28,7 @@ import {
   syncFromOnePassword,
   type Account,
 } from "./accounts.ts";
+import { allowed } from "./buckets.ts";
 import { loadConfig, REQUEST_LOG_PATH, routerUrl, STATE_PATH, type Config } from "./config.ts";
 import { createRouter, type Status } from "./server.ts";
 import { installService, PLIST_PATH, startService, stopService } from "./service.ts";
@@ -168,10 +169,7 @@ program
       const cells = buckets.map((name) => {
         const b = account.buckets[name];
         if (!b || b.resetAt <= now) return "-".padEnd(24);
-        const flag =
-          b.status === "allowed" || b.status === "allowed_warning"
-            ? ""
-            : ` ${b.status.toUpperCase()}`;
+        const flag = allowed(b.status) ? "" : ` ${b.status.toUpperCase()}`;
         return `${pct(b.utilization)}${flag} -> ${when(b.resetAt)}`.padEnd(24);
       });
       console.log(

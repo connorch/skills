@@ -8,14 +8,14 @@ import { homedir, userInfo } from "node:os";
 import { join } from "node:path";
 import { SERVICE_LOG_PATH, STATE_DIR } from "./config.ts";
 
-export const LABEL = "ai.connorch.claude-router";
+const LABEL = "ai.connorch.claude-router";
 export const PLIST_PATH = join(homedir(), "Library", "LaunchAgents", `${LABEL}.plist`);
 const DOMAIN = `gui/${userInfo().uid}`;
 
 const escapeXml = (s: string) =>
   s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
-export function plist(nodePath: string, binPath: string): string {
+function plist(nodePath: string, binPath: string): string {
   const args = [nodePath, binPath, "serve"]
     .map((a) => `    <string>${escapeXml(a)}</string>`)
     .join("\n");

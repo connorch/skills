@@ -6,7 +6,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 
-export const CONFIG_PATH = join(homedir(), ".config", "claude-router", "config.json");
+const CONFIG_PATH = join(homedir(), ".config", "claude-router", "config.json");
 export const STATE_DIR = join(homedir(), ".local", "state", "claude-router");
 export const STATE_PATH = join(STATE_DIR, "state.json");
 export const REQUEST_LOG_PATH = join(STATE_DIR, "requests.jsonl");

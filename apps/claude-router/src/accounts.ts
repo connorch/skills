@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { MAX_DATE_MS } from "./buckets.ts";
 
 export interface Account {
   label: string;
@@ -43,9 +44,8 @@ export function readKeychainAccounts(labels: readonly string[]): {
     try {
       const value = JSON.parse(result.stdout.trim()) as KeychainValue;
       if (typeof value.token !== "string" || value.token.length === 0) throw new Error("no token");
-      // A time a Date can represent, or unknown.
       const expires =
-        typeof value.expires === "number" && Math.abs(value.expires) <= 8.64e15
+        typeof value.expires === "number" && Math.abs(value.expires) <= MAX_DATE_MS
           ? value.expires
           : null;
       accounts.push({ label, token: value.token, expires });
@@ -59,7 +59,7 @@ export function readKeychainAccounts(labels: readonly string[]): {
 // `-U` updates an existing item in place, so a failed write leaves the old
 // token usable. The `security` binary that creates the item is the one the
 // service later runs to read it, so no prompt is needed.
-export function writeKeychainAccount(label: string, value: KeychainValue): void {
+function writeKeychainAccount(label: string, value: KeychainValue): void {
   const result = security([
     "add-generic-password",
     "-U",

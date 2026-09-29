@@ -2,7 +2,7 @@
 // (plan section 6). Classification reads status, headers, and, only for the
 // statuses that need it, the JSON error type. Never message text.
 
-import { headerValue, parseBuckets, type HeaderMap } from "./buckets.ts";
+import { allowed, headerValue, parseBuckets, type HeaderMap } from "./buckets.ts";
 
 export type Mark =
   // Bucket headers already say which buckets are rejected; nothing extra.
@@ -11,7 +11,8 @@ export type Mark =
   | "broken"
   // Org-level permission block: bench with backoff, probe one at a time.
   | "org_block"
-  // 5xx after one retry: short bench.
+  // 5xx or connection error after one retry, or a stream upstream cut
+  // short: short bench.
   | "transient"
   // 429 with only a retry-after: bench for that long, capped.
   | "retry_after"
@@ -52,9 +53,7 @@ export function classify({ status, headers, body, retried }: UpstreamResult): Ve
   if (status === 429) {
     // A rejected bucket blocks by itself. Bucket headers that reject nothing
     // (partial, or all allowed) say nothing, so fall through to retry-after.
-    const rejected = Object.values(parseBuckets(headers, 0)).some(
-      (b) => b.status !== "allowed" && b.status !== "allowed_warning",
-    );
+    const rejected = Object.values(parseBuckets(headers, 0)).some((b) => !allowed(b.status));
     if (rejected) return { kind: "failover", mark: "limit" };
     if (headerValue(headers, "retry-after") !== undefined) {
       return { kind: "failover", mark: "retry_after" };

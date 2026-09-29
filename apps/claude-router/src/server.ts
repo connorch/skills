@@ -1,7 +1,8 @@
 // The proxy. Inference requests (POST /v1/messages*) are routed across
 // accounts; everything else is forwarded with the client's own auth. Bytes
-// reach the client only once an account has answered with a status that
-// does not fail over, so a failover is invisible to it.
+// reach the client only once an answer is final: a status that does not fail
+// over, a forced account's own answer, or the first error after every
+// account failed. A failover is invisible to the client.
 
 import { createHash } from "node:crypto";
 import { brotliDecompressSync, gunzipSync, inflateSync } from "node:zlib";
@@ -18,7 +19,13 @@ import {
 } from "node:http";
 import { Agent as HttpsAgent, request as httpsRequest } from "node:https";
 import type { Account } from "./accounts.ts";
-import { candidate, recordResponse, type AccountState, type Candidate } from "./buckets.ts";
+import {
+  candidate,
+  headerValue,
+  recordResponse,
+  type AccountState,
+  type Candidate,
+} from "./buckets.ts";
 import type { Config } from "./config.ts";
 import { select, type Selection } from "./select.ts";
 import type { LogEntry, RequestLog, RouterState } from "./state.ts";
@@ -35,7 +42,7 @@ export interface RouterDeps {
   now?: () => number;
 }
 
-export const FORCE_HEADER = "x-claude-router-account";
+const FORCE_HEADER = "x-claude-router-account";
 const HINT =
   "claude-router: `claude-router status` shows account state; `claude-direct` bypasses the router.";
 
@@ -75,7 +82,7 @@ function filterHeaders(headers: IncomingHttpHeaders, drop: Set<string>): Outgoin
 }
 
 // `claude-cli/2.1.284 (external, claude-desktop, agent-sdk/0.3.276)` -> claude-desktop
-export function entrypointOf(userAgent: string | undefined): string | null {
+function entrypointOf(userAgent: string | undefined): string | null {
   const match = userAgent && /\(external, ([^,)]+)/.exec(userAgent);
   return match ? (match[1] ?? null) : null;
 }
@@ -334,7 +341,6 @@ export function createRouter(deps: RouterDeps): Server {
 
   async function route(req: IncomingMessage, res: ServerResponse, body: Buffer) {
     const at = now();
-    state.prunePins(at, config.pinIdleMs);
     const { model, key } = parseRequest(body);
     const entrypoint = entrypointOf(req.headers["user-agent"]);
     const entry = {
@@ -356,8 +362,7 @@ export function createRouter(deps: RouterDeps): Server {
       return passthrough(req, res, body, { ...entry, reason: "no accounts, fail open" });
     }
     const byLabel = new Map(accounts.map((a) => [a.label, a]));
-    const forcedHeader = req.headers[FORCE_HEADER];
-    const forced = Array.isArray(forcedHeader) ? (forcedHeader[0] ?? null) : (forcedHeader ?? null);
+    const forced = headerValue(req.headers, FORCE_HEADER) ?? null;
     if (forced && !byLabel.has(forced)) {
       log.append({
         ...entry,
@@ -375,8 +380,10 @@ export function createRouter(deps: RouterDeps): Server {
 
     // Pins are keyed by the hashed session id: state.json never holds the
     // raw id, and a client cannot pick a key that lands on the prototype.
-    const pinKey = key ? hashKey(key) : null;
+    const pinKey = entry.key;
     const pin = pinKey ? state.pins[pinKey] : undefined;
+    // After the read, so an idle pin is reported as expired, not as absent.
+    state.prunePins(at, config.pinIdleMs);
     const candidates = candidatesFor(accounts, model, at);
     // Nothing eligible: selection falls back to the least-bad account on
     // purpose, so the client gets a real upstream answer.
@@ -517,9 +524,9 @@ export function createRouter(deps: RouterDeps): Server {
           break;
         }
       } finally {
-        // Only the request that claimed the probe ends it. applyMark("org_block")
-        // already replaced the bench with a fresh one (probing false); anything
-        // else lifts it.
+        // Only the request that claimed the probe ends it. A mark that
+        // benches (org_block, transient, retry_after) already replaced the
+        // bench with a fresh one (probing false); any other outcome lifts it.
         if (probe && st.bench?.probing) st.bench = null;
       }
     }

@@ -12,7 +12,7 @@ import {
 } from "node:fs";
 import { dirname } from "node:path";
 import { z } from "zod";
-import { emptyAccountState, type AccountState } from "./buckets.ts";
+import { emptyAccountState, MAX_DATE_MS, type AccountState } from "./buckets.ts";
 import type { Pin } from "./select.ts";
 
 interface Persisted {
@@ -25,8 +25,7 @@ interface Persisted {
 // account, a bad file starts empty. A probe belongs to the process that
 // started it, so it never survives a load.
 const finite = z.number().finite();
-// Epoch milliseconds a Date can represent; anything else breaks toISOString.
-const ms = finite.min(-8.64e15).max(8.64e15);
+const ms = finite.min(-MAX_DATE_MS).max(MAX_DATE_MS);
 const Bucket = z.object({
   status: z.string(),
   utilization: finite,
@@ -34,7 +33,7 @@ const Bucket = z.object({
   seenAt: ms,
 });
 const Account = z.object({
-  buckets: z.record(z.string(), Bucket.catch(undefined as never)).default({}),
+  buckets: z.record(z.string(), Bucket.catch(undefined as never)).catch({}),
   modelBuckets: z.record(z.string(), z.array(z.string())).catch({}),
   broken: z
     .object({ reason: z.literal("401"), since: ms })
@@ -79,11 +78,7 @@ export class RouterState {
     try {
       const file = PersistedFile.parse(JSON.parse(readFileSync(path, "utf8")));
       for (const [label, account] of Object.entries(compact(file.accounts))) {
-        state.accounts[label] = {
-          ...emptyAccountState(),
-          ...account,
-          buckets: compact(account.buckets),
-        };
+        state.accounts[label] = { ...account, buckets: compact(account.buckets) };
       }
       state.pins = compact(file.pins);
     } catch (error) {

@@ -42,7 +42,7 @@ describe("select", () => {
     });
   });
 
-  it("re-pins when the pinned account is not eligible and never snaps back", () => {
+  it("re-pins when the pinned account is not eligible", () => {
     const candidates = [
       cand("a", { eligible: false, why: "blocked until X", unavailableUntil: NOW + 9 }),
       cand("b"),

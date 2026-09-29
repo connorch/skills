@@ -16,7 +16,7 @@ providers.
 
 ## Decision
 
-Write our own proxy, about a thousand lines, in this repo, and use
+Write our own proxy, about two thousand lines, in this repo, and use
 better-ccflare only as a source of edge cases (bare 429s, 401 and 403
 handling, `metadata.user_id` as the session key).
 

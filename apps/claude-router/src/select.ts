@@ -18,7 +18,7 @@ export interface Selection {
 
 // Not demoted first, then the earliest future rankBucket reset (unknown
 // last), then the lowest max utilization, then label for a stable order.
-export function rank(candidates: Candidate[]): Candidate[] {
+function rank(candidates: Candidate[]): Candidate[] {
   return [...candidates].sort(
     (a, b) =>
       Number(a.demoted) - Number(b.demoted) ||

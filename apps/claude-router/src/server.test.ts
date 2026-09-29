@@ -81,6 +81,7 @@ let live = accounts;
 let tick = 0;
 
 beforeEach(async () => {
+  tick = 0;
   upstream = new Upstream();
   const port = await listen(upstream.server);
   state = new RouterState(null);
@@ -187,9 +188,10 @@ describe("routing", () => {
     expect(upstream.seen.length).toBeGreaterThan(0);
   });
 
-  it("does not let a slower request snap a pin back after a faster one moved it", async () => {
-    // Both requests select personal; the first fails over to personal_2 and
-    // re-pins; the second, still answered by personal, must leave that alone.
+  it("lets the newest request decide the pin when an older one finishes late", async () => {
+    // The older request is held on personal; the newer one fails over to
+    // personal_2 and pins it. The older one, finishing late on personal, must
+    // leave that pin alone.
     let releaseSlow: () => void = () => {};
     const slow = new Promise<void>((r) => (releaseSlow = r));
     upstream.queue.push(
@@ -205,6 +207,28 @@ describe("routing", () => {
     releaseSlow();
     expect((await first).status).toBe(200);
     expect(state.pins[hashKey("user_x_session_race")]?.label).toBe("personal_2");
+  });
+
+  it("gives the pin to the newer request even when it finishes last", async () => {
+    // The older request fails over to personal_2 quickly. The newer one is
+    // pinned there by then, is served slowly by personal_2, and keeps the pin.
+    let releaseSlow: () => void = () => {};
+    const slow = new Promise<void>((r) => (releaseSlow = r));
+    upstream.queue.push(fromFixture("fable-429-7d_oi-rejected"));
+    const older = await messages(session("race2", "claude-fable-5-1"));
+    expect(older.status).toBe(200);
+    const olderSeen = state.pins[hashKey("user_x_session_race2")]?.lastSeen ?? 0;
+    upstream.queue.push(
+      (_req, res) =>
+        void slow.then(() => reply(res, 200, { "content-type": "application/json" }, "{}")),
+    );
+    const newer = messages(session("race2", "claude-fable-5-1"));
+    await new Promise((r) => setTimeout(r, 30));
+    releaseSlow();
+    expect((await newer).status).toBe(200);
+    const pin = state.pins[hashKey("user_x_session_race2")];
+    expect(pin?.label).toBe("personal_2");
+    expect(pin?.lastSeen).toBeGreaterThan(olderSeen);
   });
 
   it("returns the first upstream error unchanged when every account fails", async () => {
@@ -317,7 +341,7 @@ describe("routing", () => {
     expect(Object.values(state.accounts).some((a) => a.bench?.reason === "org_block")).toBe(true);
   });
 
-  it("closes the client response when upstream drops mid-body", async () => {
+  it("closes the client response and benches the account when upstream drops mid-body", async () => {
     upstream.fallback = (_req, res) => {
       res.writeHead(200, { "content-type": "text/event-stream" });
       res.write("event: message_start\ndata: {}\n\n");
@@ -364,7 +388,7 @@ describe("routing", () => {
     expect(state.account("work").bench?.probing).toBe(true);
   });
 
-  it("marks a 401 broken until reload clears it", async () => {
+  it("marks a 401 broken and routes around it", async () => {
     upstream.queue.push((_req, res) =>
       reply(res, 401, {}, '{"error":{"type":"authentication_error"}}'),
     );
