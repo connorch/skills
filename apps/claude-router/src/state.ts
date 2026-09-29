@@ -39,11 +39,17 @@ export class RouterState {
       }
       // Only entries with the expected shape survive; a probe belongs to
       // the process that started it.
+      const record = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? v : null);
       for (const [label, account] of Object.entries(raw.accounts ?? {})) {
-        if (!account || typeof account !== "object" || typeof account.buckets !== "object")
-          continue;
-        const st = { ...emptyAccountState(), ...account };
-        if (st.bench?.probing) st.bench.probing = false;
+        const a = record(account) as Partial<AccountState> | null;
+        if (!a) continue;
+        const st = emptyAccountState();
+        if (record(a.buckets)) st.buckets = a.buckets as AccountState["buckets"];
+        if (record(a.modelBuckets))
+          st.modelBuckets = a.modelBuckets as AccountState["modelBuckets"];
+        if (record(a.broken)) st.broken = a.broken as AccountState["broken"];
+        if (record(a.bench))
+          st.bench = { ...(a.bench as NonNullable<AccountState["bench"]>), probing: false };
         state.accounts[label] = st;
       }
       for (const [key, pin] of Object.entries(raw.pins ?? {})) {

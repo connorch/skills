@@ -43,7 +43,9 @@ export function readKeychainAccounts(labels: readonly string[]): {
     try {
       const value = JSON.parse(result.stdout.trim()) as KeychainValue;
       if (typeof value.token !== "string" || value.token.length === 0) throw new Error("no token");
-      accounts.push({ label, token: value.token, expires: value.expires ?? null });
+      const expires =
+        typeof value.expires === "number" && Number.isFinite(value.expires) ? value.expires : null;
+      accounts.push({ label, token: value.token, expires });
     } catch {
       missing.push(label);
     }

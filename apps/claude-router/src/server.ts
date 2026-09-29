@@ -386,12 +386,16 @@ export function createRouter(deps: RouterDeps): Server {
       // than another block ends the bench, so a 429 or an abort cannot leave
       // the account marked "probe in flight" forever.
       // A forced request answers for itself and takes no part in probing.
+      // Rechecked here, after earlier attempts awaited: another request may
+      // have benched this account or claimed its probe since this order was
+      // computed.
       let probe = false;
-      if (!forced && st.bench?.reason === "org_block" && at >= st.bench.until) {
-        // Rechecked here, after earlier attempts awaited: another request may
-        // have claimed the probe since this order was computed.
-        if (st.bench.probing) continue;
-        st.bench.probing = probe = true;
+      if (!forced && st.bench) {
+        if (now() < st.bench.until) continue;
+        if (st.bench.reason === "org_block") {
+          if (st.bench.probing) continue;
+          st.bench.probing = probe = true;
+        }
       }
       const gone = () => {
         log.append({

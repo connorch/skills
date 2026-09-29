@@ -32,10 +32,14 @@ describe("RouterState", () => {
     expect(RouterState.load(path).accounts).toEqual({});
     writeFileSync(
       path,
-      JSON.stringify({ accounts: { personal: null, work: { buckets: {} } }, pins: { k: 1 } }),
+      JSON.stringify({
+        accounts: { personal: null, work: { buckets: {}, modelBuckets: null } },
+        pins: { k: 1 },
+      }),
     );
     const loaded = RouterState.load(path);
     expect(Object.keys(loaded.accounts)).toEqual(["work"]);
+    expect(loaded.account("work").modelBuckets).toEqual({});
     expect(loaded.pins).toEqual({});
     const blocked = new RouterState(join(path, "cannot", "nest", "under-a-file"));
     expect(blocked.save()).toBe(false);

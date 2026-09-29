@@ -9,7 +9,14 @@
 //   accounts import-openclaw   one-time OpenClaw -> 1Password
 //   service install|uninstall  the LaunchAgent (install is run by ship:machine)
 
-import { existsSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 import { createInterface } from "node:readline/promises";
 import { Command } from "commander";
@@ -32,11 +39,14 @@ import {
 } from "./settings.ts";
 import { RequestLog, RouterState } from "./state.ts";
 
-// Temp file plus rename: a failed write leaves settings.json untouched.
+// Temp file plus rename: a failed write leaves settings.json untouched. A
+// symlinked settings.json (dotfile-managed) is replaced at its target.
 function writeSettings(text: string): void {
-  const mode = existsSync(SETTINGS_PATH) ? statSync(SETTINGS_PATH).mode & 0o777 : 0o644;
-  writeFileSync(`${SETTINGS_PATH}.tmp`, text, { mode });
-  renameSync(`${SETTINGS_PATH}.tmp`, SETTINGS_PATH);
+  const exists = existsSync(SETTINGS_PATH);
+  const target = exists ? realpathSync(SETTINGS_PATH) : SETTINGS_PATH;
+  const mode = exists ? statSync(target).mode & 0o777 : 0o644;
+  writeFileSync(`${target}.tmp`, text, { mode });
+  renameSync(`${target}.tmp`, target);
 }
 
 const program = new Command()
