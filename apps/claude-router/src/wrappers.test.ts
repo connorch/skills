@@ -16,9 +16,15 @@ describe("wrappers", () => {
     );
     // A label that is gone loses its wrapper; a user's own claude-* file stays.
     writeFileSync(join(dir, "claude-mine"), "#!/bin/sh\necho mine\n");
+    // The router's own bundle mentions the wrapper text and must survive.
+    writeFileSync(
+      join(dir, "claude-router"),
+      `#!/usr/bin/env node\nconst x = ${JSON.stringify(readFileSync(join(dir, "claude-work"), "utf8"))};\n`,
+    );
     installWrappers(["work"], dir);
     expect(existsSync(join(dir, "claude-personal_2"))).toBe(false);
     expect(existsSync(join(dir, "claude-mine"))).toBe(true);
+    expect(existsSync(join(dir, "claude-router"))).toBe(true);
     rmSync(dir, { recursive: true, force: true });
   });
 

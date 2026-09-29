@@ -10,15 +10,16 @@ import { join } from "node:path";
 const BIN_DIR = join(homedir(), ".local", "bin");
 
 export const wrapperName = (label: string) => `claude-${label}`;
-// Marks a file this installer wrote, so a stale one can be removed without
-// touching commands the user put there.
-const MARKER = "# Written by a Ship; edit apps/claude-router/src/wrappers.ts instead.";
+// The first two lines of every wrapper. A stale wrapper is recognized by
+// them alone, so nothing else that happens to mention the marker (the
+// router's own bundle does) is ever touched.
+const header = (name: string) =>
+  `#!/bin/sh\n# ${name} - Claude Code through claude-router, served only by the`;
 
 export function wrapperScript(label: string): string {
-  return `#!/bin/sh
-# ${wrapperName(label)} - Claude Code through claude-router, served only by the
-# "${label}" account, limit errors included.
-${MARKER}
+  return `${header(wrapperName(label))}
+# "${label}" account, limit errors included. Written by a Ship; edit
+# apps/claude-router/src/wrappers.ts instead.
 ANTHROPIC_CUSTOM_HEADERS="x-claude-router-account: ${label}" exec claude "$@"
 `;
 }
@@ -32,7 +33,7 @@ export function installWrappers(labels: readonly string[], dir = BIN_DIR): strin
     if (!name.startsWith("claude-") || wanted.has(name)) continue;
     const path = join(dir, name);
     try {
-      if (readFileSync(path, "utf8").includes(MARKER)) unlinkSync(path);
+      if (readFileSync(path, "utf8").startsWith(header(name))) unlinkSync(path);
     } catch {
       // Not a readable file: not ours.
     }
