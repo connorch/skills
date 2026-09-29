@@ -25,7 +25,7 @@ export function BannerApp({
   return (
     <QueryClientProvider client={queryClient}>
       <PortalContainerProvider value={portal}>
-        <div className="bg-background font-mono text-[12.5px] leading-normal text-foreground antialiased">
+        <div className="bg-background font-ui text-[13px] leading-normal text-foreground antialiased">
           <Banner page={page} />
         </div>
       </PortalContainerProvider>
