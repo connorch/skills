@@ -213,6 +213,57 @@ describe("routing", () => {
     expect(Object.values(state.accounts).some((a) => a.bench?.reason === "transient")).toBe(true);
   });
 
+  it("cancels the upstream request when the client hangs up before headers arrive", async () => {
+    let upstreamAborted = false;
+    upstream.fallback = (req, res) => {
+      req.on("close", () => (upstreamAborted = true));
+      setTimeout(() => res.end("{}"), 500);
+    };
+    const controller = new AbortController();
+    const req = fetch(`${routerUrl}/v1/messages`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "user-agent": UA },
+      body: JSON.stringify(session("abort")),
+      signal: controller.signal,
+    }).catch(() => null);
+    await new Promise((r) => setTimeout(r, 50));
+    controller.abort();
+    await req;
+    await new Promise((r) => setTimeout(r, 100));
+    expect(upstreamAborted).toBe(true);
+    expect(log.entries.some((e) => e.status === 499)).toBe(true);
+    expect(Object.values(state.accounts).every((a) => a.bench === null)).toBe(true);
+  });
+
+  it("ends an org block once its probe gets any answer that is not another block", async () => {
+    const block = JSON.stringify({
+      type: "error",
+      error: { type: "permission_error", message: "org" },
+    });
+    upstream.queue.push((_req, res) =>
+      reply(res, 403, { "content-type": "application/json" }, block),
+    );
+    await messages(session("p1"), { "x-claude-router-account": "personal" });
+    const bench = state.account("personal").bench;
+    expect(bench).toMatchObject({ reason: "org_block", attempts: 1, probing: false });
+
+    // Past the bench: the probe goes through, and a limit 429 must not strand it.
+    router.close();
+    const port = (upstream.server.address() as AddressInfo).port;
+    router = createRouter({
+      config: Config.parse({ upstream: `http://127.0.0.1:${port}` }),
+      accounts: () => live,
+      reload: () => {},
+      state,
+      log,
+      now: () => (bench?.until ?? 0) + 1,
+    });
+    routerUrl = `http://127.0.0.1:${await listen(router)}`;
+    upstream.queue.push(fromFixture("fable-429-7d_oi-rejected"));
+    await messages(session("p2", "claude-fable-5-1"), { "x-claude-router-account": "personal" });
+    expect(state.account("personal").bench).toBeNull();
+  });
+
   it("marks a 401 broken until reload clears it", async () => {
     upstream.queue.push((_req, res) =>
       reply(res, 401, {}, '{"error":{"type":"authentication_error"}}'),
@@ -247,12 +298,24 @@ describe("passthrough", () => {
     expect(log.entries[1]).toMatchObject({ kind: "passthrough", reason: "no accounts, fail open" });
   });
 
-  it("never leaks the router header or the client's host upstream", async () => {
+  it("sends exactly one credential upstream and never the router header or the client's host", async () => {
     upstream.fallback = (req, res) =>
-      reply(res, 200, { "x-seen-host": req.headers.host ?? "" }, "{}");
-    const res = await messages(session("h"), { "x-claude-router-account": "work" });
+      reply(
+        res,
+        200,
+        {
+          "x-seen-host": req.headers.host ?? "",
+          "x-seen-api-key": String(req.headers["x-api-key"] ?? ""),
+        },
+        "{}",
+      );
+    const res = await messages(session("h"), {
+      "x-claude-router-account": "work",
+      "x-api-key": "client-api-key",
+    });
     expect(res.headers.get("x-seen-host")).toMatch(/^127\.0\.0\.1:\d+$/);
     expect(res.headers.get("x-seen-host")).not.toBe(new URL(routerUrl).host);
-    expect(upstream.seen[0]?.forced).toBeUndefined();
+    expect(res.headers.get("x-seen-api-key")).toBe("");
+    expect(upstream.seen[0]).toMatchObject({ auth: "Bearer tok-work", forced: undefined });
   });
 });

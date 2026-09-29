@@ -6,6 +6,7 @@
 import { createHash } from "node:crypto";
 import {
   Agent as HttpAgent,
+  type ClientRequest,
   createServer,
   request as httpRequest,
   type IncomingHttpHeaders,
@@ -51,6 +52,8 @@ const DROP_REQUEST = new Set([
   "content-length",
   FORCE_HEADER,
 ]);
+// A routed request carries exactly one credential: the account's token.
+const DROP_ROUTED = new Set([...DROP_REQUEST, "authorization", "x-api-key"]);
 // Node manages these on the relayed response.
 const DROP_RESPONSE = new Set(["connection", "keep-alive", "transfer-encoding"]);
 
@@ -112,7 +115,24 @@ export function createRouter(deps: RouterDeps): Server {
   const agent = secure ? new HttpsAgent({ keepAlive: true }) : new HttpAgent({ keepAlive: true });
   const request = secure ? httpsRequest : httpRequest;
 
+  // The client's response: while it is open, `inflight` is the upstream
+  // request feeding it, so an abort can cancel that request. A client that
+  // hangs up mid-generation must not leave a generation running upstream.
+  interface Link {
+    res: ServerResponse;
+    inflight: ClientRequest | null;
+  }
+
+  function link(res: ServerResponse): Link {
+    const l: Link = { res, inflight: null };
+    res.on("close", () => {
+      if (!res.writableFinished) l.inflight?.destroy();
+    });
+    return l;
+  }
+
   function send(
+    l: Link,
     method: string,
     path: string,
     headers: OutgoingHttpHeaders,
@@ -120,6 +140,7 @@ export function createRouter(deps: RouterDeps): Server {
     token: string | null,
   ): Promise<Upstream> {
     return new Promise((resolve, reject) => {
+      if (l.res.destroyed) return reject(new Error("client went away"));
       const outgoing: OutgoingHttpHeaders = {
         ...headers,
         host: upstream.host,
@@ -138,6 +159,10 @@ export function createRouter(deps: RouterDeps): Server {
         (res) => resolve({ status: res.statusCode ?? 502, headers: res.headers, res }),
       );
       req.on("error", reject);
+      req.on("close", () => {
+        if (l.inflight === req) l.inflight = null;
+      });
+      l.inflight = req;
       req.end(body);
     });
   }
@@ -145,6 +170,10 @@ export function createRouter(deps: RouterDeps): Server {
   // Stream an upstream response to the client. A client that goes away
   // takes the upstream request down with it.
   function relay(up: Upstream, res: ServerResponse): void {
+    if (res.destroyed) {
+      up.res.destroy();
+      return;
+    }
     res.writeHead(up.status, filterHeaders(up.headers, DROP_RESPONSE));
     up.res.pipe(res);
     res.on("close", () => {
@@ -158,6 +187,7 @@ export function createRouter(deps: RouterDeps): Server {
     headers: IncomingHttpHeaders,
     body: Buffer,
   ) {
+    if (res.destroyed) return;
     res.writeHead(status, {
       ...filterHeaders(headers, DROP_RESPONSE),
       "content-length": body.length,
@@ -212,8 +242,10 @@ export function createRouter(deps: RouterDeps): Server {
     body: Buffer,
     entry: Omit<LogEntry, "kind" | "status">,
   ) {
+    const l = link(res);
     try {
       const up = await send(
+        l,
         req.method ?? "GET",
         req.url ?? "/",
         filterHeaders(req.headers, DROP_REQUEST),
@@ -223,6 +255,14 @@ export function createRouter(deps: RouterDeps): Server {
       log.append({ ...entry, kind: "passthrough", status: up.status });
       relay(up, res);
     } catch (error) {
+      if (res.destroyed) {
+        return log.append({
+          ...entry,
+          kind: "router_error",
+          status: 499,
+          reason: "client went away",
+        });
+      }
       log.append({ ...entry, kind: "router_error", status: 502 });
       routerError(res, 502, "api_error", `upstream unreachable: ${(error as Error).message}.`);
     }
@@ -234,6 +274,7 @@ export function createRouter(deps: RouterDeps): Server {
 
   async function route(req: IncomingMessage, res: ServerResponse, body: Buffer) {
     const at = now();
+    state.prunePins(at, config.pinIdleMs);
     const { model, key } = parseRequest(body);
     const entrypoint = entrypointOf(req.headers["user-agent"]);
     const entry = {
@@ -282,9 +323,10 @@ export function createRouter(deps: RouterDeps): Server {
     });
     if (!key && !forced) selection.reason = "no session key";
 
-    const headers = filterHeaders(req.headers, DROP_REQUEST);
+    const headers = filterHeaders(req.headers, DROP_ROUTED);
     const method = req.method ?? "POST";
     const path = req.url ?? "/";
+    const l = link(res);
     const attempts: string[] = [];
     let firstError: { status: number; headers: IncomingHttpHeaders; body: Buffer } | null = null;
 
@@ -292,19 +334,37 @@ export function createRouter(deps: RouterDeps): Server {
       const account = byLabel.get(label);
       if (!account) continue;
       const st = state.account(label);
+      // One probe through an expired org block. Whatever comes back other
+      // than another block ends the bench, so a 429 or an abort cannot leave
+      // the account marked "probe in flight" forever.
       if (st.bench?.reason === "org_block" && at >= st.bench.until) st.bench.probing = true;
+      const endProbe = () => {
+        if (st.bench?.probing) st.bench = null;
+      };
+      const gone = () => {
+        endProbe();
+        log.append({
+          ...entry,
+          kind: "router_error",
+          status: 499,
+          attempts,
+          reason: "client went away",
+        });
+      };
       let retried = false;
       for (;;) {
         attempts.push(label);
         let up: Upstream;
         try {
-          up = await send(method, path, headers, body, account.token);
+          up = await send(l, method, path, headers, body, account.token);
         } catch (error) {
+          if (res.destroyed) return gone();
           if (!retried) {
             retried = true;
             continue;
           }
           applyMark(st, "transient", {}, at);
+          endProbe();
           firstError ??= {
             status: 502,
             headers: { "content-type": "application/json" },
@@ -321,6 +381,10 @@ export function createRouter(deps: RouterDeps): Server {
           break;
         }
         recordResponse(st, model, up.headers, at);
+        if (res.destroyed) {
+          up.res.destroy();
+          return gone();
+        }
         const needsBody =
           up.status === 401 || up.status === 403 || up.status === 429 || up.status >= 500;
         const errorBody = needsBody ? await readBody(up.res) : null;
@@ -335,9 +399,9 @@ export function createRouter(deps: RouterDeps): Server {
           continue;
         }
         if (verdict.kind === "failover") applyMark(st, verdict.mark, up.headers, at);
+        endProbe();
         // A forced account answers for itself, limit errors included (D12).
         if (verdict.kind === "commit" || forced) {
-          if (up.status < 400 && st.bench?.reason === "org_block") st.bench = null;
           if (key) state.pins[key] = { label, lastSeen: at };
           state.touch();
           log.append({

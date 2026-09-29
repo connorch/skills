@@ -9,7 +9,7 @@
     "build": "vp pack",
     "test": "vp test run",
     "typecheck": "tsc --noEmit",
-    "ship:machine": "vp pack && mkdir -p ~/.local/bin && install -m 755 dist/claude-router.mjs ~/.local/bin/claude-router && install -m 755 bin/claude-direct bin/claude-router-off ~/.local/bin && node dist/claude-router.mjs service install"
+    "ship:machine": "vp pack && mkdir -p ~/.local/bin && install -m 755 dist/claude-router.mjs ~/.local/bin/claude-router && install -m 755 bin/claude-direct bin/claude-router-off ~/.local/bin && ~/.local/bin/claude-router service install"
   },
   "dependencies": {
     "commander": "^14.0.0",
