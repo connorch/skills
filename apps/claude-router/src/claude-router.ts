@@ -262,7 +262,7 @@ accounts
   .description("copy tokens from 1Password into the Keychain and reload the service")
   .action(async () => {
     const config = loadConfig();
-    const result = syncFromOnePassword(config.accounts);
+    const result = syncFromOnePassword(config.accounts, config.vault);
     for (const label of result.synced) console.log(`synced ${label}`);
     for (const { label, error } of result.failed) console.error(`failed ${label}: ${error}`);
     const reload = await fetch(`${routerUrl(config)}/_router/reload`, {
@@ -288,7 +288,7 @@ accounts
   .option("--dry-run", "show what would be created, create nothing")
   .action((opts: { dryRun?: boolean }) => {
     const config = loadConfig();
-    const result = importOpenClaw(config.accounts, Boolean(opts.dryRun));
+    const result = importOpenClaw(config.accounts, config.vault, Boolean(opts.dryRun));
     for (const { label, email, expires } of result.done) {
       console.log(
         `${opts.dryRun ? "would create" : "created"} ${label}: email ${email ?? "unknown"}, expires ${expires ?? "unknown"}`,

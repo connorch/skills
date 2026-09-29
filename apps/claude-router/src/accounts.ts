@@ -16,7 +16,6 @@ export interface Account {
 }
 
 const SERVICE = "claude-router";
-const VAULT = "Private";
 const itemTitle = (label: string) => `${SERVICE}/${label}`;
 
 interface KeychainValue {
@@ -81,8 +80,20 @@ interface OpField {
   value?: string;
 }
 
-// One label's token and expiry from 1Password.
-function readOnePassword(label: string): KeychainValue {
+// Run `use`, then sign the CLI out of 1Password whatever happened, so a
+// session authorized for this command does not stay open afterwards.
+function withOnePassword<T>(use: () => T): T {
+  try {
+    return use();
+  } finally {
+    spawnSync("op", ["signout"], { encoding: "utf8" });
+  }
+}
+
+// One label's token and expiry from 1Password. Items use the API Credential
+// category's own fields: credential (the token), expires (a date, read back
+// as epoch seconds), and username (the account email, metadata only).
+function readOnePassword(label: string, vault: string): KeychainValue {
   const result = spawnSync(
     "op",
     [
@@ -90,9 +101,9 @@ function readOnePassword(label: string): KeychainValue {
       "get",
       itemTitle(label),
       "--vault",
-      VAULT,
+      vault,
       "--fields",
-      "label=token,label=expires",
+      "label=credential,label=expires",
       "--reveal",
       "--format",
       "json",
@@ -103,10 +114,10 @@ function readOnePassword(label: string): KeychainValue {
     throw new Error(result.stderr.trim() || `op item get failed for ${itemTitle(label)}`);
   const fields = JSON.parse(result.stdout) as OpField[];
   const field = (name: string) => fields.find((f) => f.label === name)?.value;
-  const token = field("token");
-  if (!token) throw new Error(`${itemTitle(label)} has no token field`);
-  const expires = Date.parse(field("expires") ?? "");
-  return { token, expires: Number.isFinite(expires) ? expires : null };
+  const token = field("credential");
+  if (!token) throw new Error(`${itemTitle(label)} has no credential field`);
+  const seconds = Number(field("expires") || NaN);
+  return { token, expires: Number.isFinite(seconds) ? seconds * 1000 : null };
 }
 
 export interface SyncResult {
@@ -114,17 +125,19 @@ export interface SyncResult {
   failed: { label: string; error: string }[];
 }
 
-export function syncFromOnePassword(labels: readonly string[]): SyncResult {
-  const result: SyncResult = { synced: [], failed: [] };
-  for (const label of labels) {
-    try {
-      writeKeychainAccount(label, readOnePassword(label));
-      result.synced.push(label);
-    } catch (error) {
-      result.failed.push({ label, error: (error as Error).message });
+export function syncFromOnePassword(labels: readonly string[], vault: string): SyncResult {
+  return withOnePassword(() => {
+    const result: SyncResult = { synced: [], failed: [] };
+    for (const label of labels) {
+      try {
+        writeKeychainAccount(label, readOnePassword(label, vault));
+        result.synced.push(label);
+      } catch (error) {
+        result.failed.push({ label, error: (error as Error).message });
+      }
     }
-  }
-  return result;
+    return result;
+  });
 }
 
 // One-time import of OpenClaw's setup tokens into 1Password (M1). Read-only
@@ -165,6 +178,7 @@ export interface ImportPlan {
 
 export function importOpenClaw(
   labels: readonly string[],
+  vault: string,
   dryRun: boolean,
 ): { done: ImportPlan[]; failed: { label: string; error: string }[] } {
   const raw = spawnSync(
@@ -180,37 +194,58 @@ export function importOpenClaw(
   const store = JSON.parse(raw.stdout) as { profiles?: Record<string, OpenClawProfile> };
   const done: ImportPlan[] = [];
   const failed: { label: string; error: string }[] = [];
+  if (dryRun) return { done: planImport(store, labels, failed), failed };
+  return withOnePassword(() => {
+    for (const plan of planImport(store, labels, failed)) {
+      const profile = store.profiles?.[`anthropic:${plan.label}`];
+      const item = {
+        title: itemTitle(plan.label),
+        category: "API_CREDENTIAL",
+        fields: [
+          { id: "username", type: "STRING", label: "username", value: plan.email ?? "" },
+          { id: "credential", type: "CONCEALED", label: "credential", value: profile?.token ?? "" },
+          {
+            id: "expires",
+            type: "DATE",
+            label: "expires",
+            value: profile?.expires ? String(Math.floor(profile.expires / 1000)) : "",
+          },
+        ],
+      };
+      // The token travels on stdin, never on argv or disk. `op` only reads a
+      // template from a real pipe and Node gives children a socket, so `cat`
+      // sits in between.
+      const result = spawnSync(
+        "/bin/sh",
+        ["-c", 'cat | op item create --vault "$1" --format json - >/dev/null', "sh", vault],
+        { encoding: "utf8", input: JSON.stringify(item) },
+      );
+      if (result.status !== 0) {
+        failed.push({ label: plan.label, error: result.stderr.trim() || "op item create failed" });
+      } else done.push(plan);
+    }
+    return { done, failed };
+  });
+}
+
+// What an import would create, without touching 1Password.
+function planImport(
+  store: { profiles?: Record<string, OpenClawProfile> },
+  labels: readonly string[],
+  failed: { label: string; error: string }[],
+): ImportPlan[] {
+  const plans: ImportPlan[] = [];
   for (const label of labels) {
     const profile = store.profiles?.[`anthropic:${label}`];
     if (!profile?.token) {
       failed.push({ label, error: `no anthropic:${label} token in OpenClaw` });
       continue;
     }
-    const plan: ImportPlan = {
+    plans.push({
       label,
       email: emailFor(label),
       expires: profile.expires ? new Date(profile.expires).toISOString() : null,
-    };
-    if (dryRun) {
-      done.push(plan);
-      continue;
-    }
-    const item = {
-      title: itemTitle(label),
-      category: "API_CREDENTIAL",
-      fields: [
-        { id: "credential", type: "CONCEALED", label: "token", value: profile.token },
-        { id: "expires", type: "STRING", label: "expires", value: plan.expires ?? "" },
-        { id: "email", type: "STRING", label: "email", value: plan.email ?? "" },
-      ],
-    };
-    const result = spawnSync("op", ["item", "create", "--vault", VAULT, "-"], {
-      encoding: "utf8",
-      input: JSON.stringify(item),
     });
-    if (result.status !== 0)
-      failed.push({ label, error: result.stderr.trim() || "op item create failed" });
-    else done.push(plan);
   }
-  return { done, failed };
+  return plans;
 }

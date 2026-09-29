@@ -42,6 +42,8 @@ export const Config = z
       .nonempty()
       .refine((labels) => new Set(labels).size === labels.length, "account labels must be unique")
       .default(["personal", "personal_2", "work"]),
+    // The 1Password vault that holds the claude-router/<label> items.
+    vault: z.string().min(1).default("Automation"),
     // The bucket whose reset time ranks accounts (D4).
     rankBucket: z.string().default("7d"),
     // Utilization at which an account moves to the back of the ranking.

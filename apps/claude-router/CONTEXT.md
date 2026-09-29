@@ -8,7 +8,7 @@ accounts, failing over on limit errors before any byte reaches the client.
 **Account**:
 One Claude subscription the router can serve from, named by its label
 (`personal`, `personal_2`, `work`). Its token lives in the login Keychain,
-synced from 1Password.
+copied from 1Password by `accounts sync`; nothing else reads 1Password.
 _Avoid_: profile, credential, login
 
 **Bucket**:
