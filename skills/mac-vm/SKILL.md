@@ -67,8 +67,11 @@ mac-vm init                        # clones ghcr.io/cirruslabs/macos-tahoe-base 
 
 Copy apps in from the host rather than downloading them in the guest:
 `tar -C /Applications -cf - Some.app | tart exec -i agent-vm sudo -n tar -C /Applications -xf -`.
-Then, with a visible window (`tart run agent-vm`), let the user sign in to
-them. The Cirrus image logs in as `admin`/`admin`. Tart's
+Then let the user sign in to them in a visible window: `mac-vm down`, then
+`tart run agent-vm` in the background. That window has no Gateway tunnel, so
+the Agent VM node is offline until you `mac-vm down` and `mac-vm up` again;
+sign-ins persist across the restart. Tell the user not to save passwords in the
+guest's browser. The Cirrus image logs in as `admin`/`admin`. Tart's
 default network is NAT and only reachable from the host, so this is no more exposed than the host itself.
 Grant Accessibility and Screen Recording to whatever drives the UI in the guest.
 
@@ -81,3 +84,9 @@ Grant Accessibility and Screen Recording to whatever drives the UI in the guest.
   Re-run `mac-vm init` (it skips the clone).
 - Screenshots come back black or fail: the guest must be logged in (auto-login
   on) and the capturing app needs Screen Recording in the guest.
+- `open -a "Some App"` cannot find an app copied in: open it by path,
+  `open "/Applications/Some App.app"`.
+- The guest renders OpenGL in software, so GL-heavy apps (Bambu Studio's 3D
+  view) crash. Prefer a lighter companion app.
+- The guest sits behind NAT, so LAN discovery (SSDP, mDNS) of devices on the
+  home network does not work. Use the app's cloud login or a direct IP.
