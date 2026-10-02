@@ -2,7 +2,8 @@ This file contains instructions that are only useful to agents running Claude Co
 
 ## General Preferences - Claude Code
 
-* If computer use is helpful for completing or verifying work, shell out to gpt-6-astra with Codex for it. If project has preferred browser automation instructions, use that.
+* For browser work, use the `t3-browser` skill when T3 Code's `preview_*` tools are available. Otherwise, follow the project's browser automation instructions.
+* For other computer use that helps complete or verify work, shell out to gpt-6-astra with Codex for it.
 
 ## Picking the right models for workflows and subagents
 
