@@ -34,12 +34,13 @@ skills add connorch/skills --skill fleet-exec
 skills add connorch/skills --skill jev
 skills add connorch/skills --skill mac-vm
 skills add connorch/skills --skill bambu-print
+skills add connorch/skills --skill t3-browser
 ```
 
 You can also install multiple specific skills in one command:
 
 ```sh
-skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr file-pr implement-and-review handoff html-communication wovn-file-hosting fleet-exec jev mac-vm bambu-print
+skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr file-pr implement-and-review handoff html-communication wovn-file-hosting fleet-exec jev mac-vm bambu-print t3-browser
 ```
 
 ## Shipping to your machines
@@ -129,6 +130,7 @@ These skills help you plan, verify, write, refactor, and fix code.
 - **babysit-pr** — Monitor a pull request through review and CI, verifying bot findings, fixing real failures, and dismissing false positives with reasons. Adapted from a skill by [Theo Browne](https://youtu.be/e1snsuY4lTI).
 - **html-communication** — Create self-contained HTML writeups (plans, specs, findings, UI mocks) and publish them privately to files.wovn.org with the wovn CLI. Adapted from a skill by Theo Browne.
 - **wovn-file-hosting** - Upload any local file to files.wovn.org and return a permanent URL (private by default, public on request), backed by the Cloudflare Worker in `apps/wovn-files/` and the `wovn` CLI in `apps/wovn-cli/`. Adapted from a skill by Theo Browne.
+- **t3-browser** - Drive T3 Code's built-in Browser panel, which the user watches live, for browser QA and screenshots whenever its `preview_*` tools are available, reaching dev servers by environment port so they resolve to the machine running the code.
 - **jev** - Use TypeSafe's Jev decision model for bulk classification and fast Jev-driven browsing in the Agents Chrome, through the `jevx` CLI in `apps/jevx-cli/`. Ships only to connors-mac-studio.
 
 ## Fleet
