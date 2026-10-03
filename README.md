@@ -137,7 +137,7 @@ These skills help you plan, verify, write, refactor, and fix code.
 
 - **fleet-exec** - Run commands on your other machines over Tailscale SSH ("make sure main is pulled on my MacBook Pro"), with the gotchas agents would otherwise hit: exit codes that always read 0, a locked keychain, and repo paths that differ per machine.
 - **mac-vm** - Boot an on-demand macOS VM (Tart) whose desktop is always unlocked, so agents can drive GUI apps while the host Mac is locked, then shut it down. Backed by the `mac-vm` CLI in `apps/mac-vm/`. Ships only to connors-mac-studio.
-- **bambu-print** - Check on, slice for, and start prints on the Bambu Lab P1S: status and camera over the LAN, headless slicing that refuses bad profiles, a plate check before every print, and printing through Bambu Connect in the mac-vm VM (works while the Mac is locked). Backed by the `bambu` CLI in `apps/bambu-cli/`. Ships only to connors-mac-studio.
+- **bambu-print** - Design, slice, and start prints on the Bambu Lab P1S: status and camera over the LAN, models from code (parametric parts through the `cad` skill from [earthtojake/text-to-cad](https://github.com/earthtojake/text-to-cad)), headless slicing that refuses bad profiles, a plate check before every print, printing through Bambu Connect in the mac-vm VM (works while the Mac is locked), and a check that filament actually loaded. Backed by the `bambu` CLI in `apps/bambu-cli/`. Ships only to connors-mac-studio.
 
 ## Workspace
 
