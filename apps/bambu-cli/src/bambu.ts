@@ -215,13 +215,16 @@ type Plate = keyof typeof PLATES;
 
 type Profile = Record<string, unknown>;
 
-// Studio's CLI does not resolve `inherits` for system profiles, so a profile
-// loaded as-is silently falls back to defaults (wrong bed temps, 0 g weight).
-// Merge the chain parent-first into one self-contained profile.
+// Studio's CLI does not resolve `inherits` or `include` for system profiles, so
+// a profile loaded as-is silently falls back to defaults (wrong bed temps, 0 g
+// weight, a generic start gcode that never loads AMS filament). Merge into one
+// self-contained profile: parent chain, then included templates, then own keys.
 function flatten(category: string, name: string): Profile {
   const own = JSON.parse(readFileSync(`${PROFILES}/${category}/${name}.json`, "utf8")) as Profile;
-  const { inherits, ...rest } = own;
-  return typeof inherits === "string" ? { ...flatten(category, inherits), ...rest } : rest;
+  const { inherits, include, ...rest } = own;
+  const parent = typeof inherits === "string" ? flatten(category, inherits) : {};
+  const included = Array.isArray(include) ? include.map((n: string) => flatten(category, n)) : [];
+  return Object.assign(parent, ...included, rest);
 }
 
 // Headless slice with Bambu Studio's bundled system profiles. Studio runs in a
@@ -307,6 +310,10 @@ function slice(
     const bedTemp = Number(/^M190 S(\d+)/m.exec(gcode)?.[1]);
     if (!(grams > 0))
       refuse(`plate ${sliced.id} uses 0 g of filament: the filament profile did not load`);
+    // The P1S start gcode loads the first filament with `M620 S<slot>`; without
+    // it the printer runs the whole job with an empty nozzle.
+    if (!/^M620 S(?!255)\d+/m.test(gcode))
+      refuse(`plate ${sliced.id} never loads filament: the machine start gcode did not apply`);
     if (bedTemp !== expected)
       refuse(
         `plate ${sliced.id} heats the bed to ${bedTemp}C, but ${o.filament} wants ${expected}C on the ${plate.name}`,
