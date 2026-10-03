@@ -3,7 +3,7 @@ This file contains instructions that are only useful to agents running Claude Co
 ## General Preferences - Claude Code
 
 * For browser work, use the `t3-browser` skill when T3 Code's `preview_*` tools are available. Otherwise, follow the project's browser automation instructions.
-* For other computer use that helps complete or verify work, shell out to gpt-6-astra with Codex for it.
+* For other computer use that helps complete or verify work, shell out to gpt-6-astra with `codex exec -s danger-full-access`. A sandboxed `codex exec` auto-declines site and app access, and the error reads like the user refused.
 
 ## Picking the right models for workflows and subagents
 
@@ -25,7 +25,7 @@ Rankings, higher = better. Cost reflects what I actually pay (OpenAI is near-fre
 * Anything user-facing (UI, copy, API design) needs taste >= 8.
 * Reviews of plans/implementations: fable-5.1 or gpt-6-astra.
 * Never use Haiku.
-* Mechanics: gpt models are only reachable through the Codex CLI - `codex exec` / `codex review` (my `~/.codex/config.toml` defaults to gpt-6-astra). Use the codex-implementation, and codex-review skills; for work they don't cover (investigation, data analysis), run `codex exec -s read-only` directly with a self-contained prompt.
+* Mechanics: gpt models are only reachable through the Codex CLI - `codex exec` / `codex review` (my `~/.codex/config.toml` defaults to gpt-6-astra). Use the codex-implementation, and codex-review skills; for work they don't cover (investigation, data analysis), run `codex exec -s read-only` directly with a self-contained prompt (computer use is the exception, above).
 * Claude models (sonnet, opus, or fable) run via the Agent/Workflow model parameter.
 
 ### Using gpt-6-astra inside workflows and subagents (the model parameter only takes Claude models, so use a wrapper)
