@@ -26,8 +26,9 @@ const PROPERTY_RULES = stylesheet.match(/@property[^{]+\{[^}]*\}/g)?.join("") ??
 // styles.css), so the File's document starts below the 2rem strip and anchor
 // jumps stop short of it. Padding on <html> leaves the File's body styles
 // alone; rem resolves against the File's root in the shadow tree too, so the
-// space tracks the strip's height.
-const STRIP_SPACE = "html{padding-top:2rem;scroll-padding-top:2rem}";
+// space tracks the strip's height. Screen only: in print the Banner is in
+// flow (styles.css).
+const STRIP_SPACE = "@media screen{html{padding-top:2rem;scroll-padding-top:2rem}}";
 
 export function injectBanner(object: R2ObjectBody, page: FilePage): Response {
   const markup = renderToString(<BannerApp page={page} />);

@@ -149,6 +149,14 @@
   color-scheme: light dark;
 }
 
+/* Browsers repeat fixed elements on every printed page; in print the Banner
+   sits in flow once at the top, as before. */
+@media print {
+  :host {
+    position: static;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
