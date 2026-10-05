@@ -6,10 +6,10 @@
   },
   "type": "module",
   "scripts": {
-    "build": "vp pack",
+    "build": "pnpm --filter bambu-viewer build && vp pack",
     "test": "vp test run",
     "typecheck": "tsc --noEmit",
-    "ship:machine": "vp pack && mkdir -p ~/.local/bin && install -m 755 dist/bambu.mjs ~/.local/bin/bambu"
+    "ship:machine": "pnpm build && mkdir -p ~/.local/bin && install -m 755 dist/bambu.mjs ~/.local/bin/bambu"
   },
   "dependencies": {
     "@gltf-transform/core": "^4.5.1",

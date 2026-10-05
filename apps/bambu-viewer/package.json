@@ -1,0 +1,27 @@
+{
+  "name": "bambu-viewer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vp build",
+    "dev": "vp dev",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.7.6",
+    "@react-three/fiber": "^9.3.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.6",
+    "@types/react-dom": "^19.2.6",
+    "@types/three": "^0.180.0",
+    "@vitejs/plugin-react": "^6",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plugin-singlefile": "^2.3.0",
+    "vite-plus": "catalog:"
+  }
+}
