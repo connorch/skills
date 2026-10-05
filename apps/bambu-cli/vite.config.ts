@@ -23,6 +23,7 @@ export default mergeConfig(
           "@gltf-transform/functions",
           "meshoptimizer",
           "manifold-3d",
+          "fflate",
         ],
         onlyBundle: false,
       },
