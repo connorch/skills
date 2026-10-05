@@ -135,8 +135,11 @@ function centred(mesh: PreviewMesh): PreviewMesh {
 // A textured or vertex-coloured Model (GLB, glTF, OBJ) is previewed as it
 // would print: each triangle in its Palette colour, with the Palette listed.
 // Anything else, or a Model without colour, previews in the filament colour.
+// `scale` maps the paint loader's millimetre coordinates onto the analysed mesh,
+// which follows the unit decision rather than glTF's metre convention.
 async function paintedPreview(
   file: string,
+  scale: number,
 ): Promise<{ mesh: PreviewMesh; palette: NonNullable<Review["palette"]> } | undefined> {
   if (![".glb", ".gltf", ".obj"].includes(extname(file).toLowerCase())) return undefined;
   let coloured;
@@ -160,7 +163,10 @@ async function paintedPreview(
   faces.forEach((face, f) => {
     const rgb = palette.rgb[labels[f]!]!;
     face.forEach((v, corner) => {
-      positions.set(vertices[v]!, f * 9 + corner * 3);
+      positions.set(
+        vertices[v]!.map((n) => n * scale),
+        f * 9 + corner * 3,
+      );
       colors.set(rgb, f * 9 + corner * 3);
     });
   });
@@ -228,7 +234,7 @@ export function register(program: Command, config: Config): void {
         printerName: printer?.name ?? "Unknown printer",
         plate: [px, py, pz],
       });
-      const painted = await paintedPreview(file);
+      const painted = await paintedPreview(file, units.scale / 1000);
       if (painted) review.palette = painted.palette;
       const glb = await buildGlb(
         centred(

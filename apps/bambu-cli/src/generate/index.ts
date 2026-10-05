@@ -132,7 +132,10 @@ export function register(program: Command, config: Config, http = new HttpClient
           process.exitCode = 1;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        const resume = task ? `bambu generate download ${task.token}${resumeFlags}` : null;
+        // A failed read-only check is retried as one; download may start paid steps.
+        const resume = task
+          ? `bambu generate ${verb === "status" ? "status" : "download"} ${task.token}${verb === "status" ? "" : resumeFlags}`
+          : null;
         output(
           json,
           {

@@ -61,6 +61,19 @@ export async function fetchModel(
   const files: { name: string; path: string; bytes: number }[] = [],
     skipped: string[] = [];
   await fs.mkdir(resolve(out), { recursive: true });
+  const source: Source = {
+    route: "Search",
+    site: "Printables",
+    title: text(model.name),
+    author: text(mapping(model.user).publicUsername) || undefined,
+    url: pageUrl("printables", id, model.slug),
+    license: text(mapping(model.license).abbreviation) || undefined,
+  };
+  // Provenance is written before any Model so a folder holding another Model's
+  // source.json is refused up front (unless forced), not after downloading.
+  await fs.writeFile(resolve(out, SOURCE_FILE), `${JSON.stringify(source, null, 2)}\n`, {
+    flag: force ? "w" : "wx",
+  });
   for (const file of mappings(model.stls)) {
     const name = text(file.name);
     // STEP is skipped: neither analyze nor Bambu Studio's CLI reads it.
@@ -104,31 +117,29 @@ export async function fetchModel(
       signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) throw new SiteError(`HTTP ${response.status}`);
-    // The whole file is read into memory, so refuse anything past what a
-    // printable Model could be before reading it.
+    // The file is read into memory, so refuse anything past what a printable
+    // Model could be: by the declared size first, then by the bytes received.
     const declared = Math.max(
       Number(file.fileSize) || 0,
       Number(response.headers.get("content-length")) || 0,
     );
-    if (declared > MAX_FILE_BYTES)
-      throw new SiteError(`${name} is ${Math.round(declared / 1e6)} MB, over the 512 MB limit`);
-    const bytes = new Uint8Array(await response.arrayBuffer()),
+    const over = () =>
+      new SiteError(`${name} is over the ${MAX_FILE_BYTES / 1024 / 1024} MB limit`);
+    if (declared > MAX_FILE_BYTES) throw over();
+    const chunks: Uint8Array[] = [];
+    let received = 0;
+    for await (const chunk of response.body ?? []) {
+      received += chunk.length;
+      if (received > MAX_FILE_BYTES) {
+        await response.body?.cancel();
+        throw over();
+      }
+      chunks.push(chunk);
+    }
+    const bytes = Buffer.concat(chunks),
       path = resolve(out, name);
     await fs.writeFile(path, bytes, { flag: force ? "w" : "wx" });
     files.push({ name, path, bytes: bytes.length });
   }
-  const source: Source = {
-    route: "Search",
-    site: "Printables",
-    title: text(model.name),
-    author: text(mapping(model.user).publicUsername) || undefined,
-    url: pageUrl("printables", id, model.slug),
-    license: text(mapping(model.license).abbreviation) || undefined,
-  };
-  // Like the Model files: never replace another Model's provenance unless forced.
-  if (files.length)
-    await fs.writeFile(resolve(out, SOURCE_FILE), `${JSON.stringify(source, null, 2)}\n`, {
-      flag: force ? "w" : "wx",
-    });
   return { model: { id, name: source.title, url: source.url }, source, files, skipped };
 }

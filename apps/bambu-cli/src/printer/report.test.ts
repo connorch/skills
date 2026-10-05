@@ -78,8 +78,8 @@ describe("upstream printer reports", () => {
     expect(c.feed('{"print":{"nozzle_temper":30}}')).toBe(false);
     expect(c.feed("not json")).toBe(false);
     expect(c.feed('{"info":{}}')).toBe(false);
-    expect(c.feed('{"print":{"gcode_state":"IDLE","mc_percent":0}}')).toBe(false);
-    expect(c.feed('{"print":{"ams":{}}}')).toBe(true);
-    expect(c.report).toEqual({ nozzle_temper: 30, gcode_state: "IDLE", mc_percent: 0, ams: {} });
+    expect(c.feed('{"print":{"gcode_state":"IDLE"}}')).toBe(false);
+    expect(c.feed('{"print":{"mc_percent":0}}')).toBe(true);
+    expect(c.report).toEqual({ nozzle_temper: 30, gcode_state: "IDLE", mc_percent: 0 });
   });
 });

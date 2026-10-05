@@ -32,15 +32,15 @@ describe("MQTT transport", () => {
     client.emit(
       "message",
       "wrong/topic",
-      Buffer.from('{"print":{"gcode_state":"RUNNING","nozzle_temper":220,"ams":{}}}'),
+      Buffer.from('{"print":{"gcode_state":"RUNNING","mc_percent":5,"nozzle_temper":220}}'),
     );
     client.emit("message", "device/SERIAL/report", Buffer.from('{"print":{"nozzle_temper":30}}'));
     client.emit(
       "message",
       "device/SERIAL/report",
-      Buffer.from('{"print":{"gcode_state":"IDLE","ams":{}}}'),
+      Buffer.from('{"print":{"gcode_state":"IDLE","mc_percent":0}}'),
     );
-    expect(await pending).toEqual({ nozzle_temper: 30, gcode_state: "IDLE", ams: {} });
+    expect(await pending).toEqual({ nozzle_temper: 30, gcode_state: "IDLE", mc_percent: 0 });
     expect(client.endAsync).toHaveBeenCalledWith(true);
   });
   it.each([
@@ -69,7 +69,7 @@ describe("MQTT transport", () => {
       successful.emit(
         "message",
         "device/SERIAL/report",
-        Buffer.from('{"print":{"gcode_state":"IDLE","nozzle_temper":30,"ams":{}}}'),
+        Buffer.from('{"print":{"gcode_state":"IDLE","mc_percent":0,"nozzle_temper":30}}'),
       );
       await done;
       expect(vi.getTimerCount()).toBe(0);

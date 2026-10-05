@@ -26,9 +26,8 @@ export class ReportCollector {
       return false;
     }
     Object.assign(this.report, mapping(mapping(doc).print));
-    return Boolean(
-      this.report.gcode_state && this.report.nozzle_temper !== undefined && this.report.ams,
-    );
+    // Upstream's full-report keys: AMS and temperature fields are model-specific.
+    return Boolean(this.report.gcode_state && this.report.mc_percent !== undefined);
   }
 }
 

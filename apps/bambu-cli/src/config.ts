@@ -43,6 +43,8 @@ export const ENV_KEYS = {
   BAMBU_ACCESS_CODE: "access_code",
   BAMBU_3D_PROVIDER: "3d_provider",
   BAMBU_3D_API_KEY: "3d_api_key",
+  BAMBU_RODIN_TIER: "rodin_tier",
+  BAMBU_OUTPUT_DIR: "output_dir",
 } as const satisfies Record<string, keyof Settings | SecretKey>;
 
 export const KEYCHAIN_SERVICE = "bambu";
