@@ -1,0 +1,13 @@
+{
+  "name": "psychopomp",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "ship:machine": "sh ship.sh"
+  },
+  "ship": {
+    "platforms": [
+      "darwin"
+    ]
+  }
+}
