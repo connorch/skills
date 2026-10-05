@@ -59,7 +59,13 @@ export function generationResult(ref: TaskRef, observation: Status | "submitted"
     message: observation === "submitted" ? "" : observation.message,
     warnings: [] as string[],
     prompt_used: null as boolean | null,
-    next_command: `bambu generate download ${ref.token}`,
+    // A task that already failed has nothing to download or wait for.
+    next_command:
+      observation !== "submitted" &&
+      terminal(observation.state) &&
+      observation.state !== "succeeded"
+        ? ""
+        : `bambu generate download ${ref.token}`,
   };
 }
 export type GenerationResult = ReturnType<typeof generationResult>;

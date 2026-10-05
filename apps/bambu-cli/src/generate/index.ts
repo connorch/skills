@@ -124,7 +124,7 @@ export function register(program: Command, config: Config, http = new HttpClient
               ? `${result.format?.toUpperCase()} saved: ${result.output_file} (${result.has_texture ? "textured" : "no colour"})`
               : `${result.task_id}: ${result.status}${result.progress !== null ? ` ${result.progress}%` : ""}${result.message ? ` (${result.message})` : ""}`,
             ...result.warnings,
-            next(result.next_command),
+            ...(result.next_command ? [next(result.next_command)] : []),
           ].join("\n"),
         );
         if (

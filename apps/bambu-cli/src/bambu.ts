@@ -7,12 +7,14 @@
 // agent VM (docs/adr/0003). Settings and secrets: see config.ts.
 
 import { createReadStream, readFileSync, writeFileSync } from "node:fs";
+import { createInterface } from "node:readline/promises";
+import { Writable } from "node:stream";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { connect as tlsConnect, type TLSSocket } from "node:tls";
 import { Client as FtpClient } from "basic-ftp";
-import { Argument, Command } from "commander";
-import { fail } from "./cli.ts";
+import { Argument, Command, CommanderError } from "commander";
+import { EXIT_USAGE, fail } from "./cli.ts";
 import { Config, mask, type Printer, SECRET_KEYS, type SecretKey, SETTING_KEYS } from "./config.ts";
 import { diagnose, report } from "./doctor.ts";
 import { register as registerAnalyze } from "./analyze/index.ts";
@@ -81,9 +83,10 @@ async function snapshot(printer: Printer, out: string) {
   console.log(out);
 }
 
-const program = new Command("bambu").description(
-  "a Bambu Lab printer: find, generate, make, check, review, slice, and watch Models",
-);
+const program = new Command("bambu")
+  .description("a Bambu Lab printer: find, generate, make, check, review, slice, and watch Models")
+  // Set before the subcommands are created, which copy it.
+  .exitOverride();
 
 // Commands in workflow order (skills/bambu-print/SKILL.md), then the printer.
 registerSearch(program, config);
@@ -122,11 +125,24 @@ program
   );
 
 // Secrets arrive on stdin unless --value is given, so they stay out of shell
-// history and process listings.
-function readSecretValue(value?: string): string {
-  const secret = (value ?? readFileSync(0, "utf8")).trim();
+// history and process listings: one unechoed line at a terminal, or the whole
+// of a pipe.
+async function readSecretValue(value?: string): Promise<string> {
+  const secret = (
+    value ?? (process.stdin.isTTY ? await promptHidden() : readFileSync(0, "utf8"))
+  ).trim();
   if (!secret) fail("empty secret");
   return secret;
+}
+function promptHidden(): Promise<string> {
+  // The line editor echoes into a muted stream, so nothing typed is shown.
+  const muted = new Writable({ write: (_chunk, _encoding, done) => done() });
+  const rl = createInterface({ input: process.stdin, output: muted, terminal: true });
+  process.stderr.write("Secret: ");
+  return rl.question("").finally(() => {
+    rl.close();
+    process.stderr.write("\n");
+  });
 }
 
 const configCommand = program
@@ -165,13 +181,13 @@ configCommand
   .addArgument(new Argument("<name>").choices(SECRET_KEYS))
   .option("--value <secret>", "the secret itself")
   .option("--unset", "remove it instead")
-  .action((name: SecretKey, options: { value?: string; unset?: boolean }) => {
+  .action(async (name: SecretKey, options: { value?: string; unset?: boolean }) => {
     if (options.unset) {
       config.unsetSecret(name);
       console.log(`removed ${name}`);
       return;
     }
-    config.setSecret(name, readSecretValue(options.value));
+    config.setSecret(name, await readSecretValue(options.value));
     console.log(`stored ${name} in the Keychain`);
   });
 configCommand
@@ -204,4 +220,9 @@ program
     if (!ok) process.exit(1);
   });
 
-await program.parseAsync().catch((error: Error) => fail(error.message));
+// Commander's own parse errors (unknown option, missing argument) exit 2 like
+// every other usage error; help and version keep exit 0.
+await program.parseAsync().catch((error: Error) => {
+  if (error instanceof CommanderError) process.exit(error.exitCode === 0 ? 0 : EXIT_USAGE);
+  fail(error.message);
+});
