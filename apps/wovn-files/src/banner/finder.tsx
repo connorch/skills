@@ -33,6 +33,8 @@ import { VisibilityDot, VisibilityLabel } from "./visibility-badge";
 // shows; a click on another File shows that File's info, a second click (or
 // "open") goes to it. Deep paths scroll sideways, starting at the deepest
 // column, and the left edge fades while columns are scrolled out of view.
+// Capped below the strip at the viewport height and scrolled within, since
+// in an HTML File the Banner is fixed and the page cannot scroll to it.
 export function Finder({ page, file, id }: { page: FilePage; file: FileMeta; id: string }) {
   const [openDir, setOpenDir] = useState(dirOf(page.file.key));
   const [selected, setSelected] = useState(page.file.key);
@@ -52,7 +54,7 @@ export function Finder({ page, file, id }: { page: FilePage; file: FileMeta; id:
   return (
     <div
       id={id}
-      className="@container border-b border-border bg-background font-ui text-[13px] tabular-nums"
+      className="@container max-h-[calc(100dvh-2rem)] overflow-y-auto border-b border-border bg-background font-ui text-[13px] tabular-nums"
     >
       <div className="flex h-[440px] @max-[760px]:h-auto @max-[760px]:flex-col">
         <div

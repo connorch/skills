@@ -134,10 +134,17 @@
   }
 }
 
-/* The Banner's custom element inside an HTML File: a block in normal flow
-   that does not inherit the File's typography. */
+/* The Banner's custom element inside an HTML File: pinned to the top of the
+   viewport above everything, so the File's own body styles (padding,
+   max-width, margins) cannot offset or narrow it. It overlays the File's
+   first few pixels rather than pushing content down. */
 :host {
   display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2147483647;
   color-scheme: light dark;
 }
 
