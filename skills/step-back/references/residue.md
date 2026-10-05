@@ -1,5 +1,12 @@
 # The Residue Sweep
 
+## Contents
+
+1. Dead and orphaned code
+2. Redundant guards left by layered fixes
+3. Documentation and comment drift
+4. Hardening the fixes themselves forgot
+
 Mechanical churn artifacts, checked after the shape pass has formed the
 verdict. Each check names what to look for, the required empirical
 verification, and the legitimate keeps that look like findings but are not.

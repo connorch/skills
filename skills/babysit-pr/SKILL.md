@@ -7,7 +7,7 @@ description: Use when the user asks to monitor, watch, or babysit a PR
 
 All the repos we work in have various AI review bots. They're helpful, even if they are not always right.
 
-If the PR doesn't exist yet, open one with the `file-pr` skill first.
+If the PR doesn't exist yet, open one with the $file-pr skill first.
 
 If your harness offers tools to monitor a PR, use them so you can respond when comments arrive. Otherwise, poll the PR for new comments and checks.
 
@@ -23,7 +23,7 @@ Always reply before resolving a thread, and resolving means marking it resolved 
 [actual reply]
 ```
 
-Screenshots and videos help as well. Use the `wovn-file-hosting` skill when needed.
+Screenshots and videos help as well. Use the $wovn-file-hosting skill when needed.
 
 If nothing has changed, stay quiet rather than posting filler comments. Stop when the review bots and required checks are green on the latest commit. Merge only when the user explicitly requested it; otherwise report that the PR is ready.
 

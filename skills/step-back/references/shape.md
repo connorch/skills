@@ -1,5 +1,14 @@
 # The Shape Pass
 
+## Contents
+
+1. Judge the big calls on their merits
+2. Invariant erosion
+3. Placement and sharing
+4. Live duplication from hardening rounds
+5. Rigor consistency
+6. Forward fit
+
 This pass forms the architectural verdict. Run it before the residue sweep,
 with the whole diff and the branch's design docs already read. The output is
 judgment, not a checklist result - but each question below has a method, and

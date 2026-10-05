@@ -1,12 +1,18 @@
 ---
 name: qa-ux-plan
 description: >-
+  Writes an end-to-end QA plan from the branch diff without running tests.
   Use when asked to create an end-to-end QA or UX verification plan for the
   current Git branch, especially from branch diffs, changed files, product
   flows, routes, screens, components, API changes, copy, styles, or config.
 ---
 
 # QA UX Plan
+
+## Example Invocation
+
+> Use the QA UX plan skill to generate an end-to-end QA plan for the
+> current branch.
 
 ## Purpose
 
@@ -16,11 +22,6 @@ the user explicitly asks.
 
 The plan is product- and UX-focused: what changed, which flows may be affected,
 what should be verified, expected outcomes, and nearby regressions to watch.
-
-## Example Invocation
-
-> Use the QA UX plan skill to generate an end-to-end QA plan for the
-> current branch.
 
 ## Inspection Flow
 

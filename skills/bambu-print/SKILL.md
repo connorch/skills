@@ -3,7 +3,7 @@ name: bambu-print
 description: Use when the user asks to 3D print something, design or slice a part to print, check on the Bambu printer, or see what is on the print bed. Covers status, camera, making models, slicing, and starting prints through Bambu Connect.
 metadata:
   machines: [connors-mac-studio]
-  requires: "the bambu CLI on PATH, Bambu Studio in /Applications for slicing, the mac-vm skill with Bambu Connect in the guest for starting prints, and optionally the cad skill from earthtojake/text-to-cad for parametric models"
+  requires: "the bambu CLI on PATH, Bambu Studio in /Applications for slicing, the $mac-vm skill with Bambu Connect in the guest for starting prints, and optionally the $cad skill from earthtojake/text-to-cad for parametric models"
 ---
 
 # Bambu print
@@ -56,13 +56,13 @@ Check its per-plate summary lines before offering to print, and show Connor
 each plate's preview (`Metadata/plate_<n>.png` inside the 3mf).
 
 Only slice with `bambu slice`. Connect needs Bambu Studio's `.gcode.3mf`;
-other slicers (OrcaSlicer, text-to-cad's `gcode` skill) produce plain gcode.
+other slicers (OrcaSlicer, text-to-cad's $gcode skill) produce plain gcode.
 
 ## Making a model
 
 - A flat part (a plate, a guide, an extruded outline): extrude a 2D polygon
   into a binary STL from a short script.
-- Anything with holes, fillets, fits, or several features: use the `cad` skill
+- Anything with holes, fillets, fits, or several features: use the $cad skill
   (build123d, from earthtojake/text-to-cad) to write a parametric model, export
   STL, and review its snapshot before slicing.
 - An existing design: check MakerWorld or Printables before modeling.
@@ -72,11 +72,23 @@ source script or download, the STL, and the sliced 3mf.
 
 ## Starting a print
 
-Prints go through **Bambu Connect** in the `mac-vm` guest, which works whether
+Prints go through **Bambu Connect** in the guest VM from the $mac-vm skill, which works whether
 or not the Mac is locked. Connect sends an already-sliced file over Connor's
 Bambu cloud account. Bambu Studio itself crashes in the guest (software
 OpenGL), and Connect's LAN Discover cannot see the printer through Tart's NAT,
 so rely on the cloud login. Connor is already signed in to Connect in the guest.
+
+Copy this checklist and track your progress:
+
+```
+- [ ] 1. Connor confirmed, and a fresh snapshot shows a clear plate
+- [ ] 2. VM up (noting whether it was already running), 3mf copied in
+- [ ] 3. Imported in Connect, preview checked
+- [ ] 4. Sent with Connor's slot, Timelapse off, Bed leveling on
+- [ ] 5. Filament loaded (tray_now left 255)
+- [ ] 6. First layer checked in a snapshot
+- [ ] 7. VM down, unless it was already running
+```
 
 1. Confirm with Connor and check the plate (see Rules).
 2. Note whether `mac-vm status` shows the VM already running. Then

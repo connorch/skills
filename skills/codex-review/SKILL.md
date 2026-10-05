@@ -1,6 +1,6 @@
 ---
 name: codex-review
-description: Ask Codex CLI (gpt-5.6-sol) for an independent code review of uncommitted changes, a branch diff, a commit, or a specific implementation. This is how gpt-5.6-sol is invoked for review work. Use when the user asks Claude to have Codex or gpt-5.6-sol review work, when the model-selection rubric calls for a gpt-5.6-sol review perspective, or when Codex should audit a diff, find bugs or regressions, or compare Claude's implementation against requirements. For a review by Claude itself, use the normal review process instead.
+description: Gets an independent code review from Codex CLI. This is how the GPT model rated intelligence 9 in the model-selection table is invoked for review work. Use when the user asks to have Codex or a GPT model review work, when the model-selection rubric calls for that model's review perspective, or when Codex should audit uncommitted changes, a branch diff, a commit, or a specific implementation for bugs, regressions, or gaps against requirements. For a review by Claude itself, use the normal review process instead.
 metadata:
   agents: [claude-code]
 ---
