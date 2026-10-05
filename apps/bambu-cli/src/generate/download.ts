@@ -39,6 +39,19 @@ export function sniffProblem(
 
 // Signed download URLs are refreshed from the task, with no credentials sent to file hosts.
 const DOWNLOAD_STALL_MS = 120_000;
+// A 3MF is a ZIP: its end-of-central-directory record sits in the last 64 KB.
+function zipProblem(path: string, format: OutputFormat, io: typeof fs): string | undefined {
+  if (format !== "3mf") return undefined;
+  const size = io.statSync(path).size,
+    tail = Buffer.alloc(Math.min(65_557, size)),
+    handle = io.openSync(path, "r");
+  try {
+    io.readSync(handle, tail, 0, tail.length, size - tail.length);
+  } finally {
+    io.closeSync(handle);
+  }
+  return tail.includes(Buffer.from([0x50, 0x4b, 0x05, 0x06])) ? undefined : "the 3MF is truncated";
+}
 // A chunked body can end cleanly mid-file; an ASCII STL must at least close.
 function asciiStlProblem(path: string, format: OutputFormat, io: typeof fs): string | undefined {
   if (format !== "stl") return undefined;
@@ -130,9 +143,20 @@ export async function fetchListedOutput(
           true,
         );
       const problem =
-        sniffProblem(readHead(tmp, io), chosen, written) ?? asciiStlProblem(tmp, chosen, io);
+        sniffProblem(readHead(tmp, io), chosen, written) ??
+        asciiStlProblem(tmp, chosen, io) ??
+        zipProblem(tmp, chosen, io);
       if (problem) throw new ProviderError("not_a_model", problem);
-      if (chosen === "glb") standUprightFile(tmp, io);
+      if (chosen === "glb") {
+        // Validates the header and chunk boundaries as well.
+        const handle = io.openSync(tmp, "r");
+        try {
+          readJsonChunk(handle, io);
+        } finally {
+          io.closeSync(handle);
+        }
+        standUprightFile(tmp, io);
+      }
       io.renameSync(tmp, path);
       return { path, output_format: chosen };
     } catch (error) {
@@ -242,9 +266,17 @@ function readJsonChunk(
   if (
     header.readUInt32LE(16) !== 0x4e4f534a ||
     jsonLength > MAX_JSON_CHUNK ||
-    20 + jsonLength > total
+    20 + jsonLength > total ||
+    header.readUInt32LE(8) !== total
   )
     throw new ProviderError("not_a_model", "the GLB header does not match the file");
+  // Every chunk after the JSON one must fit; a body that ended mid-chunk does not.
+  const chunk = Buffer.alloc(8);
+  for (let at = 20 + jsonLength; at < total;) {
+    if (io.readSync(handle, chunk, 0, 8, at) < 8 || at + 8 + chunk.readUInt32LE(0) > total)
+      throw new ProviderError("not_a_model", "the GLB is truncated");
+    at += 8 + chunk.readUInt32LE(0);
+  }
   const json = Buffer.alloc(jsonLength);
   io.readSync(handle, json, 0, jsonLength, 20);
   return { header, json, total };

@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { Command } from "commander";
 import { z } from "zod";
-import { output, next } from "../cli.ts";
+import { output, next, shellQuote } from "../cli.ts";
 import { PROVIDERS, type Config } from "../config.ts";
 import {
   FollowUpLedger,
@@ -31,10 +31,6 @@ const optionsSchema = z.object({
 });
 
 // Adds the Generate Route without modifying the CLI entry point.
-// POSIX single quoting for a path echoed into a command line.
-function shellQuote(value: string): string {
-  return /^[\w./-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;
-}
 export function register(program: Command, config: Config, http = new HttpClient()): void {
   const group = program
     .command("generate")

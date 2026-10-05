@@ -114,6 +114,13 @@ const preview = id("meshy/create_preview", "result");
 const refine = id("meshy/create_refine", "result");
 const trip = String(object(object(fixture("tripo/create_task").body).data).task_id);
 
+// The smallest 3MF-shaped body: a ZIP end-of-central-directory record.
+const ZIP = Buffer.concat([
+  Buffer.from("PK\x03\x04", "latin1"),
+  Buffer.alloc(26),
+  Buffer.from("PK\x05\x06", "latin1"),
+  Buffer.alloc(18),
+]);
 describe("recorded task states", () => {
   it.each([
     ["preview_pending", "queued", 0],
@@ -328,7 +335,7 @@ describe("provider requests and downloads", () => {
       .on(
         "GET",
         "https://cdn.example/model",
-        new Response(format === "stl" ? "solid model\nendsolid model" : "PKmodel"),
+        new Response(format === "stl" ? "solid model\nendsolid model" : ZIP),
       );
     const dir = directory();
     const time = clock();
@@ -358,7 +365,7 @@ describe("provider requests and downloads", () => {
       .on("POST", `${mesh}/v1/convert`, "meshy/create_convert")
       .on("GET", `${mesh}/v1/convert/${converted}`, "meshy/convert_succeeded");
     const url = parseMeshyTask(fixture("meshy/convert_succeeded").body).outputs["3mf"]!;
-    f.on("GET", url.split("?")[0]!, new Response("PKmodel"));
+    f.on("GET", url.split("?")[0]!, new Response(ZIP));
     const time = clock();
     const gen = new Generator(
       createProvider("meshy", "k", f.http),

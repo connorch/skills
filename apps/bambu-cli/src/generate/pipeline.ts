@@ -1,3 +1,4 @@
+import { shellQuote } from "../cli.ts";
 import {
   FollowUpLedger,
   ProviderError,
@@ -135,7 +136,7 @@ export class Generator {
           result.warnings.push(
             `this task only has ${fetched.output_format.toUpperCase()}, not ${format.toUpperCase()}; kept ${fetched.output_format.toUpperCase()}`,
           );
-        result.next_command = `bambu analyze ${JSON.stringify(fetched.path)} --height <mm>`;
+        result.next_command = `bambu analyze ${shellQuote(fetched.path)} --height <mm>`;
         return result;
       }
       const recorded = this.ledger.get(step.key);

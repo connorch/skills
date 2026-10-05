@@ -17,6 +17,11 @@ export function output(json: boolean, doc: unknown, human: () => string): void {
   console.log(json ? JSON.stringify(doc, null, 2) : human());
 }
 
+// POSIX single quoting for a path echoed into a suggested command line.
+export function shellQuote(value: string): string {
+  return /^[\w./-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;
+}
+
 export function next(text: string): string {
   return `➡️ ${text}`;
 }

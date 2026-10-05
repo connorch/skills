@@ -40,7 +40,7 @@ export const MODEL_QUERY = `query DownloadModel($id: ID!) { print(id: $id) { id 
 export const LINK_MUTATION = `mutation DownloadFile($id: ID!, $modelId: ID!) { getDownloadLink(id: $id, printId: $modelId, fileType: stl, source: model_detail) { ok errors { field messages } output { link ttl } } }`;
 export const MAX_FILE_BYTES = 512 * 1024 * 1024;
 const STALL_MS = 30_000;
-const MODEL_EXTENSIONS = new Set([".stl", ".3mf", ".obj"]);
+const MODEL_EXTENSIONS = new Set([".stl", ".3mf", ".obj", ".glb"]);
 const COMPANION_EXTENSIONS = new Set([".mtl", ".png", ".jpg", ".jpeg"]);
 // Download anonymous Printables Model files into a Print Job folder.
 export async function fetchModel(
@@ -85,8 +85,8 @@ export async function fetchModel(
     // only its safety is checked.
     const name = typeof file.name === "string" ? file.name : "",
       ext = extname(name).toLowerCase();
-    // STEP is skipped: neither analyze nor Bambu Studio's CLI reads it. An
-    // OBJ's material library and textures come along so paint can read it.
+    // STEP and the like are skipped: neither analyze nor Bambu Studio's CLI
+    // reads them. An OBJ's material library and textures come along for paint.
     const isModel = MODEL_EXTENSIONS.has(ext);
     if (!isModel && !(textured && COMPANION_EXTENSIONS.has(ext))) {
       skipped.push(name);
@@ -107,7 +107,7 @@ export async function fetchModel(
   }
   if (!wanted.some((f) => f.model))
     throw new SiteError(
-      `no STL, 3MF, or OBJ file to download${skipped.length ? ` (skipped ${skipped.join(", ")})` : ""}`,
+      `no STL, 3MF, OBJ, or GLB file to download${skipped.length ? ` (skipped ${skipped.join(", ")})` : ""}`,
     );
   if (!force)
     for (const name of [SOURCE_FILE, ...wanted.map((f) => f.name)])

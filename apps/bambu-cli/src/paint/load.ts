@@ -219,8 +219,14 @@ export async function loadColouredModel(
       }
     }
   } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT")
-      throw new ModelLoadError(`file not found: ${path}`);
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      const missing = "path" in error && typeof error.path === "string" ? error.path : path;
+      throw new ModelLoadError(
+        missing === path
+          ? `file not found: ${path}`
+          : `${basename(path)} refers to ${missing}, which is missing`,
+      );
+    }
     throw new ModelLoadError(
       `could not read ${basename(path)}: ${error instanceof Error ? error.message : String(error)}`,
     );
