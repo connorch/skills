@@ -25,6 +25,10 @@ import { register as registerView } from "./view/index.ts";
 
 const USER = "bblp";
 
+// mqtt still calls url.parse, which Node 24 reports as deprecated on every
+// printer command; the note is noise for the agent reading stderr.
+process.noDeprecation = true;
+
 const config = new Config();
 
 // The printer serves a self-signed cert from Bambu's own CA.
