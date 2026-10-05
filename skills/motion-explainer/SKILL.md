@@ -130,10 +130,15 @@ follow them except where the overrides below say otherwise:
    `$S/narration/script.json` as his skill describes, then voice it with
    `cd "$PP"` first (narrate.ts writes the clips next to the script):
    - **ElevenLabs**, the default. The key is in the login keychain, copied
-     from 1Password, so reading it never prompts:
+     from 1Password, so reading it never prompts. Kit's `narrate.ts` asks for
+     192 kbps audio, which this ElevenLabs plan rejects
+     (`HTTP 403: output_format_not_allowed`), so run a copy that asks for
+     128 kbps:
      ```sh
+     mkdir -p "$S/scripts"
+     sed 's/mp3_44100_192/mp3_44100_128/' "$PP/scripts/narrate.ts" > "$S/scripts/narrate.ts"
      ELEVENLABS_API_KEY="$(security find-generic-password -s elevenlabs -a api-key -w)" \
-       bun scripts/narrate.ts "$S/narration/script.json"
+       bun "$S/scripts/narrate.ts" "$S/narration/script.json"
      ```
      If the item is missing, ask the user to run
      `security add-generic-password -U -s elevenlabs -a api-key -w "$(op read 'op://Personal/ElevenLabs API Key/credential')"`
@@ -150,6 +155,11 @@ follow them except where the overrides below say otherwise:
    - **No voice**, only when the user asks: time beats in seconds instead of
      phrases, as `$PP/scenes/hello` does.
 
+   Anchors match Whisper's transcript, not the script: it writes numbers as
+   digits ("58") and splits brand names ("Eleven Labs"). Check the
+   `.words.json` files, or anchor with alternatives such as
+   `.at_any(&["237", "two hundred"])`.
+
 5. **Review before rendering.** Get segment spans from
    `$PSY plan inspect "$S/<slug>.reel.json"`, then make contact sheets at each
    segment's before, switch, after, and code beats:
@@ -160,10 +170,17 @@ follow them except where the overrides below say otherwise:
 
    `sheet.ts` rebuilds the engine and writes frames to `$PP/output`, which is
    gitignored; that is the one expected write inside the checkout. Read the
-   sheet. Fix text that overlaps, clips, or reads against the wrong chip, file
-   paths cut off in the editor tab, and footers that finish typing just as a
-   cut hides them, then rebuild and check
-   again. Then render one segment
+   sheet and fix, then rebuild and check again:
+   - text that overlaps, clips, or reads against the wrong chip, such as packet
+     labels on a vertical wire against an orb name placed above the orb (put
+     the name below), or a callout that lands on the orb
+   - file paths cut off in the editor tab
+   - footers that finish typing just as a cut hides them
+   - wires left showing after a rewind removes their card (reset the beam's
+     `draw` to 0; do not fade it)
+
+   A Zoom transition looks unfinished in a mid-zoom frame by design. Then
+   render one segment
    (`$PSY plan render "$S/<slug>.reel.json" "$S/output/cue.mp4" --cue <scene-id> --theme neutral`;
    it includes the transition into the next segment) and pull frames with
    ffmpeg at the packet, impact, and halo beats, where the stage looks
