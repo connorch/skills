@@ -265,10 +265,10 @@ const gltfSchema = z.object({
   extensionsRequired: z.array(z.string()).default([]),
 });
 // Geometry stored by these extensions is not in the accessors this loader reads.
-const COMPRESSION = ["KHR_draco_mesh_compression", "EXT_meshopt_compression"];
+const COMPRESSION = new Set(["KHR_draco_mesh_compression", "EXT_meshopt_compression"]);
 export function loadGLTF(json: unknown, buffers: Uint8Array[], format = "gltf"): Mesh {
   const doc = gltfSchema.parse(json);
-  const compressed = doc.extensionsRequired.find((e) => COMPRESSION.includes(e));
+  const compressed = doc.extensionsRequired.find((e) => COMPRESSION.has(e));
   if (compressed)
     throw new MeshLoadError(
       `${compressed} glTF is not supported; export the Model uncompressed (or as STL or 3MF)`,
