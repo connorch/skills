@@ -29,7 +29,7 @@ import {
 } from "../paint/index.ts";
 import { buildGlb, type PreviewMesh } from "./glb.ts";
 import { renderReviewPage, type Review } from "./page.ts";
-import { publish } from "./publish.ts";
+import { publish, slug } from "./publish.ts";
 
 type Analysis = ReturnType<typeof analyze>;
 type AnalysisCheck = Analysis["checks"][number];
@@ -277,7 +277,9 @@ async function view(model: string, options: ViewOptions, config: Config): Promis
     ),
   );
   writeFileSync(page, renderReviewPage(review, glb));
-  const url = options.publish ? publish(page, `bambu/${job}/review.html`) : undefined;
+  const url = options.publish
+    ? publish(page, `bambu/${slug(job, "review")}/review.html`)
+    : undefined;
   output(Boolean(options.json), { page, url, score: analysis.score, review }, () =>
     [
       `Score ${analysis.score}/10 · ${review.model.size.map((n) => n.toFixed(1)).join(" x ")} mm · ${review.model.triangles.toLocaleString("en-US")} triangles`,

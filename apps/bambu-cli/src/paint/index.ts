@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { rename, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import type { Command } from "commander";
 import type { Config } from "../config.ts";
@@ -39,7 +39,11 @@ export interface PaintDependencies {
 export const defaultDependencies: PaintDependencies = {
   load: loadColouredModel,
   status: fetchStatus,
-  write: writeFile,
+  // Written beside the destination and renamed, so a failed repaint keeps the old project.
+  write: async (path: string, data: Uint8Array) => {
+    await writeFile(`${path}.tmp`, data);
+    await rename(`${path}.tmp`, path);
+  },
   stderr: (message: string) => console.error(message),
 };
 // Injectable command boundary: offline callers supply Models, Slots and a file sink.

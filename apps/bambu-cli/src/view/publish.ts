@@ -4,6 +4,16 @@
 
 import { execFileSync } from "node:child_process";
 
+// One path segment from free text: lower-case letters, digits, and hyphens,
+// so a job name can neither escape its folder nor break the URL.
+export function slug(text: string, fallback = "page"): string {
+  return (
+    text
+      .toLowerCase()
+      .replaceAll(/[^a-z0-9]+/g, "-")
+      .replaceAll(/^-|-$/g, "") || fallback
+  );
+}
 export function publish(file: string, key: string): string {
   const out = execFileSync("wovn", ["put", "--force", "--at", key, file], { encoding: "utf8" });
   const url = out.trim().split("\n").at(-1);

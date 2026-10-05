@@ -5,7 +5,7 @@ import { next, output } from "../cli.ts";
 import { search, SITE_NAMES, SITES, SORTS, type Fetch, type ModelResult } from "./core.ts";
 import { fetchModel, FetchUsageError } from "./download.ts";
 import { renderCandidatesPage } from "../view/candidates.ts";
-import { publish } from "../view/publish.ts";
+import { publish, slug } from "../view/publish.ts";
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 export * from "./core.ts";
@@ -19,11 +19,6 @@ for now. Search MakerWorld and Printables instead:
 
   bambu search "<query>"
   bambu search "<query>" --source printables`;
-const slug = (text: string) =>
-  text
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, "-")
-    .replaceAll(/^-|-$/g, "") || "search";
 
 export function formatResult(number: number, candidate: ModelResult): string {
   const stats = [SITE_NAMES[candidate.site]];
@@ -108,7 +103,8 @@ export function register(
           const file = resolve(typeof options.page === "string" ? options.page : "candidates.html");
           writeFileSync(file, renderCandidatesPage(query, report.results, options.sort));
           page = { file };
-          if (options.publish) page.url = publish(file, `bambu/candidates/${slug(query)}.html`);
+          if (options.publish)
+            page.url = publish(file, `bambu/candidates/${slug(query, "search")}.html`);
         } catch (error) {
           // The search itself succeeded; the page failure keeps the --json contract.
           const message = `Candidates page failed: ${error instanceof Error ? error.message : String(error)}`;

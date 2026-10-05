@@ -221,8 +221,20 @@ program
   });
 
 // Commander's own parse errors (unknown option, missing argument) exit 2 like
-// every other usage error; help and version keep exit 0.
+// every other usage error, with the error document when --json was asked for;
+// help and version keep exit 0.
 await program.parseAsync().catch((error: Error) => {
-  if (error instanceof CommanderError) process.exit(error.exitCode === 0 ? 0 : EXIT_USAGE);
+  if (error instanceof CommanderError) {
+    if (error.exitCode === 0) process.exit(0);
+    if (process.argv.includes("--json"))
+      console.log(
+        JSON.stringify(
+          { error: { type: "usage", message: error.message.replace(/^error: /, "") } },
+          null,
+          2,
+        ),
+      );
+    process.exit(EXIT_USAGE);
+  }
   fail(error.message);
 });

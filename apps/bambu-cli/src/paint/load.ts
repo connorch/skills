@@ -43,6 +43,11 @@ export function textureSize(bytes: Uint8Array): [number, number] | undefined {
   if (bytes[0] === 0xff && bytes[1] === 0xd8)
     // JPEG: walk the markers to the first start-of-frame.
     for (let p = 2; p + 9 < bytes.length && bytes[p] === 0xff;) {
+      // Fill bytes (FF FF ...) may pad a marker.
+      if (bytes[p + 1] === 0xff) {
+        p++;
+        continue;
+      }
       const marker = bytes[p + 1]!,
         length = view.getUint16(p + 2);
       if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker))
@@ -57,10 +62,18 @@ export function decodeTexture(bytes: Uint8Array): Texture {
     throw new ModelLoadError(
       `texture is ${size[0]} x ${size[1]} pixels; the limit is ${MAX_TEXTURE_PIXELS} pixels`,
     );
+  // The decoders are given the same ceiling, so a header the sniff could not
+  // read cannot fall through to their larger defaults.
   const png =
     bytes[0] === 0xff && bytes[1] === 0xd8
-      ? jpeg.decode(bytes, { useTArray: true })
+      ? jpeg.decode(bytes, {
+          useTArray: true,
+          maxResolutionInMP: MAX_TEXTURE_PIXELS / 1e6,
+          maxMemoryUsageInMB: (MAX_TEXTURE_PIXELS * 4) / 2 ** 20 + 64,
+        })
       : PNG.sync.read(Buffer.from(bytes));
+  if (png.width * png.height > MAX_TEXTURE_PIXELS)
+    throw new ModelLoadError(`texture is ${png.width} x ${png.height} pixels; too large`);
   return { width: png.width, height: png.height, data: png.data };
 }
 // Read scene transforms and each primitive's own colour source without welding UV seams.

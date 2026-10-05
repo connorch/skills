@@ -121,8 +121,8 @@ export function register(program: Command, config: Config): void {
             waitStart = Number(options.waitStart);
           if (!Number.isInteger(interval) || interval < 10)
             throw new RangeError("--interval must be at least 10 seconds");
-          if (!/^-?\d+$/.test(options.waitStart))
-            throw new RangeError("--wait-start must be an integer number of minutes");
+          if (!/^\d+$/.test(options.waitStart) || !Number.isSafeInteger(waitStart))
+            throw new RangeError("--wait-start must be a whole number of minutes");
           const deps = defaultWatchDependencies(
             config.dir,
             config.settings().output_dir,

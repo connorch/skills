@@ -24,11 +24,16 @@ const widths: Record<string, number> = {
   float64: 8,
 };
 // PLY input falls back to STL for derived files, as in upstream's analyze tests.
+const MAX_HEADER_BYTES = 64 * 1024;
 export function loadPLY(bytes: Uint8Array): Mesh {
-  const text = new TextDecoder().decode(bytes),
-    end = /end_header\r?\n/.exec(text);
-  if ((!text.startsWith("ply\n") && !text.startsWith("ply\r\n")) || !end)
+  // The header is found in a bounded prefix; only ASCII bodies are decoded whole.
+  const prefix = new TextDecoder().decode(bytes.subarray(0, MAX_HEADER_BYTES)),
+    end = /end_header\r?\n/.exec(prefix);
+  if ((!prefix.startsWith("ply\n") && !prefix.startsWith("ply\r\n")) || !end)
     throw new Error("invalid PLY header");
+  const text = /format ascii/.test(prefix.slice(0, end.index))
+    ? new TextDecoder().decode(bytes)
+    : prefix;
   const header = text.slice(0, end.index),
     format = /format (\S+) /.exec(header)?.[1],
     elements: { name: string; count: number; properties: Property[] }[] = [];
