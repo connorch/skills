@@ -11,11 +11,11 @@ If the PR doesn't exist yet, open one with the `file-pr` skill first.
 
 If your harness offers tools to monitor a PR, use them so you can respond when comments arrive. Otherwise, poll the PR for new comments and checks.
 
-Only act on checks and comments newer than the latest push. Verify every bot finding against the source before changing code. Fix real findings and CI failures, distinguish repository failures from infrastructure flakes, and reply with a written reason when dismissing false positives.
+Only act on checks and comments newer than the latest push. Fix findings that pass triage, and CI failures, distinguishing repository failures from infrastructure flakes.
 
 Keep an eye on changes to `main` and rebase when needed. If an overlapping PR makes this one obsolete, stop monitoring, report it to the user, and ask before closing the PR unless closure was explicitly authorized.
 
-If a review bot leaves feedback you believe is not worth addressing, reply and resolve the comment. Be sure to evaluate scope of the changes and the PR's initial intent when considering whether a comment is worth addressing, and feel free to push back on comments when you think it's best. Resolving or dismissing a comment means marking its thread as resolved in GitHub (e.g. via the `resolveReviewThread` GraphQL mutation with `gh api graphql`), not just replying. Format comments left on Connor's behalf as:
+Always reply before resolving a thread, and resolving means marking it resolved in GitHub (e.g. via the `resolveReviewThread` GraphQL mutation with `gh api graphql`), not just replying. Format comments left on Connor's behalf as:
 
 ```md
 ## [MODEL-SLUG] RESPONDING ON BEHALF OF CONNOR
@@ -25,10 +25,19 @@ If a review bot leaves feedback you believe is not worth addressing, reply and r
 
 Screenshots and videos help as well. Use the `wovn-file-hosting` skill when needed.
 
-Do not let review feedback expand the PR beyond the user's original goal. Address real shortcomings, but avoid scope creep.
-
 If nothing has changed, stay quiet rather than posting filler comments. Stop when the review bots and required checks are green on the latest commit. Merge only when the user explicitly requested it; otherwise report that the PR is ready.
 
-## chatgpt-codex-connector reviews
+## Triage every finding
 
-This is section is specifically for reviews from the `chatgpt-codex-connector` (i.e., "Codex Review" comments on the PR). Be selective about which codex review comments are worth addressing. The Codex review bot is notoriously bad at judging severity - a comment it labels P1 could really be a P3, or not a real issue at all. Don't take Codex Review severity label at face value; use your own judgement on whether a finding is real and worth fixing.
+Bots, especially `chatgpt-codex-connector` (Codex Review), flag anything
+technically possible. "True" is not the bar. Fix a finding only when all hold:
+
+- **Real**: verified against the source, not inferred from the diff alone.
+- **Likely**: it happens in this project's actual use, not only under
+  contrived inputs or misuse the code already forbids.
+- **In scope**: it concerns what this PR changes or promises.
+- **Worth it**: the fix costs less complexity than the failure it prevents.
+
+Otherwise, reply with which test it fails and resolve the thread. A partial
+fix is fine: correct an overclaiming comment or doc instead of adding a
+guard. Ignore Codex severity labels; judge severity yourself.
