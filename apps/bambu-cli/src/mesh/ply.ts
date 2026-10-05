@@ -121,9 +121,11 @@ export function loadPLY(bytes: Uint8Array): Mesh {
       let face: number[] = [];
       for (const p of element.properties) {
         if (p.countType) {
+          // Each list value takes a token (ASCII) or its type's width (binary).
           const count = scalar(p.countType),
-            left = ascii ? tokens.length - cursor : bytes.length - offset;
-          if (!Number.isSafeInteger(count) || count < 0 || count > left)
+            left = ascii ? tokens.length - cursor : bytes.length - offset,
+            each = ascii ? 1 : (widths[p.type] ?? 1);
+          if (!Number.isSafeInteger(count) || count < 0 || count * each > left)
             throw new Error("invalid PLY list count");
           const values = Array.from({ length: count }, () => scalar(p.type));
           if (p.name === "vertex_indices" || p.name === "vertex_index") face = values;

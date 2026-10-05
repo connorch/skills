@@ -14,7 +14,7 @@ export function safeFilename(stem: string, suffix: string): string {
 export const SNIFF_BYTES = 1024;
 export function sniffProblem(
   head: Buffer,
-  format: OutputFormat,
+  format: OutputFormat | "ply",
   length = head.length,
 ): string | undefined {
   if (!length) return "the download is empty";
@@ -25,15 +25,17 @@ export function sniffProblem(
       ? head.toString("ascii", 0, 4) === "glTF"
       : format === "3mf"
         ? head.toString("ascii", 0, 2) === "PK"
-        : format === "stl"
-          ? (length >= 84 && head.length >= 84 && length === 84 + 50 * head.readUInt32LE(80)) ||
-            /^solid/i.test(text)
-          : /^(v|vn|vt|f|o|g|mtllib|usemtl|s)\s/.test(
-              text
-                .split("\n")
-                .map((l) => l.trim())
-                .find((l) => l && !l.startsWith("#")) || "",
-            );
+        : format === "ply"
+          ? /^ply\r?\n/.test(text)
+          : format === "stl"
+            ? (length >= 84 && head.length >= 84 && length === 84 + 50 * head.readUInt32LE(80)) ||
+              /^solid/i.test(text)
+            : /^(v|vn|vt|f|o|g|mtllib|usemtl|s)\s/.test(
+                text
+                  .split("\n")
+                  .map((l) => l.trim())
+                  .find((l) => l && !l.startsWith("#")) || "",
+              );
   return valid ? undefined : `the download is not a ${format.toUpperCase()} file`;
 }
 

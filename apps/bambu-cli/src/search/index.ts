@@ -145,7 +145,8 @@ export function register(
           [
             ...report.files.map((f) => f.path),
             ...report.skipped.map(
-              (name) => `Skipped ${name} (only STL, 3MF, OBJ, and GLB can be analyzed and sliced)`,
+              (name) =>
+                `Skipped ${name} (only STL, 3MF, OBJ, GLB, and PLY can be analyzed and sliced)`,
             ),
           ].join("\n"),
         );

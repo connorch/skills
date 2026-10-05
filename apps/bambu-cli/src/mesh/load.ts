@@ -83,8 +83,11 @@ export function loadSTL(bytes: Uint8Array): Mesh {
     const text = strFromU8(bytes);
     if (!/^\s*solid\b/i.test(text) || !/endsolid/i.test(text))
       throw new MeshLoadError("invalid STL");
-    for (const match of text.matchAll(/\bvertex\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)/gi))
+    for (const match of text.matchAll(/\bvertex\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)/gi)) {
+      if (positions.length >= MAX_TRIANGLES * 9)
+        throw new MeshLoadError(`STL has more than ${MAX_TRIANGLES} triangles`);
       positions.push(Number(match[1]), Number(match[2]), Number(match[3]));
+    }
   }
   return model(
     positions,

@@ -40,7 +40,7 @@ export const MODEL_QUERY = `query DownloadModel($id: ID!) { print(id: $id) { id 
 export const LINK_MUTATION = `mutation DownloadFile($id: ID!, $modelId: ID!) { getDownloadLink(id: $id, printId: $modelId, fileType: stl, source: model_detail) { ok errors { field messages } output { link ttl } } }`;
 export const MAX_FILE_BYTES = 512 * 1024 * 1024;
 const STALL_MS = 30_000;
-const MODEL_EXTENSIONS = new Set([".stl", ".3mf", ".obj", ".glb"]);
+const MODEL_EXTENSIONS = new Set([".stl", ".3mf", ".obj", ".glb", ".ply"]);
 const COMPANION_EXTENSIONS = new Set([".mtl", ".png", ".jpg", ".jpeg"]);
 // Download anonymous Printables Model files into a Print Job folder.
 export async function fetchModel(
@@ -107,7 +107,7 @@ export async function fetchModel(
   }
   if (!wanted.some((f) => f.model))
     throw new SiteError(
-      `no STL, 3MF, OBJ, or GLB file to download${skipped.length ? ` (skipped ${skipped.join(", ")})` : ""}`,
+      `no STL, 3MF, OBJ, GLB, or PLY file to download${skipped.length ? ` (skipped ${skipped.join(", ")})` : ""}`,
     );
   if (!force)
     for (const name of [SOURCE_FILE, ...wanted.map((f) => f.name)])
@@ -200,7 +200,7 @@ export async function fetchModel(
       // A signed host can answer 200 with an error page; the file must look
       // like the Model it is named as before the job is committed.
       const problem = isModel
-        ? sniffProblem(head, extname(name).slice(1).toLowerCase() as OutputFormat, received)
+        ? sniffProblem(head, extname(name).slice(1).toLowerCase() as OutputFormat | "ply", received)
         : undefined;
       if (problem) throw new SiteError(`${name}: ${problem}`);
       staged[staged.length - 1]!.bytes = received;
