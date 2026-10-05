@@ -10,11 +10,14 @@ every Model and starts every print by hand) is the opposite of what the skill
 is for here. Where upstream and the pre-existing `bambu` CLI overlapped, upstream's
 behaviour won: it is the more considered and the only tested one.
 
-Upstream stays in the repo as a squashed `git subtree` at `vendor/bambu-studio-ai`,
-excluded from lint, typecheck, and Ship. It is a reference, not a dependency:
-`git subtree pull --squash` lands upstream's changes as one commit whose diff is
-the list of features to consider porting by hand. `vendor/README.md` records the
-commit the port tracks. Delete the folder when we stop tracking upstream.
+Upstream stays in the repo as a plain copy at `vendor/bambu-studio-ai`, excluded
+from lint, typecheck, and Ship. It is a reference, not a dependency: replacing the
+copy at a newer upstream commit gives one diff that is the list of features to
+consider porting by hand. `vendor/README.md` records the commit the port tracks
+and the update recipe. It was first added as a squashed `git subtree`; that was
+dropped because the subtree's parentless squash commit cannot be rebased across,
+and upstream's history buys nothing for a copy we never edit. Delete the folder
+when we stop tracking upstream.
 
 ## Considered Options
 
