@@ -225,7 +225,7 @@ describe("paint command and AMS contract", () => {
           "mtllib cube.mtl\nusemtl red\nv 0 0 0\nv 10 0 0\nv 0 10 0\nvt 0 0\nvt 1 0\nvt 0 1\nf 1/1 2/2 3/3\n",
         ),
       ],
-      ["/cube.mtl", Buffer.from("newmtl red\nKd 1 0 0\nmap_Kd red.png\n")],
+      ["/cube.mtl", Buffer.from("newmtl red\nKd 1 0 0\nmap_Kd -s 1 1 1 -clamp on red.png\n")],
       ["/red.png", png(bands([[200, 30, 30]], 8))],
     ]);
     const model = await loadColouredModel("/cube.obj", async (p) => {
@@ -234,6 +234,7 @@ describe("paint command and AMS contract", () => {
       return data;
     });
     expect(model.parts[0]!.texture?.width).toBe(8);
+    expect(model.turned).toBe(true);
     model.vertices[2]!.forEach((v, i) => expect(v).toBeCloseTo([0, 0, 10][i]!));
     const vertex = await loadColouredModel("/vertex.obj", async () =>
       Buffer.from("v 0 0 0 1 0 0\nv 1 0 0 1 0 0\nv 0 1 0 1 0 0\nf 1 2 3\n"),

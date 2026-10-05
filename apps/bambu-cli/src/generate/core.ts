@@ -146,7 +146,12 @@ export class HttpClient {
     for (let attempt = 0; ; attempt++) {
       let error: ProviderError;
       try {
-        const response = await this.fetcher(url, { ...init, signal: AbortSignal.timeout(70000) });
+        // API calls get a whole-request deadline; a caller streaming a file
+        // passes its own signal and keeps its own inactivity clock.
+        const response = await this.fetcher(url, {
+          ...init,
+          signal: init.signal ?? AbortSignal.timeout(70000),
+        });
         if (response.status < 400) return response;
         let body: Record<string, unknown> = {};
         const text = await response.text();

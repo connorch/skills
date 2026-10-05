@@ -33,6 +33,7 @@ export function sniffProblem(data: Buffer, format: OutputFormat): string | undef
 }
 
 // Signed download URLs are refreshed from the task, with no credentials sent to file hosts.
+const DOWNLOAD_STALL_MS = 120_000;
 export async function fetchListedOutput(
   http: HttpClient,
   poll: () => Promise<Status>,
@@ -58,15 +59,29 @@ export async function fetchListedOutput(
           "no_output",
           `the task no longer lists a ${chosen.toUpperCase()} file`,
         );
-      const response = await http.send(url);
+      // Upstream's download read timeout: abandon a transfer that goes
+      // 120 s without a byte, however long a large Model takes overall.
+      const controller = new AbortController();
+      let stall = setTimeout(() => controller.abort(), DOWNLOAD_STALL_MS);
+      let response: Response;
+      try {
+        response = await http.send(url, { signal: controller.signal });
+      } catch (error) {
+        clearTimeout(stall);
+        throw error;
+      }
       const declared = Number(response.headers.get("content-length") || 0);
-      if (declared > 1024 ** 3)
+      if (declared > 1024 ** 3) {
+        clearTimeout(stall);
         throw new ProviderError("too_large", "model exceeds 1073741824 bytes");
+      }
       const handle = io.openSync(tmp, "w");
       let written = 0;
       try {
         if (response.body)
           for await (const chunk of response.body) {
+            clearTimeout(stall);
+            stall = setTimeout(() => controller.abort(), DOWNLOAD_STALL_MS);
             written += chunk.byteLength;
             if (written > 1024 ** 3)
               throw new ProviderError("too_large", "model exceeds 1073741824 bytes");
@@ -76,6 +91,7 @@ export async function fetchListedOutput(
         if (error instanceof ProviderError) throw error;
         throw new ProviderError("network", "download interrupted", true);
       } finally {
+        clearTimeout(stall);
         io.closeSync(handle);
       }
       if (declared && !response.headers.get("content-encoding") && declared !== written)

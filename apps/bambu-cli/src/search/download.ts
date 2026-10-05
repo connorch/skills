@@ -92,6 +92,10 @@ export async function fetchModel(
     if (!fileId) throw new SiteError("Printables returned an invalid file id");
     wanted.push({ name, fileId, fileSize: file.fileSize });
   }
+  if (!wanted.length)
+    throw new SiteError(
+      `no STL, 3MF, or OBJ file to download${skipped.length ? ` (skipped ${skipped.join(", ")})` : ""}`,
+    );
   if (!force)
     for (const name of [SOURCE_FILE, ...wanted.map((f) => f.name)])
       if (existsSync(resolve(out, name)))
@@ -124,23 +128,23 @@ export async function fetchModel(
     // inactivity: the request is abandoned after 30 s without a byte.
     const controller = new AbortController();
     let timer = setTimeout(() => controller.abort(), STALL_MS);
-    const response = await fetcher(link, {
-      headers: { "User-Agent": USER_AGENT },
-      signal: controller.signal,
-    });
-    if (!response.ok) throw new SiteError(`HTTP ${response.status}`);
-    // The file is read into memory, so refuse anything past what a printable
-    // Model could be: by the declared size first, then by the bytes received.
-    const declared = Math.max(
-      Number(fileSize) || 0,
-      Number(response.headers.get("content-length")) || 0,
-    );
-    const over = () =>
-      new SiteError(`${name} is over the ${MAX_FILE_BYTES / 1024 / 1024} MB limit`);
-    if (declared > MAX_FILE_BYTES) throw over();
     const chunks: Uint8Array[] = [];
-    let received = 0;
     try {
+      const response = await fetcher(link, {
+        headers: { "User-Agent": USER_AGENT },
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new SiteError(`HTTP ${response.status}`);
+      // The file is read into memory, so refuse anything past what a printable
+      // Model could be: by the declared size first, then by the bytes received.
+      const declared = Math.max(
+        Number(fileSize) || 0,
+        Number(response.headers.get("content-length")) || 0,
+      );
+      const over = () =>
+        new SiteError(`${name} is over the ${MAX_FILE_BYTES / 1024 / 1024} MB limit`);
+      if (declared > MAX_FILE_BYTES) throw over();
+      let received = 0;
       for await (const chunk of response.body ?? []) {
         clearTimeout(timer);
         timer = setTimeout(() => controller.abort(), STALL_MS);

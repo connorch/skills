@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -352,6 +352,21 @@ describe("Printables fetching", () => {
       expect(await readFile(join(dir, "model.stl"), "utf8")).toBe("original");
       await fetchModel("42", { out: dir, force: true, fetcher });
       expect(await readFile(join(dir, "model.stl"), "utf8")).toBe("mesh");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+  it("refuses an entry with nothing it can download before writing provenance", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
+    const fetcher: Fetch = async () =>
+      Response.json({
+        data: {
+          print: { id: "42", name: "Model", slug: "model", stls: [{ id: "3", name: "a.step" }] },
+        },
+      });
+    try {
+      await expect(fetchModel("42", { out: dir, fetcher })).rejects.toThrow("skipped a.step");
+      expect(existsSync(join(dir, "source.json"))).toBe(false);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

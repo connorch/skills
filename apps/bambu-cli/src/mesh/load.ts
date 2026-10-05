@@ -17,7 +17,8 @@ import type { Mesh } from "./geometry.ts";
 import { loadPLY } from "./ply.ts";
 
 export class MeshLoadError extends Error {}
-export const MAX_MODEL_FILE_BYTES = 1024 * 1024 * 1024;
+export const MAX_ACCESSOR_COUNT = 20_000_000;
+const MAX_MODEL_FILE_BYTES = 1024 * 1024 * 1024;
 export class MeshSaveError extends Error {}
 export interface MeshIO {
   read(path: string): Uint8Array;
@@ -330,6 +331,11 @@ export function loadGLTF(json: unknown, buffers: Uint8Array[], format = "gltf"):
   function accessor(index: number, components: number): number[] {
     const a = doc.accessors[index];
     if (!a) throw new MeshLoadError("missing glTF accessor");
+    // A sparse accessor without a buffer view is allocated from its count alone.
+    if (a.count > MAX_ACCESSOR_COUNT)
+      throw new MeshLoadError(
+        `glTF accessor has ${a.count} elements; the limit is ${MAX_ACCESSOR_COUNT}`,
+      );
     if (a.type !== (components === 3 ? "VEC3" : "SCALAR"))
       throw new MeshLoadError("unexpected glTF accessor type");
     const result =

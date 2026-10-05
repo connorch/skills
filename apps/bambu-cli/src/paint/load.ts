@@ -174,12 +174,36 @@ export async function loadColouredModel(
   return model;
 }
 // OBJ numbers are millimetres; MTL diffuse colours are display sRGB.
+// MTL map options take a fixed number of values; what follows them is the file.
+const MAP_OPTION_VALUES: Record<string, number> = {
+  "-blendu": 1,
+  "-blendv": 1,
+  "-cc": 1,
+  "-clamp": 1,
+  "-texres": 1,
+  "-imfchan": 1,
+  "-bm": 1,
+  "-mm": 2,
+  "-o": 3,
+  "-s": 3,
+  "-t": 3,
+};
+function textureFile(args: string[]): string {
+  let i = 0;
+  while (i < args.length) {
+    const values = MAP_OPTION_VALUES[args[i]!];
+    if (values === undefined) break;
+    i += 1 + values;
+  }
+  return args.slice(i).join(" ");
+}
 async function loadObj(path: string, read: ReadFile, model: ColouredModel) {
   const text = Buffer.from(await read(path)).toString(),
     positions: Vec3[] = [],
     uvs: [number, number][] = [],
     colours: Vec4[] = [];
   const materials = new Map<string, { factor: Vec4; texture?: Texture }>();
+  model.turned = true;
   for (const line of text.split(/\r?\n/)) {
     const [kind, ...words] = line.trim().split(/\s+/);
     if (kind === "mtllib") {
@@ -204,7 +228,7 @@ async function loadObj(path: string, read: ReadFile, model: ColouredModel) {
           if (key === "d") current.factor[3] = Number(args[0]);
           if (key === "map_Kd")
             current.texture = decodeTexture(
-              await read(resolve(dirname(materialPath), args.join(" "))),
+              await read(resolve(dirname(materialPath), textureFile(args))),
             );
         }
       }
