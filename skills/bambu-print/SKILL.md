@@ -108,14 +108,14 @@ Helpers: `box`, `cylinder`, `sphere`, `extrude`, `revolve`, `bracket`, `plateWit
 Tell Connor the dimensions and volume and let him adjust before continuing.
 
 **Multi-colour**: Generate a textured GLB, then `bambu paint` (step 3) turns its texture into a
-Palette of the filaments loaded in the AMS and writes a painted 3MF. Don't ask Connor to choose
-colours up front; they come from the texture.
+Palette and writes a painted 3MF. Don't ask Connor to choose colours up front; they come from
+the texture.
 
 ### 3. Analyze (and paint)
 
 ```sh
 bambu analyze model.stl --orient --repair --height 60 --material PLA --purpose decorative
-bambu paint model.glb                                 # textured GLB → painted 3MF, AMS Palette
+bambu paint model.glb --height 60 [--max-colors 4 | --colors "#hex,#hex"] [--no-ams]
 ```
 
 Seven checks (mesh, build volume, floating parts, overhangs, wall thickness, bed contact,
@@ -129,6 +129,12 @@ upright. Made Models: no `--orient`; their print orientation is designed in.
 Overhangs are area-weighted against 45°; "supports likely needed" is a hint. AI meshes often
 report dozens of bodies, which is usually non-manifold topology rather than loose pieces: look
 at the Review Page before `--keep-main` or regenerating.
+
+`paint` maps each texture colour to the nearest filament loaded in the AMS (ΔE shown per
+colour) and writes `<name>_painted.3mf`, a Bambu Studio project with every triangle painted.
+With the printer off, or `--no-ams`, it picks a free Palette and suggests Bambu filaments.
+Analyze and view the GLB before painting; the painted 3MF goes straight to `slice`. Show Connor
+the colour table (colour, share, Slot) and let him trim it (`--max-colors 3`) before slicing.
 
 ### 4. Review Page
 
