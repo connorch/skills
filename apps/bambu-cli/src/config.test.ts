@@ -43,6 +43,7 @@ describe("settings", () => {
     const config = new Config({ dir, env: {}, keychain: fakeKeychain() });
     expect(() => config.set({ "3d_provider": "openai" })).toThrow(/3d_provider/);
     expect(() => config.set({ printer_i: "10.0.0.5" })).toThrow(/unknown setting printer_i/);
+    expect(() => config.unset(["printer_i"])).toThrow(/unknown setting printer_i/);
     writeFileSync(config.file, '{"preferred_format": "step"}');
     expect(() => config.settings()).toThrow(ConfigError);
   });

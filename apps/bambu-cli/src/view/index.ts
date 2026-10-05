@@ -7,11 +7,18 @@ import { writeFileSync } from "node:fs";
 import { basename, dirname, extname, resolve } from "node:path";
 import { Command } from "commander";
 import { z } from "zod";
-import { next, output } from "../cli.ts";
+import { EXIT_USAGE, fail, next, output } from "../cli.ts";
 import type { Config } from "../config.ts";
 import { readSource, type Source } from "../job.ts";
 import { resolveMaterial, resolvePrinter } from "../analyze/index.ts";
-import { analyze, load, printer as printerTable } from "../mesh/index.ts";
+import {
+  analyze,
+  bounds,
+  decideUnits,
+  load,
+  printer as printerTable,
+  scale,
+} from "../mesh/index.ts";
 import {
   ColorsLostError,
   loadColouredModel,
@@ -192,8 +199,18 @@ export function register(program: Command, config: Config): void {
         })
         .parse(raw);
       const file = resolve(model);
-      const mesh = load(file);
+      const page = resolve(options.output ?? resolve(dirname(file), "review.html"));
+      if (page === file) fail("the page must not be the Model file", EXIT_USAGE);
+      if (extname(page).toLowerCase() !== ".html")
+        fail("the page must be an .html file", EXIT_USAGE);
       const notes: string[] = [];
+      // The same unit decision analyze makes, so the report describes the
+      // Model at its printed size; run analyze first to override it.
+      const loaded = load(file);
+      const units = decideUnits(Math.max(...bounds(loaded).extents), { declared: loaded.unit });
+      if (units.doubtful)
+        notes.push(units.note.replace("pass --unit", "run `bambu analyze --unit` first"));
+      const mesh = Math.abs(units.scale - 1) > 1e-9 ? scale(loaded, units.scale) : loaded;
       const printer = resolvePrinter(options.printer, config.settings().model, notes);
       const material = resolveMaterial(options.material, notes);
       for (const note of notes) console.error(note);
@@ -219,7 +236,6 @@ export function register(program: Command, config: Config): void {
           },
         ),
       );
-      const page = resolve(options.output ?? resolve(dirname(file), "review.html"));
       writeFileSync(page, renderReviewPage(review, glb));
       const url = options.publish ? publish(page, `bambu/${job}/review.html`) : undefined;
       output(Boolean(options.json), { page, url, score: analysis.score, review }, () =>

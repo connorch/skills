@@ -166,6 +166,12 @@ export class Config {
   }
 
   unset(keys: string[]): Settings {
+    const unknown = keys.filter((k) => !(SETTING_KEYS as string[]).includes(k));
+    if (unknown.length) {
+      throw new ConfigError(
+        `unknown setting ${unknown.join(", ")}; settings are ${SETTING_KEYS.join(", ")}`,
+      );
+    }
     const next = { ...this.stored() };
     for (const key of keys) delete next[key as keyof Settings];
     this.save(next);

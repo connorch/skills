@@ -30,7 +30,12 @@ export function projectSettings(colours: string[], model = "P1S"): Record<string
       : `${family} 0.4 nozzle`
     : `Bambu Lab ${family} 0.4 nozzle`;
   const profile = profiles[printer as keyof typeof profiles];
-  if (!profile) throw new RangeError(`no recorded 0.4 mm paint profile for ${model}`);
+  if (!profile)
+    throw new RangeError(
+      `no recorded 0.4 mm paint profile for ${model}; this CLI carries ${Object.keys(profiles)
+        .map((k) => k.replace(/^Bambu Lab | 0\.4 nozzle$/g, ""))
+        .join(", ")}`,
+    );
   const settings: Record<string, unknown> = {
       ...structuredClone(template),
       ...structuredClone(profile),

@@ -58,6 +58,14 @@ describe("Model file formats", () => {
     expect(bounds(mesh).min).toEqual([128, 128, 0]);
     expect(bounds(mesh).extents).toEqual([2, 3, 0]);
   });
+  it("rejects compressed glTF instead of reading empty geometry", () => {
+    expect(() =>
+      loadGLTF(
+        { asset: { version: "2.0" }, extensionsRequired: ["KHR_draco_mesh_compression"] },
+        [],
+      ),
+    ).toThrow(/KHR_draco_mesh_compression/);
+  });
   it("rejects cyclic components and corrupt or empty Models", () => {
     const { io, files } = memoryIO();
     files.set(
