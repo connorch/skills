@@ -25,6 +25,7 @@ const widths: Record<string, number> = {
 };
 // PLY input falls back to STL for derived files, as in upstream's analyze tests.
 const MAX_HEADER_BYTES = 64 * 1024;
+const MAX_RECORDS = 50_000_000;
 export function loadPLY(bytes: Uint8Array): Mesh {
   // The header is found in a bounded prefix; only ASCII bodies are decoded whole.
   const prefix = new TextDecoder().decode(bytes.subarray(0, MAX_HEADER_BYTES)),
@@ -105,13 +106,15 @@ export function loadPLY(bytes: Uint8Array): Mesh {
   }
   const positions: number[] = [],
     indices: number[] = [];
+  let records = 0;
   for (const element of elements) {
     // Each record takes at least one token or byte, so a count past what is
     // left in the file is wrong before any of it is read.
     const remaining = ascii ? tokens.length - cursor : bytes.length - offset;
     if (!Number.isSafeInteger(element.count) || element.count < 0)
       throw new Error("invalid PLY element count");
-    if (element.count > remaining)
+    records += element.count;
+    if (element.count > remaining || records > MAX_RECORDS)
       throw new Error(`PLY declares ${element.count} ${element.name} records but holds fewer`);
     for (let i = 0; i < element.count; i++) {
       const record: Record<string, number> = {};

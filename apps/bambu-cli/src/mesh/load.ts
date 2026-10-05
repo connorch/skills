@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
 import { unzipSync, zipSync, strFromU8, strToU8 } from "fflate";
 import { z } from "zod";
@@ -23,9 +23,11 @@ export class MeshSaveError extends Error {}
 export interface MeshIO {
   read(path: string): Uint8Array;
   write(path: string, data: Uint8Array): void;
+  exists(path: string): boolean;
 }
 export const fileIO: MeshIO = {
   read: (path) => readFileSync(path),
+  exists: (path) => existsSync(path),
   write: (path, data) => writeFileSync(path, data),
 };
 function model(positions: number[], indices: number[], format: string): Mesh {
@@ -141,7 +143,7 @@ export function load3MF(bytes: Uint8Array): Mesh {
   const archive = unzipSync(bytes, {
     filter: (entry) => {
       if (!/^3D\/.*\.model$/i.test(entry.name)) return false;
-      expanded += entry.size;
+      expanded += entry.originalSize ?? entry.size;
       if (expanded > MAX_MODEL_FILE_BYTES)
         throw new MeshLoadError(`the model files expand past ${MAX_MODEL_FILE_BYTES / 2 ** 30} GB`);
       return true;

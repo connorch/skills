@@ -143,6 +143,7 @@ the colour table (colour, share, Slot) and let him trim it (`--max-colors 3`) be
 
 ```sh
 bambu view model_oriented.stl        # review.html next to it, published on wovn; --job names the page
+bambu view model.glb --height 60     # a generated GLB, at the height it will be painted and printed
 ```
 
 Open the local `review.html` in the browser tools first (`?view=front|side|top` for the fixed

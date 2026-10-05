@@ -207,11 +207,7 @@ export function analyzeFile(
   if (!parsed.success) throw new UsageError(parsed.error.issues.map((i) => i.message).join("; "));
   const args = parsed.data,
     notes: string[] = [];
-  try {
-    io.read(file);
-  } catch {
-    throw new UsageError(`file not found: ${file}`);
-  }
+  if (!io.exists(file)) throw new UsageError(`file not found: ${file}`);
   const resolvedPrinter = resolvePrinter(args.printer, configuredPrinter, notes),
     material = resolveMaterial(args.material, notes),
     prepared = prepare(file, args, notes, io);

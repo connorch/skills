@@ -3,7 +3,7 @@
 // GLB, fills the viewer template, writes review.html beside the Model, and
 // publishes it privately on wovn.
 
-import { writeFileSync } from "node:fs";
+import { existsSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, resolve } from "node:path";
 import { Command } from "commander";
 import { z } from "zod";
@@ -143,13 +143,19 @@ function centred(mesh: PreviewMesh): PreviewMesh {
 async function paintedPreview(
   file: string,
   scale: number,
+  notes: string[],
 ): Promise<{ mesh: PreviewMesh; palette: NonNullable<Review["palette"]> } | undefined> {
   if (![".glb", ".gltf", ".obj"].includes(extname(file).toLowerCase())) return undefined;
   let coloured;
   try {
     coloured = await loadColouredModel(file);
   } catch (error) {
-    if (error instanceof NoColourError || error instanceof ModelLoadError) return undefined;
+    if (error instanceof NoColourError) return undefined;
+    // A colourless page is still useful, but paint would fail on this file: say so.
+    if (error instanceof ModelLoadError) {
+      notes.push(`Colour not read (${error.message}); bambu paint will fail on this file.`);
+      return undefined;
+    }
     throw error;
   }
   let painted;
@@ -196,6 +202,7 @@ export function register(program: Command, config: Config): void {
     .option("--printer <model>", "printer for the checks (default: the configured model)")
     .option("--material <name>", "filament type for the checks", "PLA")
     .option("--purpose <purpose>", "general, decorative, or functional", "general")
+    .option("--height <mm>", "scale the Model to this height, as analyze and paint do")
     .option("--no-publish", "write the page but do not upload it")
     .option("--json")
     .action(async (model: string, raw: unknown) => {
@@ -208,12 +215,15 @@ export function register(program: Command, config: Config): void {
             printer: z.string().optional(),
             material: z.string(),
             purpose: z.enum(["general", "decorative", "functional"]),
+            height: z.coerce.number().positive().finite().optional(),
             publish: z.boolean(),
             json: z.boolean().optional(),
           })
           .safeParse(raw);
         if (!parsed.success)
-          throw new UsageError("--purpose must be general, decorative, or functional");
+          throw new UsageError(
+            "--purpose must be general, decorative, or functional; --height a positive number of mm",
+          );
         await view(model, parsed.data, config);
       } catch (error) {
         // One JSON error document under --json, like analyze and the rest.
@@ -233,23 +243,30 @@ type ViewOptions = {
   printer?: string;
   material: string;
   purpose: "general" | "decorative" | "functional";
+  height?: number;
   publish: boolean;
   json?: boolean;
 };
 async function view(model: string, options: ViewOptions, config: Config): Promise<void> {
   const file = resolve(model);
   const page = resolve(options.output ?? resolve(dirname(file), "review.html"));
-  if (page === file) throw new UsageError("the page must not be the Model file");
+  if (page === file || (existsSync(page) && realpathSync(page) === realpathSync(file)))
+    throw new UsageError("the page must not be the Model file");
   if (extname(page).toLowerCase() !== ".html")
     throw new UsageError("the page must be an .html file");
   const notes: string[] = [];
   // The same unit decision analyze makes, so the report describes the
-  // Model at its printed size; run analyze first to override it.
+  // Model at its printed size; --height overrides it the way analyze and
+  // paint do, so a generated GLB is reviewed at the size it will print.
   const loaded = load(file);
   const units = decideUnits(Math.max(...bounds(loaded).extents), { declared: loaded.unit });
-  if (units.doubtful)
+  let factor = units.scale;
+  if (options.height !== undefined && bounds(loaded).extents[2] >= 0.01)
+    factor = options.height / bounds(loaded).extents[2];
+  else if (options.height !== undefined) notes.push("--height ignored: the model is flat along Z.");
+  else if (units.doubtful)
     notes.push(units.note.replace("pass --unit", "run `bambu analyze --unit` first"));
-  const mesh = Math.abs(units.scale - 1) > 1e-9 ? scale(loaded, units.scale) : loaded;
+  const mesh = Math.abs(factor - 1) > 1e-9 ? scale(loaded, factor) : loaded;
   const printer = resolvePrinter(options.printer, config.settings().model, notes);
   const material = resolveMaterial(options.material, notes);
   for (const note of notes) console.error(note);
@@ -263,10 +280,13 @@ async function view(model: string, options: ViewOptions, config: Config): Promis
     printerName: printer?.name ?? "Unknown printer",
     plate: [px, py, pz],
   });
+  const noted = notes.length;
   const painted = await paintedPreview(
     file,
-    extname(file).toLowerCase() === ".obj" ? units.scale : units.scale / 1000,
+    extname(file).toLowerCase() === ".obj" ? factor : factor / 1000,
+    notes,
   );
+  for (const note of notes.slice(noted)) console.error(note);
   if (painted) review.palette = painted.palette;
   const glb = await buildGlb(
     centred(

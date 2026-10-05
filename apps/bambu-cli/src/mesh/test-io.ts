@@ -10,6 +10,7 @@ export function memoryIO() {
     write(path, data) {
       files.set(path, data);
     },
+    exists: (path) => files.has(path),
   };
   return { files, io };
 }
