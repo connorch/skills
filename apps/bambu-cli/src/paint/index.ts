@@ -43,6 +43,9 @@ export const defaultDependencies: PaintDependencies = {
   stderr: (message: string) => console.error(message),
 };
 // Injectable command boundary: offline callers supply Models, Slots and a file sink.
+// The filament type the painted project is written for (its profiles and temperatures).
+export const PROJECT_MATERIAL = "PLA";
+
 export async function runPaint(
   path: string,
   options: PaintCommandOptions,
@@ -73,9 +76,16 @@ export async function runPaint(
   let slots: Slot[] = [];
   if (options.colors === undefined && options.ams !== false) {
     try {
-      slots = (await deps.status(config)).trays.filter((s) => s.color);
+      // The project is written with PLA profiles and temperatures, so only
+      // PLA Slots can be the Palette; a PETG match would print PETG as PLA.
+      const trays = (await deps.status(config)).trays;
+      slots = trays.filter((s) => s.color && s.material.toUpperCase() === PROJECT_MATERIAL);
       if (!slots.length)
-        deps.stderr("bambu: no loaded Slot has a colour; using a detected Palette");
+        deps.stderr(
+          `bambu: no loaded ${PROJECT_MATERIAL} Slot has a colour; using a detected Palette`,
+        );
+      else if (slots.length < trays.filter((s) => s.color).length)
+        deps.stderr(`bambu: only ${PROJECT_MATERIAL} Slots are used for the Palette`);
     } catch (error) {
       deps.stderr(
         `bambu: printer unreachable: ${error instanceof Error ? error.message : String(error)}; using a detected Palette`,
@@ -85,6 +95,9 @@ export async function runPaint(
   const result = paintModel(model, { ...settings, slots }),
     stem = basename(path, extname(path)),
     target = resolve(options.output ?? join(dirname(path), `${stem}_painted.3mf`));
+  if (target === resolve(path)) throw new RangeError("the output must not be the input Model");
+  if (extname(target).toLowerCase() !== ".3mf")
+    throw new RangeError("the output must be a .3mf file");
   try {
     await deps.write(
       target,

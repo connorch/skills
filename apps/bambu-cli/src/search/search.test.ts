@@ -336,8 +336,8 @@ describe("Printables fetching", () => {
         out: dir,
         fetcher,
       });
-      expect(report.files.map((f) => f.bytes)).toEqual([4, 4]);
-      expect(report.skipped).toEqual(["model.f3d"]);
+      expect(report.files.map((f) => f.bytes)).toEqual([4]);
+      expect(report.skipped).toEqual(["model.f3d", "model.step"]);
       expect(await readFile(join(dir, "model.stl"), "utf8")).toBe("mesh");
       expect(JSON.parse(await readFile(join(dir, "source.json"), "utf8"))).toEqual({
         route: "Search",

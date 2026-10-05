@@ -173,17 +173,15 @@ export class Config {
   }
 
   // Environment first, then the Keychain. `3d_api_key` falls back to the key of
-  // the configured provider, so either way of storing a provider key works.
-  secret(name: SecretKey): string | undefined {
+  // the provider in use (the configured one unless given), so either way of
+  // storing a provider key works.
+  secret(name: SecretKey, provider = this.settings()["3d_provider"]): string | undefined {
     for (const [envKey, key] of Object.entries(ENV_KEYS)) {
       if (key === name && this.env[envKey]) return this.env[envKey];
     }
     const stored = this.keychain.read(name);
     if (stored) return stored;
-    if (name === "3d_api_key") {
-      const provider = this.settings()["3d_provider"];
-      if (provider) return this.keychain.read(`${provider}_api_key`);
-    }
+    if (name === "3d_api_key" && provider) return this.keychain.read(`${provider}_api_key`);
     return undefined;
   }
 

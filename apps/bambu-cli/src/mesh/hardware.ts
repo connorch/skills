@@ -98,6 +98,9 @@ export interface PrinterProfile {
   usable_volume_mm: Vec3;
   enclosed: boolean;
   high_temp: boolean;
+  // Beyond upstream's profile: the facts the material check warns about.
+  hardened_nozzle?: boolean;
+  heated_chamber?: boolean;
 }
 export interface MaterialProfile {
   name: string;
@@ -108,6 +111,10 @@ export interface MaterialProfile {
   infill_decorative_pct: number;
   infill_functional_pct: number;
   needs_enclosure: boolean;
+  abrasive?: boolean;
+  needs_heated_chamber?: boolean;
+  // Printers Bambu Studio ships a profile for.
+  printers?: string[];
 }
 export function printerProfile(p: Printer): PrinterProfile {
   return {
@@ -115,6 +122,8 @@ export function printerProfile(p: Printer): PrinterProfile {
     usable_volume_mm: usableVolume(p),
     enclosed: p.enclosed,
     high_temp: p.max_nozzle_c > 300,
+    hardened_nozzle: p.nozzle === "hardened_steel",
+    heated_chamber: p.chamber_max_c !== null,
   };
 }
 export function materialProfile(m: Material, name = m.key): MaterialProfile {
@@ -127,5 +136,8 @@ export function materialProfile(m: Material, name = m.key): MaterialProfile {
     infill_decorative_pct: 15,
     infill_functional_pct: 30,
     needs_enclosure: m.needs_enclosure,
+    abrasive: m.abrasive,
+    needs_heated_chamber: m.needs_heated_chamber,
+    printers: m.printers,
   };
 }

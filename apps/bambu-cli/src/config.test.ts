@@ -69,10 +69,11 @@ describe("secrets", () => {
     ).toBe("87654321");
   });
 
-  it("falls back from 3d_api_key to the configured provider's key", () => {
+  it("falls back from 3d_api_key to the provider's key", () => {
     const keychain = fakeKeychain({ "bambu/tripo_api_key": "tsk_1" });
     const config = new Config({ dir, env: {}, keychain });
     expect(config.secret("3d_api_key")).toBeUndefined();
+    expect(config.secret("3d_api_key", "tripo")).toBe("tsk_1");
     config.set({ "3d_provider": "tripo" });
     expect(config.secret("3d_api_key")).toBe("tsk_1");
     config.setSecret("3d_api_key", "generic");

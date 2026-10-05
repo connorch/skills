@@ -147,7 +147,9 @@ export function register(
         output(Boolean(options.json), report, () =>
           [
             ...report.files.map((f) => f.path),
-            ...report.skipped.map((name) => `Skipped ${name} (unsupported file extension)`),
+            ...report.skipped.map(
+              (name) => `Skipped ${name} (only STL, 3MF, and OBJ can be analyzed and sliced)`,
+            ),
           ].join("\n"),
         );
       } catch (error) {

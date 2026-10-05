@@ -86,6 +86,7 @@ export async function fetchListedOutput(
         );
       const problem = sniffProblem(io.readFileSync(tmp), chosen);
       if (problem) throw new ProviderError("not_a_model", problem);
+      if (chosen === "glb") io.writeFileSync(tmp, standUpright(io.readFileSync(tmp)));
       io.renameSync(tmp, path);
       return { path, output_format: chosen };
     } catch (error) {
@@ -128,4 +129,37 @@ export function hasTexture(path: string, format: OutputFormat): boolean {
   } catch {
     return false;
   }
+}
+
+// glTF is Y-up and the printer is Z-up. Wrap every scene's roots in one
+// rotated node, as upstream does, so the Model stands as the provider meant
+// it; Bambu Studio and the mesh loader bake node transforms into vertices.
+// Only the JSON chunk changes, so meshes and textures are byte-identical.
+// Idempotent: a GLB that already has the node is returned unchanged.
+export const UPRIGHT_NODE = "bambu-upright";
+export function standUpright(glb: Buffer): Buffer {
+  const jsonLength = glb.readUInt32LE(12);
+  const doc = JSON.parse(glb.toString("utf8", 20, 20 + jsonLength)) as {
+    nodes?: { name?: string; children?: number[]; rotation?: number[] }[];
+    scenes?: { nodes?: number[] }[];
+  };
+  const nodes = (doc.nodes ??= []);
+  if (nodes.some((n) => n.name === UPRIGHT_NODE)) return glb;
+  for (const scene of doc.scenes ?? []) {
+    nodes.push({
+      name: UPRIGHT_NODE,
+      rotation: [Math.SQRT1_2, 0, 0, Math.SQRT1_2],
+      children: scene.nodes ?? [],
+    });
+    scene.nodes = [nodes.length - 1];
+  }
+  const json = Buffer.from(JSON.stringify(doc));
+  const padded = Buffer.alloc(Math.ceil(json.length / 4) * 4, 0x20);
+  json.copy(padded);
+  const rest = glb.subarray(20 + jsonLength);
+  const out = Buffer.concat([glb.subarray(0, 12), Buffer.alloc(8), padded, rest]);
+  out.writeUInt32LE(out.length, 8);
+  out.writeUInt32LE(padded.length, 12);
+  out.writeUInt32LE(0x4e4f534a, 16);
+  return out;
 }

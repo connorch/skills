@@ -6,10 +6,10 @@ import { template } from "./template.ts";
 
 export type { Review };
 
-export function renderReviewPage(review: Review, glb: Uint8Array): string {
+export function renderReviewPage(review: Review, glb: Uint8Array, html = template()): string {
   // "</script" inside the JSON would end the data block early.
   const json = JSON.stringify(review).replaceAll("<", "\\u003c");
-  return fill(fill(template(), "review", json), "model", Buffer.from(glb).toString("base64"));
+  return fill(fill(html, "review", json), "model", Buffer.from(glb).toString("base64"));
 }
 
 // Replace the body of the template's `<script id="...">` data block. The

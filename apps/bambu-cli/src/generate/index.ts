@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { Command } from "commander";
 import { z } from "zod";
 import { output, next } from "../cli.ts";
-import type { Config } from "../config.ts";
+import { PROVIDERS, type Config } from "../config.ts";
 import {
   FollowUpLedger,
   HttpClient,
@@ -64,11 +64,11 @@ export function register(program: Command, config: Config, http = new HttpClient
         if (verb === "status" || verb === "download") task = TaskRef.parse(value);
         const settings = config.settings();
         const name = task?.provider ?? options.provider ?? settings["3d_provider"] ?? "meshy";
-        const key =
-          config.secret("3d_api_key") ||
-          (name === "meshy" || name === "tripo" || name === "rodin"
-            ? config.secret(`${name}_api_key`)
-            : undefined);
+        const known = PROVIDERS.find((p) => p === name);
+        // The selected provider's own key beats a generic one left for another.
+        const key = known
+          ? config.secret(`${known}_api_key`) || config.secret("3d_api_key", known)
+          : config.secret("3d_api_key");
         if (!key) {
           notConfigured = true;
           throw new InputError(

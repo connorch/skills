@@ -3,8 +3,10 @@
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { type Config, ConfigError, mask, PROVIDERS } from "./config.ts";
-import { PROFILES, STUDIO, STUDIO_CLI } from "./studio.ts";
+import { findCli, findProfilesDir } from "./slice/discovery.ts";
+import { PROFILES, STUDIO } from "./studio.ts";
 
 type Level = "ok" | "warn" | "missing" | "info";
 
@@ -26,9 +28,10 @@ function onPath(command: string): string | undefined {
   }
 }
 
-function studioVersion(): string | undefined {
+// Bambu Studio's version from the app bundle holding the CLI binary.
+function studioVersion(cli: string): string | undefined {
   try {
-    const plist = readFileSync(`${STUDIO}/Contents/Info.plist`, "utf8");
+    const plist = readFileSync(`${dirname(dirname(cli))}/Info.plist`, "utf8");
     return plist.match(/CFBundleShortVersionString<\/key>\s*<string>([^<]+)/)?.[1];
   } catch {
     return undefined;
@@ -39,15 +42,16 @@ export function diagnose(config: Config): Finding[] {
   const findings: Finding[] = [];
   const add = (level: Level, text: string) => findings.push({ level, text });
 
-  if (existsSync(STUDIO_CLI)) {
-    add("ok", `Bambu Studio ${studioVersion() ?? "(version unknown)"} at ${STUDIO}`);
-  } else {
+  // The same discovery slice uses, so BAMBU_STUDIO_CLI / BAMBU_STUDIO_PROFILES apply.
+  const cli = findCli()?.[0];
+  if (cli) add("ok", `Bambu Studio ${studioVersion(cli) ?? "(version unknown)"} at ${cli}`);
+  else
     add(
       "missing",
       `Bambu Studio not found at ${STUDIO}; install it from bambulab.com/en/download/studio`,
     );
-  }
-  if (existsSync(PROFILES)) add("ok", `Slicing profiles at ${PROFILES}`);
+  const profiles = findProfilesDir(cli ? [cli] : undefined);
+  if (profiles) add("ok", `Slicing profiles at ${profiles}`);
   else add("missing", `No slicing profiles at ${PROFILES}`);
 
   const macVm = onPath("mac-vm");

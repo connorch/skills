@@ -20,6 +20,7 @@ import {
   parseRodinStatus,
   parseTripoTask,
   sniffProblem,
+  standUpright,
   status,
   waitForTask,
   type GenerationRequest,
@@ -44,6 +45,8 @@ function glb() {
   const json = Buffer.from(
     JSON.stringify({
       asset: { version: "2.0" },
+      scenes: [{ nodes: [0] }],
+      nodes: [{ name: "body" }],
       textures: [{}],
       materials: [{ pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }],
     }),
@@ -194,7 +197,13 @@ describe("provider requests and downloads", () => {
       status: "succeeded",
       has_texture: true,
     });
-    expect(readFileSync(result.output_file!)).toEqual(glb());
+    // The saved GLB is the provider's, stood upright: one extra root node.
+    const saved = readFileSync(result.output_file!);
+    expect(standUpright(saved)).toEqual(saved);
+    expect(JSON.parse(saved.toString("utf8", 20, 20 + saved.readUInt32LE(12))).nodes).toEqual([
+      { name: "body" },
+      { name: "bambu-upright", rotation: [Math.SQRT1_2, 0, 0, Math.SQRT1_2], children: [0] },
+    ]);
     const posts = f.calls.filter((c) => c.init.method === "POST");
     expect(JSON.parse(String(posts[0]!.init.body))).toEqual({
       mode: "preview",

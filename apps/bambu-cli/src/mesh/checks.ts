@@ -160,12 +160,23 @@ export function checkMaterial(material: MaterialProfile, printer: PrinterProfile
     problems.push(
       `${material.name} prints at ${material.nozzle_min_c}-${material.nozzle_max_c} C, hotter than the ${printer.name}'s hotend`,
     );
+  // Hardware facts beyond upstream's check: a warning, since the print can
+  // still run (an abrasive filament wears a stainless nozzle; a cold chamber
+  // warps; a missing profile needs a hand-made one in Studio).
+  const warnings: string[] = [];
+  if (material.abrasive && printer.hardened_nozzle === false)
+    warnings.push(`${material.name} is abrasive; fit a hardened-steel nozzle`);
+  if (material.needs_heated_chamber && printer.heated_chamber === false)
+    warnings.push(`${material.name} prints best in a heated chamber; the ${printer.name} has none`);
+  if (material.printers && !material.printers.includes(printer.name))
+    warnings.push(`Bambu Studio has no ${material.name} profile for the ${printer.name}`);
+  const all = [...problems, ...warnings];
   return {
     ...check(
-      problems.length ? "fail" : "pass",
-      problems.length ? problems.join("; ") + "." : `${material.name} suits the ${printer.name}.`,
+      problems.length ? "fail" : warnings.length ? "warn" : "pass",
+      all.length ? all.join("; ") + "." : `${material.name} suits the ${printer.name}.`,
     ),
-    problems,
+    problems: all,
   };
 }
 export function checkWallThickness(mesh: Mesh, diagnosis = diagnose(mesh), minWall = 0.9) {

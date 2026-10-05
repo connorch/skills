@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { extname, basename, dirname, resolve } from "node:path";
-import { NodeIO, type GLTF } from "@gltf-transform/core";
+import { NodeIO, type GLTF, type Node } from "@gltf-transform/core";
 import jpeg from "jpeg-js";
 import { PNG } from "pngjs";
 import { linearToSrgb, srgbToLinear, roundEven, type Vec3, type Vec4 } from "./lab.ts";
@@ -73,7 +73,13 @@ export async function loadColouredModel(
                   );
               return io.readJSON({ json, resources });
             })();
-      for (const node of document.getRoot().listNodes()) {
+      // Only what the default scene shows; a GLB can carry other scenes or
+      // staging nodes that are not part of the Model.
+      const root = document.getRoot(),
+        scene = root.getDefaultScene() ?? root.listScenes()[0],
+        shown = new Set<Node>();
+      if (scene) scene.traverse((node) => shown.add(node));
+      for (const node of shown) {
         const mesh = node.getMesh();
         if (!mesh) continue;
         const matrix = node.getWorldMatrix();

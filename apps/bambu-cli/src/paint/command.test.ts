@@ -100,10 +100,25 @@ describe("paint command and AMS contract", () => {
     expect(report.colors.every((c) => "suggested_filament" in c && c.suggested_filament)).toBe(
       true,
     );
-    expect(deps.stderr).toHaveBeenCalledWith(expect.stringContaining("no loaded Slot"));
+    expect(deps.stderr).toHaveBeenCalledWith(expect.stringContaining("no loaded PLA Slot"));
     deps.status.mockRejectedValueOnce(new Error("offline"));
     await runPaint("cube.glb", {}, config, deps);
     expect(deps.stderr).toHaveBeenCalledWith(expect.stringContaining("printer unreachable"));
+  });
+  it("ignores Slots of other materials, since the project is written for PLA", async () => {
+    const deps = dependencies([slots[0]!, { ...slots[1]!, material: "PETG" }]),
+      report = await runPaint("cube.glb", {}, config, deps);
+    expect(
+      report.colors.flatMap((c) => ("slot" in c && c.slot ? [c.slot.name] : [])),
+    ).not.toContain("Green");
+    expect(deps.stderr).toHaveBeenCalledWith(expect.stringContaining("only PLA Slots"));
+  });
+  it("refuses to overwrite the input Model or write a non-3MF", async () => {
+    const deps = dependencies();
+    await expect(runPaint("cube.glb", { output: "cube.glb" }, config, deps)).rejects.toThrow(
+      "must not be the input",
+    );
+    await expect(runPaint("cube.glb", { output: "out.stl" }, config, deps)).rejects.toThrow(".3mf");
   });
   it("maps every cluster to the nearest Slot and caps Palette size", async () => {
     const deps = dependencies([

@@ -11,8 +11,16 @@ import { next, output } from "../cli.ts";
 import type { Config } from "../config.ts";
 import { readSource, type Source } from "../job.ts";
 import { resolveMaterial, resolvePrinter } from "../analyze/index.ts";
-import { analyze, bounds, load, printer as printerTable } from "../mesh/index.ts";
-import { buildGlb } from "./glb.ts";
+import { analyze, load, printer as printerTable } from "../mesh/index.ts";
+import {
+  ColorsLostError,
+  loadColouredModel,
+  ModelLoadError,
+  nearestFilaments,
+  NoColourError,
+  paintModel,
+} from "../paint/index.ts";
+import { buildGlb, type PreviewMesh } from "./glb.ts";
 import { renderReviewPage, type Review } from "./page.ts";
 import { publish } from "./publish.ts";
 
@@ -98,6 +106,67 @@ export function reviewOf(
   };
 }
 
+// Model space is Z-up like the printer; the page expects the Model centred
+// on the origin and resting on z = 0.
+function centred(mesh: PreviewMesh): PreviewMesh {
+  const min = [Infinity, Infinity, Infinity],
+    max = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < mesh.positions.length; i += 3)
+    for (let k = 0; k < 3; k++) {
+      min[k] = Math.min(min[k]!, mesh.positions[i + k]!);
+      max[k] = Math.max(max[k]!, mesh.positions[i + k]!);
+    }
+  const shift = [(min[0]! + max[0]!) / 2, (min[1]! + max[1]!) / 2, min[2]!];
+  const positions = new Float32Array(mesh.positions.length);
+  for (let i = 0; i < positions.length; i += 3)
+    for (let k = 0; k < 3; k++) positions[i + k] = mesh.positions[i + k]! - shift[k]!;
+  return { ...mesh, positions };
+}
+
+// A textured or vertex-coloured Model (GLB, glTF, OBJ) is previewed as it
+// would print: each triangle in its Palette colour, with the Palette listed.
+// Anything else, or a Model without colour, previews in the filament colour.
+async function paintedPreview(
+  file: string,
+): Promise<{ mesh: PreviewMesh; palette: NonNullable<Review["palette"]> } | undefined> {
+  if (![".glb", ".gltf", ".obj"].includes(extname(file).toLowerCase())) return undefined;
+  let coloured;
+  try {
+    coloured = await loadColouredModel(file);
+  } catch (error) {
+    if (error instanceof NoColourError || error instanceof ModelLoadError) return undefined;
+    throw error;
+  }
+  let painted;
+  try {
+    painted = paintModel(coloured, { maxColors: 8 });
+  } catch (error) {
+    // A colour too fine for the mesh is left out of the preview, as of the print.
+    if (!(error instanceof ColorsLostError)) throw error;
+    painted = paintModel(coloured, { colors: error.kept });
+  }
+  const { vertices, faces, labels, palette, areaShare } = painted;
+  const positions = new Float32Array(faces.length * 9),
+    colors = new Float32Array(faces.length * 9);
+  faces.forEach((face, f) => {
+    const rgb = palette.rgb[labels[f]!]!;
+    face.forEach((v, corner) => {
+      positions.set(vertices[v]!, f * 9 + corner * 3);
+      colors.set(rgb, f * 9 + corner * 3);
+    });
+  });
+  const filaments = nearestFilaments(palette.hex);
+  return {
+    mesh: { positions, colors },
+    palette: palette.hex.map((hex, i) => ({
+      hex,
+      name: filaments[i] ? `${filaments[i].line} ${filaments[i].name}` : "",
+      slot: "",
+      areaPct: (areaShare[i] ?? 0) * 100,
+    })),
+  };
+}
+
 export function register(program: Command, config: Config): void {
   program
     .command("view")
@@ -140,16 +209,16 @@ export function register(program: Command, config: Config): void {
         printerName: printer?.name ?? "Unknown printer",
         plate: [px, py, pz],
       });
-      // Model space is Z-up like the printer; the page expects it resting on z = 0.
-      const { min } = bounds(mesh);
-      const positions = new Float32Array(mesh.positions.length);
-      for (let i = 0; i < positions.length; i += 3) {
-        positions[i] = mesh.positions[i]! - (min[0] + analysis.geometry.dimensions_mm[0]! / 2);
-        positions[i + 1] =
-          mesh.positions[i + 1]! - (min[1] + analysis.geometry.dimensions_mm[1]! / 2);
-        positions[i + 2] = mesh.positions[i + 2]! - min[2];
-      }
-      const glb = await buildGlb({ positions, indices: new Uint32Array(mesh.indices) });
+      const painted = await paintedPreview(file);
+      if (painted) review.palette = painted.palette;
+      const glb = await buildGlb(
+        centred(
+          painted?.mesh ?? {
+            positions: new Float32Array(mesh.positions),
+            indices: new Uint32Array(mesh.indices),
+          },
+        ),
+      );
       const page = resolve(options.output ?? resolve(dirname(file), "review.html"));
       writeFileSync(page, renderReviewPage(review, glb));
       const url = options.publish ? publish(page, `bambu/${job}/review.html`) : undefined;

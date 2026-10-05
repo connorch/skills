@@ -62,7 +62,8 @@ export async function fetchModel(
   await fs.mkdir(resolve(out), { recursive: true });
   for (const file of mappings(model.stls)) {
     const name = text(file.name);
-    if (![".stl", ".3mf", ".obj", ".step"].includes(extname(name).toLowerCase())) {
+    // STEP is skipped: neither analyze nor Bambu Studio's CLI reads it.
+    if (![".stl", ".3mf", ".obj"].includes(extname(name).toLowerCase())) {
       skipped.push(name);
       continue;
     }
