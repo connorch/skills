@@ -1,3 +1,4 @@
+import { existsSync, realpathSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { basename, extname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -28,7 +29,11 @@ export async function make(script: string, out?: string) {
   if (![".ts", ".js", ".mts", ".mjs"].includes(extname(file)))
     throw new Error("Make scripts must be TypeScript or JavaScript modules");
   const destination = resolve(out ?? file.slice(0, -extname(file).length) + ".stl");
-  if (destination === file) throw new Error("Output must differ from the script");
+  if (
+    destination === file ||
+    (existsSync(destination) && realpathSync(destination) === realpathSync(file))
+  )
+    throw new Error("Output must differ from the script");
   if (extname(destination).toLowerCase() !== ".stl") throw new Error("Output must be an STL file");
   const scriptModule: { default?: unknown } = await import(pathToFileURL(file).href);
   if (typeof scriptModule.default !== "function")

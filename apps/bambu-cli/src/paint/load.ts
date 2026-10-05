@@ -27,6 +27,8 @@ export interface ColouredModel {
   vertexColours: Vec4[];
   parts: Part[];
   warnings: string[];
+  // True when glTF Y-up coordinates were turned Z-up for the printer.
+  turned: boolean;
 }
 export class ModelLoadError extends Error {}
 export class NoColourError extends Error {}
@@ -55,6 +57,7 @@ export async function loadColouredModel(
     vertexColours: [],
     parts: [],
     warnings: [],
+    turned: false,
   };
   try {
     if (suffix === ".obj") await loadObj(path, read, model);
@@ -83,6 +86,7 @@ export async function loadColouredModel(
       // A generated GLB was already turned Z-up by its upright root node
       // (generate/download.ts); only a raw glTF needs the Y-up conversion.
       const zUp = root.listNodes().some((n) => n.getName() === UPRIGHT_NODE);
+      model.turned = !zUp;
       const toPrinter = (w: number[]): Vec3 =>
         zUp
           ? [w[0]! * 1000, w[1]! * 1000, w[2]! * 1000]

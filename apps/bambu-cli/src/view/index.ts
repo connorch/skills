@@ -7,10 +7,10 @@ import { writeFileSync } from "node:fs";
 import { basename, dirname, extname, resolve } from "node:path";
 import { Command } from "commander";
 import { z } from "zod";
-import { EXIT_USAGE, fail, next, output } from "../cli.ts";
+import { EXIT_FAILED, EXIT_USAGE, next, output } from "../cli.ts";
 import type { Config } from "../config.ts";
 import { readSource, type Source } from "../job.ts";
-import { resolveMaterial, resolvePrinter } from "../analyze/index.ts";
+import { UsageError, resolveMaterial, resolvePrinter } from "../analyze/index.ts";
 import {
   analyze,
   bounds,
@@ -137,6 +137,8 @@ function centred(mesh: PreviewMesh): PreviewMesh {
 // Anything else, or a Model without colour, previews in the filament colour.
 // `scale` maps the paint loader's millimetre coordinates onto the analysed mesh,
 // which follows the unit decision rather than glTF's metre convention.
+// The coordinates are also turned back to the file's own axes when the loader
+// made them Z-up: analysis and the page both show a raw glTF as it is.
 async function paintedPreview(
   file: string,
   scale: number,
@@ -163,8 +165,9 @@ async function paintedPreview(
   faces.forEach((face, f) => {
     const rgb = palette.rgb[labels[f]!]!;
     face.forEach((v, corner) => {
+      const [x, y, z] = vertices[v]!;
       positions.set(
-        vertices[v]!.map((n) => n * scale),
+        (coloured.turned ? [x, z, -y] : [x, y, z]).map((n) => n * scale),
         f * 9 + corner * 3,
       );
       colors.set(rgb, f * 9 + corner * 3);
@@ -206,59 +209,80 @@ export function register(program: Command, config: Config): void {
           json: z.boolean().optional(),
         })
         .parse(raw);
-      const file = resolve(model);
-      const page = resolve(options.output ?? resolve(dirname(file), "review.html"));
-      if (page === file) fail("the page must not be the Model file", EXIT_USAGE);
-      if (extname(page).toLowerCase() !== ".html")
-        fail("the page must be an .html file", EXIT_USAGE);
-      const notes: string[] = [];
-      // The same unit decision analyze makes, so the report describes the
-      // Model at its printed size; run analyze first to override it.
-      const loaded = load(file);
-      const units = decideUnits(Math.max(...bounds(loaded).extents), { declared: loaded.unit });
-      if (units.doubtful)
-        notes.push(units.note.replace("pass --unit", "run `bambu analyze --unit` first"));
-      const mesh = Math.abs(units.scale - 1) > 1e-9 ? scale(loaded, units.scale) : loaded;
-      const printer = resolvePrinter(options.printer, config.settings().model, notes);
-      const material = resolveMaterial(options.material, notes);
-      for (const note of notes) console.error(note);
-      const analysis = analyze(mesh, { material, printer, purpose: options.purpose });
-      const [px = 256, py = 256, pz = 256] = printer
-        ? printerTable(printer.name).build_volume_mm
-        : [];
-      const job = options.job ?? basename(dirname(file));
-      const review = reviewOf(analysis, {
-        job,
-        file,
-        source: readSource(file),
-        printerName: printer?.name ?? "Unknown printer",
-        plate: [px, py, pz],
-      });
-      const painted = await paintedPreview(file, units.scale / 1000);
-      if (painted) review.palette = painted.palette;
-      const glb = await buildGlb(
-        centred(
-          painted?.mesh ?? {
-            positions: new Float32Array(mesh.positions),
-            indices: new Uint32Array(mesh.indices),
-          },
-        ),
-      );
-      writeFileSync(page, renderReviewPage(review, glb));
-      const url = options.publish ? publish(page, `bambu/${job}/review.html`) : undefined;
-      output(Boolean(options.json), { page, url, score: analysis.score, review }, () =>
-        [
-          `Score ${analysis.score}/10 · ${review.model.size.map((n) => n.toFixed(1)).join(" x ")} mm · ${review.model.triangles.toLocaleString("en-US")} triangles`,
-          ...analysis.checks
-            .filter((c) => c.status === "warn" || c.status === "fail")
-            .map((c) => `${c.status === "fail" ? "FAIL" : "WARN"} ${c.name}: ${c.summary}`),
-          `Review Page: ${url ?? page}`,
-          next(
-            url
-              ? `Open ${page} in the browser tools to check it, then send Connor ${url}`
-              : `Open ${page} in the browser tools to check it`,
-          ),
-        ].join("\n"),
-      );
+      try {
+        await view(model, options, config);
+      } catch (error) {
+        // One JSON error document under --json, like analyze and the rest.
+        const message = error instanceof Error ? error.message : String(error),
+          usage = error instanceof UsageError;
+        if (options.json)
+          output(true, { error: { type: usage ? "usage" : "failed", message } }, () => message);
+        console.error(`bambu: ${message}`);
+        process.exitCode = usage ? EXIT_USAGE : EXIT_FAILED;
+      }
     });
+}
+
+type ViewOptions = {
+  output?: string;
+  job?: string;
+  printer?: string;
+  material: string;
+  purpose: "general" | "decorative" | "functional";
+  publish: boolean;
+  json?: boolean;
+};
+async function view(model: string, options: ViewOptions, config: Config): Promise<void> {
+  const file = resolve(model);
+  const page = resolve(options.output ?? resolve(dirname(file), "review.html"));
+  if (page === file) throw new UsageError("the page must not be the Model file");
+  if (extname(page).toLowerCase() !== ".html")
+    throw new UsageError("the page must be an .html file");
+  const notes: string[] = [];
+  // The same unit decision analyze makes, so the report describes the
+  // Model at its printed size; run analyze first to override it.
+  const loaded = load(file);
+  const units = decideUnits(Math.max(...bounds(loaded).extents), { declared: loaded.unit });
+  if (units.doubtful)
+    notes.push(units.note.replace("pass --unit", "run `bambu analyze --unit` first"));
+  const mesh = Math.abs(units.scale - 1) > 1e-9 ? scale(loaded, units.scale) : loaded;
+  const printer = resolvePrinter(options.printer, config.settings().model, notes);
+  const material = resolveMaterial(options.material, notes);
+  for (const note of notes) console.error(note);
+  const analysis = analyze(mesh, { material, printer, purpose: options.purpose });
+  const [px = 256, py = 256, pz = 256] = printer ? printerTable(printer.name).build_volume_mm : [];
+  const job = options.job ?? basename(dirname(file));
+  const review = reviewOf(analysis, {
+    job,
+    file,
+    source: readSource(file),
+    printerName: printer?.name ?? "Unknown printer",
+    plate: [px, py, pz],
+  });
+  const painted = await paintedPreview(file, units.scale / 1000);
+  if (painted) review.palette = painted.palette;
+  const glb = await buildGlb(
+    centred(
+      painted?.mesh ?? {
+        positions: new Float32Array(mesh.positions),
+        indices: new Uint32Array(mesh.indices),
+      },
+    ),
+  );
+  writeFileSync(page, renderReviewPage(review, glb));
+  const url = options.publish ? publish(page, `bambu/${job}/review.html`) : undefined;
+  output(Boolean(options.json), { page, url, score: analysis.score, review }, () =>
+    [
+      `Score ${analysis.score}/10 · ${review.model.size.map((n) => n.toFixed(1)).join(" x ")} mm · ${review.model.triangles.toLocaleString("en-US")} triangles`,
+      ...analysis.checks
+        .filter((c) => c.status === "warn" || c.status === "fail")
+        .map((c) => `${c.status === "fail" ? "FAIL" : "WARN"} ${c.name}: ${c.summary}`),
+      `Review Page: ${url ?? page}`,
+      next(
+        url
+          ? `Open ${page} in the browser tools to check it, then send Connor ${url}`
+          : `Open ${page} in the browser tools to check it`,
+      ),
+    ].join("\n"),
+  );
 }

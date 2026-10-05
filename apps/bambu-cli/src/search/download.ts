@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, extname, resolve } from "node:path";
 import { SOURCE_FILE, type Source } from "../job.ts";
@@ -36,6 +37,7 @@ export function printablesId(input: string): string {
 export const MODEL_QUERY = `query DownloadModel($id: ID!) { print(id: $id) { id name slug user { publicUsername } license { abbreviation } stls { id name fileSize } } }`;
 export const LINK_MUTATION = `mutation DownloadFile($id: ID!, $modelId: ID!) { getDownloadLink(id: $id, printId: $modelId, fileType: stl, source: model_detail) { ok errors { field messages } output { link ttl } } }`;
 export const MAX_FILE_BYTES = 512 * 1024 * 1024;
+const STALL_MS = 30_000;
 // Download anonymous Printables Model files into a Print Job folder.
 export async function fetchModel(
   input: string,
@@ -69,11 +71,9 @@ export async function fetchModel(
     url: pageUrl("printables", id, model.slug),
     license: text(mapping(model.license).abbreviation) || undefined,
   };
-  // Provenance is written before any Model so a folder holding another Model's
-  // source.json is refused up front (unless forced), not after downloading.
-  await fs.writeFile(resolve(out, SOURCE_FILE), `${JSON.stringify(source, null, 2)}\n`, {
-    flag: force ? "w" : "wx",
-  });
+  // Every destination, provenance included, is checked before anything is
+  // written so a folder holding another Model is refused up front unless forced.
+  const wanted: { name: string; fileId: string; fileSize: unknown }[] = [];
   for (const file of mappings(model.stls)) {
     const name = text(file.name);
     // STEP is skipped: neither analyze nor Bambu Studio's CLI reads it.
@@ -90,6 +90,14 @@ export async function fetchModel(
       throw new SiteError("Printables returned an unsafe filename");
     const fileId = modelId(file.id);
     if (!fileId) throw new SiteError("Printables returned an invalid file id");
+    wanted.push({ name, fileId, fileSize: file.fileSize });
+  }
+  if (!force)
+    for (const name of [SOURCE_FILE, ...wanted.map((f) => f.name)])
+      if (existsSync(resolve(out, name)))
+        throw new Error(`EEXIST: ${resolve(out, name)} exists; pass --force to replace it`);
+  await fs.writeFile(resolve(out, SOURCE_FILE), `${JSON.stringify(source, null, 2)}\n`);
+  for (const { name, fileId, fileSize } of wanted) {
     const result = mapping(
       graphqlData(
         await requestJson(
@@ -112,15 +120,19 @@ export async function fetchModel(
     }
     if (url.protocol !== "https:" || url.username || url.password)
       throw new SiteError("Printables returned an unsafe download link");
+    // Large Models take minutes on a home connection, so the deadline is on
+    // inactivity: the request is abandoned after 30 s without a byte.
+    const controller = new AbortController();
+    let timer = setTimeout(() => controller.abort(), STALL_MS);
     const response = await fetcher(link, {
       headers: { "User-Agent": USER_AGENT },
-      signal: AbortSignal.timeout(10_000),
+      signal: controller.signal,
     });
     if (!response.ok) throw new SiteError(`HTTP ${response.status}`);
     // The file is read into memory, so refuse anything past what a printable
     // Model could be: by the declared size first, then by the bytes received.
     const declared = Math.max(
-      Number(file.fileSize) || 0,
+      Number(fileSize) || 0,
       Number(response.headers.get("content-length")) || 0,
     );
     const over = () =>
@@ -128,17 +140,23 @@ export async function fetchModel(
     if (declared > MAX_FILE_BYTES) throw over();
     const chunks: Uint8Array[] = [];
     let received = 0;
-    for await (const chunk of response.body ?? []) {
-      received += chunk.length;
-      if (received > MAX_FILE_BYTES) {
-        await response.body?.cancel();
-        throw over();
+    try {
+      for await (const chunk of response.body ?? []) {
+        clearTimeout(timer);
+        timer = setTimeout(() => controller.abort(), STALL_MS);
+        received += chunk.length;
+        if (received > MAX_FILE_BYTES) {
+          await response.body?.cancel();
+          throw over();
+        }
+        chunks.push(chunk);
       }
-      chunks.push(chunk);
+    } finally {
+      clearTimeout(timer);
     }
     const bytes = Buffer.concat(chunks),
       path = resolve(out, name);
-    await fs.writeFile(path, bytes, { flag: force ? "w" : "wx" });
+    await fs.writeFile(path, bytes);
     files.push({ name, path, bytes: bytes.length });
   }
   return { model: { id, name: source.title, url: source.url }, source, files, skipped };

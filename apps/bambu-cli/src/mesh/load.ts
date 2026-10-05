@@ -136,11 +136,13 @@ function mfTransform(text?: string): number[] {
 export function load3MF(bytes: Uint8Array): Mesh {
   // Inflate only the model files, and none past what a mesh could be, so a
   // hostile or huge archive cannot exhaust memory before it is inspected.
+  let expanded = 0;
   const archive = unzipSync(bytes, {
     filter: (entry) => {
       if (!/^3D\/.*\.model$/i.test(entry.name)) return false;
-      if (entry.size > MAX_MODEL_FILE_BYTES)
-        throw new MeshLoadError(`${entry.name} expands to ${Math.round(entry.size / 1e6)} MB`);
+      expanded += entry.size;
+      if (expanded > MAX_MODEL_FILE_BYTES)
+        throw new MeshLoadError(`the model files expand past ${MAX_MODEL_FILE_BYTES / 2 ** 30} GB`);
       return true;
     },
   });
@@ -476,8 +478,13 @@ export function load(path: string, io: MeshIO = fileIO): Mesh {
             if (!bin) throw new MeshLoadError("missing GLB BIN chunk");
             return bin;
           }
-          if (b.uri.startsWith("data:"))
-            return new Uint8Array(Buffer.from(b.uri.slice(b.uri.indexOf(",") + 1), "base64"));
+          if (b.uri.startsWith("data:")) {
+            // glTF requires base64 data URIs; anything else is refused, not misread.
+            const comma = b.uri.indexOf(",");
+            if (!b.uri.slice(0, comma).endsWith(";base64"))
+              throw new MeshLoadError("glTF data URIs must be base64");
+            return new Uint8Array(Buffer.from(b.uri.slice(comma + 1), "base64"));
+          }
           if (/^[a-z]+:/i.test(b.uri))
             throw new MeshLoadError("remote glTF buffers are unsupported");
           return io.read(join(dirname(path), decodeURIComponent(b.uri)));

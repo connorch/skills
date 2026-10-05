@@ -27,6 +27,7 @@ it("paints over 200k triangles and a 2048 texture in seconds", () => {
     faces: mesh.faces,
     uv: mesh.uv,
     vertexColours: mesh.positions.map(() => [1, 1, 1, 1]),
+    turned: false,
     parts: [
       {
         start: 0,

@@ -197,6 +197,8 @@ describe("upstream colour texture cases", () => {
       Math.max(...vs.map((v) => v[k]!)) - Math.min(...vs.map((v) => v[k]!));
     expect(extent(raw.vertices, 2)).toBeCloseTo(10, 3);
     expect(extent(upright.vertices, 2)).toBeCloseTo(10, 3);
+    expect(raw.turned).toBe(true);
+    expect(upright.turned).toBe(false);
   });
   it("refuses colourless, unsupported, missing and malformed Models", async () => {
     await expect(load(glb([box()]))).rejects.toBeInstanceOf(NoColourError);
