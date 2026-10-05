@@ -29,6 +29,7 @@ import mqtt from "mqtt";
 import { fail } from "./cli.ts";
 import { Config, mask, type Printer, SECRET_KEYS, type SecretKey, SETTING_KEYS } from "./config.ts";
 import { diagnose, report } from "./doctor.ts";
+import { register as registerSearch } from "./search/index.ts";
 import { PROFILES, STUDIO_CLI } from "./studio.ts";
 
 const USER = "bblp";
@@ -420,6 +421,8 @@ configCommand
         : "no access code found to copy",
     );
   });
+
+registerSearch(program, config);
 
 program
   .command("doctor")
