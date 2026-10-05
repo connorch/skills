@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { type Config, ConfigError, mask, PROVIDERS } from "./config.ts";
 import { findCli, findProfilesDir } from "./slice/discovery.ts";
+import { printer, printers } from "./mesh/hardware.ts";
 import { PROFILES, STUDIO } from "./studio.ts";
 
 type Level = "ok" | "warn" | "missing" | "info";
@@ -80,6 +81,15 @@ export function diagnose(config: Config): Finding[] {
   if (ip && serial) add("ok", `Printer ${model ?? "(model not set)"} at ${ip}, serial ${serial}`);
   else add("missing", "Printer not set; run `bambu config set printer_ip <ip> serial <serial>`");
   if (!model) add("warn", "Printer model not set; run `bambu config set model P1S`");
+  else
+    try {
+      printer(model);
+    } catch {
+      add(
+        "missing",
+        `Unknown printer model "${model}"; known: ${printers.map((p) => p.key).join(", ")}. Run \`bambu config set model <model>\``,
+      );
+    }
 
   const code = config.secret("access_code");
   if (code) add("ok", `Access code ${mask(code)}`);

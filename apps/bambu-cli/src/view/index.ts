@@ -143,6 +143,7 @@ function centred(mesh: PreviewMesh): PreviewMesh {
 async function paintedPreview(
   file: string,
   scale: number,
+  maxColors: number,
   notes: string[],
 ): Promise<{ mesh: PreviewMesh; palette: NonNullable<Review["palette"]> } | undefined> {
   if (![".glb", ".gltf", ".obj"].includes(extname(file).toLowerCase())) return undefined;
@@ -160,7 +161,7 @@ async function paintedPreview(
   }
   let painted;
   try {
-    painted = paintModel(coloured, { maxColors: 8 });
+    painted = paintModel(coloured, { maxColors });
   } catch (error) {
     // A colour too fine for the mesh is left out of the preview, as of the print.
     if (!(error instanceof ColorsLostError)) throw error;
@@ -203,6 +204,7 @@ export function register(program: Command, config: Config): void {
     .option("--material <name>", "filament type for the checks", "PLA")
     .option("--purpose <purpose>", "general, decorative, or functional", "general")
     .option("--height <mm>", "scale the Model to this height, as analyze and paint do")
+    .option("--max-colors <N>", "Palette size for a coloured Model, as paint's", "4")
     .option("--no-publish", "write the page but do not upload it")
     .option("--json")
     .action(async (model: string, raw: unknown) => {
@@ -216,13 +218,14 @@ export function register(program: Command, config: Config): void {
             material: z.string(),
             purpose: z.enum(["general", "decorative", "functional"]),
             height: z.coerce.number().positive().finite().optional(),
+            maxColors: z.coerce.number().int().min(1).max(8),
             publish: z.boolean(),
             json: z.boolean().optional(),
           })
           .safeParse(raw);
         if (!parsed.success)
           throw new UsageError(
-            "--purpose must be general, decorative, or functional; --height a positive number of mm",
+            "--purpose must be general, decorative, or functional; --height a positive number of mm; --max-colors 1-8",
           );
         await view(model, parsed.data, config);
       } catch (error) {
@@ -244,6 +247,7 @@ type ViewOptions = {
   material: string;
   purpose: "general" | "decorative" | "functional";
   height?: number;
+  maxColors: number;
   publish: boolean;
   json?: boolean;
 };
@@ -284,6 +288,7 @@ async function view(model: string, options: ViewOptions, config: Config): Promis
   const painted = await paintedPreview(
     file,
     extname(file).toLowerCase() === ".obj" ? factor : factor / 1000,
+    options.maxColors,
     notes,
   );
   for (const note of notes.slice(noted)) console.error(note);

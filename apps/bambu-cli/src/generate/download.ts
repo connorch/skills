@@ -139,11 +139,9 @@ export function hasTexture(path: string, format: OutputFormat): boolean {
   const handle = fs.openSync(path, "r");
   let json: Buffer;
   try {
-    const header = Buffer.alloc(20);
-    if (fs.readSync(handle, header, 0, 20, 0) < 20 || header.readUInt32LE(16) !== 0x4e4f534a)
-      return false;
-    json = Buffer.alloc(header.readUInt32LE(12));
-    fs.readSync(handle, json, 0, json.length, 20);
+    json = readJsonChunk(handle, fs).json;
+  } catch {
+    return false;
   } finally {
     fs.closeSync(handle);
   }
@@ -213,21 +211,39 @@ export function standUpright(glb: Buffer): Buffer {
 }
 // The same rewrite on disk: only the JSON chunk is held in memory, the binary
 // chunk is copied through in pieces, so a large download is never loaded whole.
+// Header and JSON chunk of an open GLB, checked against the file before the
+// chunk is allocated: a bad header or a chunk the file cannot hold is refused.
+const MAX_JSON_CHUNK = 64 * 1024 * 1024;
+function readJsonChunk(
+  handle: number,
+  io: typeof fs,
+): { header: Buffer; json: Buffer; total: number } {
+  const header = Buffer.alloc(20),
+    total = io.fstatSync(handle).size;
+  if (io.readSync(handle, header, 0, 20, 0) < 20 || header.toString("ascii", 0, 4) !== "glTF")
+    throw new ProviderError("not_a_model", "the download is not a GLB file");
+  const jsonLength = header.readUInt32LE(12);
+  if (
+    header.readUInt32LE(16) !== 0x4e4f534a ||
+    jsonLength > MAX_JSON_CHUNK ||
+    20 + jsonLength > total
+  )
+    throw new ProviderError("not_a_model", "the GLB header does not match the file");
+  const json = Buffer.alloc(jsonLength);
+  io.readSync(handle, json, 0, jsonLength, 20);
+  return { header, json, total };
+}
 export function standUprightFile(path: string, io: typeof fs): void {
   const input = io.openSync(path, "r");
   let output: number | undefined;
   const out = `${path}.upright`;
   try {
-    const header = Buffer.alloc(20);
-    io.readSync(input, header, 0, 20, 0);
-    const jsonLength = header.readUInt32LE(12),
-      json = Buffer.alloc(jsonLength);
-    io.readSync(input, json, 0, jsonLength, 20);
+    const { header, json, total } = readJsonChunk(input, io),
+      jsonLength = json.length;
     const chunk = uprightChunk(json.toString("utf8"));
     if (!chunk) return;
     output = io.openSync(out, "w");
-    const total = io.fstatSync(input).size,
-      rest = total - 20 - jsonLength;
+    const rest = total - 20 - jsonLength;
     header.writeUInt32LE(12 + chunk.length + rest, 8);
     io.writeSync(output, header, 0, 12);
     io.writeSync(output, chunk);

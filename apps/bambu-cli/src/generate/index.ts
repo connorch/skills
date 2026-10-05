@@ -59,7 +59,9 @@ export function register(program: Command, config: Config, http = new HttpClient
         if (!parsed.success)
           throw new InputError(parsed.error.issues[0]?.message || "invalid arguments");
         const options = parsed.data;
-        resumeFlags = `${options.format !== "glb" ? ` --format ${options.format}` : ""}${!options.texture || options.format !== "glb" ? " --no-texture" : ""}`;
+        resumeFlags = `${options.format !== "glb" ? ` --format ${options.format}` : ""}${!options.texture || options.format !== "glb" ? " --no-texture" : ""}${options.out ? ` --out ${JSON.stringify(options.out)}` : ""}`;
+        if (verb === "status" && options.wait)
+          throw new InputError("status never waits; use `generate download` to wait for the Model");
         const image = verb === "image" ? loadImage(value) : undefined;
         if (verb === "status" || verb === "download") task = TaskRef.parse(value);
         const settings = config.settings();

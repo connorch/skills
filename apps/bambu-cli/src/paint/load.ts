@@ -259,7 +259,9 @@ async function loadObj(path: string, read: ReadFile, model: ColouredModel) {
     positions: Vec3[] = [],
     uvs: [number, number][] = [],
     colours: Vec4[] = [];
-  const materials = new Map<string, { factor: Vec4; texture?: Texture }>();
+  // Textures are decoded only for materials that faces use, so an unused
+  // entry in a shared library cannot fail the Model.
+  const materials = new Map<string, { factor: Vec4; texturePath?: string; texture?: Texture }>();
   model.turned = true;
   for (const line of text.split(/\r?\n/)) {
     const [kind, ...words] = line.replace(/#.*/, "").trim().split(/\s+/);
@@ -267,7 +269,7 @@ async function loadObj(path: string, read: ReadFile, model: ColouredModel) {
       for (const file of words) {
         const materialPath = companionPath(path, file);
         const mtl = Buffer.from(await read(materialPath)).toString();
-        let current: { factor: Vec4; texture?: Texture } | undefined;
+        let current: { factor: Vec4; texturePath?: string; texture?: Texture } | undefined;
         for (const row of mtl.split(/\r?\n/)) {
           const [key, ...args] = row.replace(/#.*/, "").trim().split(/\s+/);
           if (key === "newmtl") {
@@ -284,9 +286,7 @@ async function loadObj(path: string, read: ReadFile, model: ColouredModel) {
             ];
           if (key === "d") current.factor[3] = Number(args[0]);
           if (key === "map_Kd")
-            current.texture = decodeTexture(
-              await read(companionPath(materialPath, textureFile(args))),
-            );
+            current.texturePath = companionPath(materialPath, textureFile(args));
         }
       }
     }
@@ -321,6 +321,8 @@ async function loadObj(path: string, read: ReadFile, model: ColouredModel) {
       model.faces.push([offset, offset + i, offset + i + 1]);
     const material = materials.get(name),
       factor = material?.factor ?? [1, 1, 1, 1];
+    if (material?.texturePath && !material.texture && hasUv)
+      material.texture = decodeTexture(await read(material.texturePath));
     const part: Part = {
       start,
       end: model.faces.length,

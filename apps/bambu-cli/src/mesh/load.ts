@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { unzipSync, zipSync, strFromU8, strToU8 } from "fflate";
 import { z } from "zod";
@@ -21,9 +21,21 @@ export class MeshLoadError extends Error {}
 // downloaded Model cannot reach outside its own folder.
 export function companionPath(model: string, reference: string): string {
   const dir = dirname(model),
-    target = resolve(dir, reference),
-    inside = relative(dir, target);
-  if (!inside || inside.startsWith("..") || isAbsolute(inside))
+    target = resolve(dir, reference);
+  const outside = (from: string, to: string) => {
+    const inside = relative(from, to);
+    return !inside || inside.startsWith("..") || isAbsolute(inside);
+  };
+  // Lexically first, then by real path so a link inside the folder cannot
+  // point out of it.
+  let escaped = outside(dir, target);
+  if (!escaped && existsSync(target))
+    try {
+      escaped = outside(realpathSync(dir), realpathSync(target));
+    } catch {
+      escaped = true;
+    }
+  if (escaped)
     throw new MeshLoadError(`${basename(model)} refers to ${reference}, outside its folder`);
   return target;
 }
