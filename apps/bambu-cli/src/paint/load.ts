@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { extname, basename, dirname, resolve } from "node:path";
 import { NodeIO, type GLTF, type Node } from "@gltf-transform/core";
+import { UPRIGHT_NODE } from "../generate/download.ts";
 import jpeg from "jpeg-js";
 import { PNG } from "pngjs";
 import { linearToSrgb, srgbToLinear, roundEven, type Vec3, type Vec4 } from "./lab.ts";
@@ -79,6 +80,13 @@ export async function loadColouredModel(
         scene = root.getDefaultScene() ?? root.listScenes()[0],
         shown = new Set<Node>();
       if (scene) scene.traverse((node) => shown.add(node));
+      // A generated GLB was already turned Z-up by its upright root node
+      // (generate/download.ts); only a raw glTF needs the Y-up conversion.
+      const zUp = root.listNodes().some((n) => n.getName() === UPRIGHT_NODE);
+      const toPrinter = (w: number[]): Vec3 =>
+        zUp
+          ? [w[0]! * 1000, w[1]! * 1000, w[2]! * 1000]
+          : [w[0]! * 1000, -w[2]! * 1000, w[1]! * 1000];
       for (const node of shown) {
         const mesh = node.getMesh();
         if (!mesh) continue;
@@ -106,7 +114,7 @@ export async function loadColouredModel(
               matrix[1]! * x + matrix[5]! * y + matrix[9]! * z + matrix[13]!,
               matrix[2]! * x + matrix[6]! * y + matrix[10]! * z + matrix[14]!,
             ];
-            model.vertices.push([world[0]! * 1000, -world[2]! * 1000, world[1]! * 1000]);
+            model.vertices.push(toPrinter(world));
             const tex = uv?.getElement(i, []) ?? [0, 0];
             model.uv.push([tex[0]!, 1 - tex[1]!]);
             // Upstream's trimesh reader quantises vertex RGBA to 8 bits before decoding linear light.

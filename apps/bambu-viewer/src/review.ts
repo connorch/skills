@@ -2,7 +2,8 @@
 // built template's `#review` script; the page reads it back. The CLI imports
 // this type, so the two sides cannot drift.
 
-export type CheckStatus = "ok" | "warn" | "bad";
+// "skip": the check could not run (unknown printer, open mesh); not a pass.
+export type CheckStatus = "ok" | "warn" | "bad" | "skip";
 
 export interface Check {
   key: string;

@@ -163,7 +163,9 @@ function ReportColumn({ review, open, setOpen }: ColumnProps) {
   const popover = usePopover("checks", open, setOpen);
   const r = review.report;
   if (!r) return <div className="col" />;
+  // Anything not a pass is listed, including checks that could not run.
   const issues = r.checks.filter((c) => c.status !== "ok");
+  const passed = r.checks.filter((c) => c.status === "ok").length;
   return (
     <div className="col">
       <div className="big">
@@ -172,9 +174,7 @@ function ReportColumn({ review, open, setOpen }: ColumnProps) {
           <span>/10</span>
         </span>
         <span className="t">
-          {issues.length
-            ? `${r.checks.length - issues.length} of ${r.checks.length} checks pass`
-            : "All checks pass"}
+          {issues.length ? `${passed} of ${r.checks.length} checks pass` : "All checks pass"}
         </span>
       </div>
       <div>
@@ -183,7 +183,7 @@ function ReportColumn({ review, open, setOpen }: ColumnProps) {
             <div className="line" key={c.key} title={c.detail}>
               <i className={`dot ${c.status}`} />
               <span className="k">{c.label}</span>
-              <span className="warn-v">{c.value}</span>
+              <span className={c.status === "skip" ? "skip-v" : "warn-v"}>{c.value}</span>
               <span className="rest">{c.detail}</span>
             </div>
           ))

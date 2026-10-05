@@ -110,7 +110,7 @@ describe("upstream printer commands", () => {
     });
   });
   it("watch once emits one JSON document and no notification text", async () => {
-    vi.mocked(defaultWatchDependencies).mockImplementation((_dir, announce) => ({
+    vi.mocked(defaultWatchDependencies).mockImplementation((_dir, _out, announce) => ({
       read: async () => fixture.print,
       store: { load: () => freshState(), save: () => {}, append: () => {} },
       now: () => 0,

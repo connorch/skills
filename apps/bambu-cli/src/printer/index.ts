@@ -123,10 +123,14 @@ export function register(program: Command, config: Config): void {
             throw new RangeError("--interval must be at least 10 seconds");
           if (!/^-?\d+$/.test(options.waitStart))
             throw new RangeError("--wait-start must be an integer number of minutes");
-          const deps = defaultWatchDependencies(config.dir, (event) => {
-            if (options.json) events.push(event);
-            if (!options.json) console.log(`\u{1F4E2} NOTIFY: ${event.title} - ${event.message}`);
-          });
+          const deps = defaultWatchDependencies(
+            config.dir,
+            config.settings().output_dir,
+            (event) => {
+              if (options.json) events.push(event);
+              if (!options.json) console.log(`\u{1F4E2} NOTIFY: ${event.title} - ${event.message}`);
+            },
+          );
           process.exitCode = await watch(
             config.printer(),
             limitsFor(config.settings().model),

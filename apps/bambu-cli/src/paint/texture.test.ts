@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import { loadColouredModel, NoColourError } from "./load.ts";
 import { paintModel } from "./pipeline.ts";
+import { standUpright } from "../generate/download.ts";
 import { sampleSurface, texelIndex } from "./sampling.ts";
 import {
   bands,
@@ -184,6 +185,18 @@ describe("upstream colour texture cases", () => {
     expect(north.filter((f) => result.labels[f.i] === red).length / north.length).toBeGreaterThan(
       0.95,
     );
+  });
+  it("does not turn a generated GLB a second time", async () => {
+    const tall = { ...box([0.01, 0.01, 0.03]), material: 0 },
+      image = png(bands([RED, GREEN, BLUE]));
+    // A raw glTF is Y-up: its tall axis lands on Z.
+    const raw = await load(glb([tall], [textured(0)], [image]));
+    // After generate's upright node the file is Z-up already.
+    const upright = await load(standUpright(Buffer.from(glb([tall], [textured(0)], [image]))));
+    const extent = (vs: Vec3[], k: number) =>
+      Math.max(...vs.map((v) => v[k]!)) - Math.min(...vs.map((v) => v[k]!));
+    expect(extent(raw.vertices, 2)).toBeCloseTo(10, 3);
+    expect(extent(upright.vertices, 2)).toBeCloseTo(10, 3);
   });
   it("refuses colourless, unsupported, missing and malformed Models", async () => {
     await expect(load(glb([box()]))).rejects.toBeInstanceOf(NoColourError);

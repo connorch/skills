@@ -257,9 +257,12 @@ h1 {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.line .warn-v,
+.line .skip-v {
+  white-space: nowrap;
+}
 .line .warn-v {
   color: var(--warn);
-  white-space: nowrap;
 }
 .line.palette {
   gap: 14px;
@@ -280,6 +283,13 @@ h1 {
 }
 .dot.bad {
   background: var(--bad);
+}
+.dot.skip {
+  background: var(--faint);
+}
+.line .skip-v,
+.pop li.skip .v {
+  color: var(--faint);
 }
 .swatch {
   width: 12px;

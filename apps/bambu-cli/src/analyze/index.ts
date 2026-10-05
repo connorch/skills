@@ -161,6 +161,10 @@ export function prepare(file: string, args: AnalyzeOptions, notes: string[], io:
         `--height ${args.height} was applied before --orient turned the model; it now stands ${bounds(mesh).extents[2].toFixed(1)} mm tall on the plate.`,
       );
   }
+  if (written.length && /\.(glb|gltf|obj)$/i.test(file))
+    notes.push(
+      "Derived files keep geometry only: to paint, run bambu paint on the original file with --height.",
+    );
   return { mesh, steps, units, written };
 }
 const removedOptions = z.object({

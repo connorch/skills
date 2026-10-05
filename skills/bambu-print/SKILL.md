@@ -31,7 +31,8 @@ Commands print a `bambu: ...` line to stderr and exit 1 (failed) or 2 (usage) on
    print: send Connor the snapshot and wait. After he says he cleared it, take a new one.
 3. **Never start a print while the printer is busy** (`RUNNING`, `PAUSE`, `PREPARE`).
 4. **Analyze every Model**, downloaded, generated, made, or supplied. Add `--orient` for
-   downloaded and generated Models (they arrive in arbitrary orientations), not for made ones.
+   downloaded Models only (they arrive in arbitrary orientations); generated Models already
+   stand upright and made ones are designed in their print orientation.
 5. **Show the Review Page before slicing.** Connor should see the Model before anyone spends
    time on it. Look at it yourself first with the browser tools.
 6. **Know the size before generating.** Generation costs credits and minutes, and scale is the
@@ -133,7 +134,9 @@ at the Review Page before `--keep-main` or regenerating.
 `paint` maps each texture colour to the nearest filament loaded in the AMS (ΔE shown per
 colour) and writes `<name>_painted.3mf`, a Bambu Studio project with every triangle painted.
 With the printer off, or `--no-ams`, it picks a free Palette and suggests Bambu filaments.
-Analyze and view the GLB before painting; the painted 3MF goes straight to `slice`. Show Connor
+Analyze and view the GLB before painting, then paint the original GLB with the same `--height`:
+the `_scaled`/`_repaired`/`_oriented` files analyze writes keep geometry only, no texture. The
+painted 3MF goes straight to `slice`. Show Connor
 the colour table (colour, share, Slot) and let him trim it (`--max-colors 3`) before slicing.
 
 ### 4. Review Page

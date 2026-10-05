@@ -92,11 +92,13 @@ export function reviewOf(
         key: c.id,
         label: c.name,
         status:
-          c.status === "pass" || c.status === "skipped"
+          c.status === "pass"
             ? "ok"
-            : c.status === "warn"
-              ? "warn"
-              : "bad",
+            : c.status === "skipped"
+              ? "skip"
+              : c.status === "warn"
+                ? "warn"
+                : "bad",
         value: shortValue(c),
         detail: c.summary,
       })),

@@ -35,7 +35,18 @@ function tile(c: Candidate, i: number): string {
   return `<div class="c"><a href="${escape(c.url)}">${thumb}</a><span class="n">${i + 1}</span><span class="site">${SITE[c.site]}</span><div class="b"><a class="t" href="${escape(c.url)}">${escape(c.title)}</a><div class="m">${c.author ? `<span>${escape(c.author)}</span>` : ""}<span class="r">↓ ${count(c.downloads)}</span><span>♥ ${count(c.likes)}</span><span${nc}>${escape(licence)}</span></div></div></div>`;
 }
 
-export function renderCandidatesPage(query: string, candidates: Candidate[]): string {
+const SORT_LABEL = {
+  downloads: "most downloaded first",
+  likes: "most liked first",
+  newest: "newest first",
+  relevance: "by relevance",
+} as const;
+
+export function renderCandidatesPage(
+  query: string,
+  candidates: Candidate[],
+  sort: keyof typeof SORT_LABEL = "downloads",
+): string {
   const sites = [...new Set(candidates.map((c) => SITE[c.site]))].join(" + ");
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -61,7 +72,7 @@ h1{font-size:22px;margin:0;font-weight:600;letter-spacing:-.015em}
 .c .m .nc{color:var(--warn)}.c .m .r{margin-left:auto}
 p.next{color:var(--dim);margin-top:16px}p.next b{color:var(--warn);font-weight:500}
 </style></head><body>
-<header><h1>${escape(query)}</h1><span class="muted">${candidates.length} candidates · ${sites} · most downloaded first</span></header>
+<header><h1>${escape(query)}</h1><span class="muted">${candidates.length} candidates · ${sites} · ${SORT_LABEL[sort]}</span></header>
 <div class="grid">${candidates.map(tile).join("")}</div>
 <p class="next">Reply with a number to fetch it. MakerWorld needs your login for the file itself; Printables I can fetch. <b>NC</b> means no selling prints.</p>
 </body></html>

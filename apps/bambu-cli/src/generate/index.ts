@@ -78,7 +78,7 @@ export function register(program: Command, config: Config, http = new HttpClient
         const provider = createProvider(name, key, http, settings.rodin_tier);
         const generator = new Generator(
           provider,
-          options.out ?? "./bambu-output/models",
+          options.out ?? join(settings.output_dir ?? "./bambu-output", "models"),
           new FollowUpLedger(join(config.dir, "generation-tasks.json")),
         );
         const texture = options.texture && options.format === "glb";

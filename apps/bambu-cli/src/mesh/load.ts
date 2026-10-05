@@ -17,6 +17,7 @@ import type { Mesh } from "./geometry.ts";
 import { loadPLY } from "./ply.ts";
 
 export class MeshLoadError extends Error {}
+export const MAX_MODEL_FILE_BYTES = 1024 * 1024 * 1024;
 export class MeshSaveError extends Error {}
 export interface MeshIO {
   read(path: string): Uint8Array;
@@ -133,7 +134,16 @@ function mfTransform(text?: string): number[] {
   ];
 }
 export function load3MF(bytes: Uint8Array): Mesh {
-  const archive = unzipSync(bytes);
+  // Inflate only the model files, and none past what a mesh could be, so a
+  // hostile or huge archive cannot exhaust memory before it is inspected.
+  const archive = unzipSync(bytes, {
+    filter: (entry) => {
+      if (!/^3D\/.*\.model$/i.test(entry.name)) return false;
+      if (entry.size > MAX_MODEL_FILE_BYTES)
+        throw new MeshLoadError(`${entry.name} expands to ${Math.round(entry.size / 1e6)} MB`);
+      return true;
+    },
+  });
   // Objects by "<model file>#<id>": the production extension (Bambu Studio
   // projects) keeps each object in its own file under 3D/Objects, referenced
   // from a component's p:path.

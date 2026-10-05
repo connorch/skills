@@ -112,7 +112,7 @@ export function register(
       let page: { file: string; url?: string } | undefined;
       if (options.page && report.results.length) {
         const file = resolve(typeof options.page === "string" ? options.page : "candidates.html");
-        writeFileSync(file, renderCandidatesPage(query, report.results));
+        writeFileSync(file, renderCandidatesPage(query, report.results, options.sort));
         page = { file };
         if (options.publish) page.url = publish(file, `bambu/candidates/${slug(query)}.html`);
       }
@@ -153,8 +153,11 @@ export function register(
           ].join("\n"),
         );
       } catch (error) {
-        console.error(`bambu: ${error instanceof Error ? error.message : String(error)}`);
-        process.exitCode = error instanceof FetchUsageError ? 2 : 1;
+        const message = error instanceof Error ? error.message : String(error),
+          type = error instanceof FetchUsageError ? "usage" : "fetch_failed";
+        if (options.json) output(true, { error: { type, message } }, () => "");
+        console.error(`bambu: ${message}`);
+        process.exitCode = type === "usage" ? 2 : 1;
       }
     });
 }

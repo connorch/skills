@@ -39,9 +39,10 @@ export interface MonitorStore {
 }
 
 // Keep scheduler state atomically and retain the last 500 log entries after 1000.
-export function fileStore(configDir: string, cwd = process.cwd()): MonitorStore {
+// The event log lives under output_dir (upstream's ./bambu-output by default).
+export function fileStore(configDir: string, outputDir = "./bambu-output"): MonitorStore {
   const statePath = join(configDir, "monitor-state.json"),
-    logPath = join(cwd, "bambu-output", "monitor", "events.jsonl");
+    logPath = join(outputDir, "monitor", "events.jsonl");
   return {
     load() {
       try {
@@ -82,11 +83,12 @@ export interface WatchDependencies {
 }
 export function defaultWatchDependencies(
   configDir: string,
+  outputDir: string | undefined,
   announce: (event: Event) => void,
 ): WatchDependencies {
   return {
     read: readReport,
-    store: fileStore(configDir),
+    store: fileStore(configDir, outputDir),
     now: () => Date.now() / 1000,
     sleep: (s) => delay(s * 1000),
     announce,

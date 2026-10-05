@@ -35,6 +35,7 @@ export function printablesId(input: string): string {
 }
 export const MODEL_QUERY = `query DownloadModel($id: ID!) { print(id: $id) { id name slug user { publicUsername } license { abbreviation } stls { id name fileSize } } }`;
 export const LINK_MUTATION = `mutation DownloadFile($id: ID!, $modelId: ID!) { getDownloadLink(id: $id, printId: $modelId, fileType: stl, source: model_detail) { ok errors { field messages } output { link ttl } } }`;
+export const MAX_FILE_BYTES = 512 * 1024 * 1024;
 // Download anonymous Printables Model files into a Print Job folder.
 export async function fetchModel(
   input: string,
@@ -103,6 +104,14 @@ export async function fetchModel(
       signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) throw new SiteError(`HTTP ${response.status}`);
+    // The whole file is read into memory, so refuse anything past what a
+    // printable Model could be before reading it.
+    const declared = Math.max(
+      Number(file.fileSize) || 0,
+      Number(response.headers.get("content-length")) || 0,
+    );
+    if (declared > MAX_FILE_BYTES)
+      throw new SiteError(`${name} is ${Math.round(declared / 1e6)} MB, over the 512 MB limit`);
     const bytes = new Uint8Array(await response.arrayBuffer()),
       path = resolve(out, name);
     await fs.writeFile(path, bytes, { flag: force ? "w" : "wx" });
@@ -116,7 +125,10 @@ export async function fetchModel(
     url: pageUrl("printables", id, model.slug),
     license: text(mapping(model.license).abbreviation) || undefined,
   };
+  // Like the Model files: never replace another Model's provenance unless forced.
   if (files.length)
-    await fs.writeFile(resolve(out, SOURCE_FILE), `${JSON.stringify(source, null, 2)}\n`);
+    await fs.writeFile(resolve(out, SOURCE_FILE), `${JSON.stringify(source, null, 2)}\n`, {
+      flag: force ? "w" : "wx",
+    });
   return { model: { id, name: source.title, url: source.url }, source, files, skipped };
 }

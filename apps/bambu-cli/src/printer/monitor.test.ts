@@ -121,7 +121,7 @@ describe("upstream monitor polling", () => {
   it("atomically persists state and trims logs at upstream thresholds", () => {
     const dir = mkdtempSync(join(tmpdir(), "bambu-monitor-"));
     try {
-      const store = fileStore(dir, dir);
+      const store = fileStore(dir, join(dir, "out"));
       expect(store.load()).toEqual(freshState());
       const state = { ...freshState(), watching: true, job: "cat" };
       store.save(state);
@@ -135,7 +135,7 @@ describe("upstream monitor polling", () => {
         message: "cat",
       };
       store.append(event, 0);
-      const path = join(dir, "bambu-output", "monitor", "events.jsonl");
+      const path = join(dir, "out", "monitor", "events.jsonl");
       expect(JSON.parse(readFileSync(path, "utf8"))).toMatchObject(event);
       writeFileSync(
         path,
