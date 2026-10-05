@@ -26,6 +26,7 @@ import { connect as tlsConnect, type TLSSocket } from "node:tls";
 import { Client as FtpClient } from "basic-ftp";
 import { Argument, Command, Option } from "commander";
 import mqtt from "mqtt";
+import { fail } from "./cli.ts";
 import { Config, mask, type Printer, SECRET_KEYS, type SecretKey, SETTING_KEYS } from "./config.ts";
 import { diagnose, report } from "./doctor.ts";
 import { PROFILES, STUDIO_CLI } from "./studio.ts";
@@ -55,11 +56,6 @@ interface PrinterStatus {
       tray?: { id: string; tray_type?: string; tray_color?: string }[];
     }[];
   };
-}
-
-function fail(message: string): never {
-  console.error(`bambu: ${message}`);
-  process.exit(1);
 }
 
 const config = new Config();
