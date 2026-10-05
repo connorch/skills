@@ -20,6 +20,8 @@ if (root && data) {
   const toasts = document.createElement("div");
   toasts.id = "wovn-toasts";
   document.body.appendChild(toasts);
-  createRoot(toasts).render(<Toaster />);
+  // Level with the fixed Banner's z-index (styles.css :host) and later in
+  // the document, so toasts paint above an open Finder panel.
+  createRoot(toasts).render(<Toaster style={{ zIndex: 2147483647 }} />);
   hydrateRoot(root, <BannerApp page={page} portal={shadow} />);
 }
