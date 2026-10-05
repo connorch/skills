@@ -58,6 +58,7 @@ async function withFtp<T>(printer: Printer, run: (ftp: FtpClient) => Promise<T>)
 
 // One JPEG from the camera stream on 6000: an 80-byte auth packet, then a
 // 16-byte frame header whose first 4 bytes are the JPEG size.
+const MAX_FRAME_BYTES = 16 * 1024 * 1024;
 async function snapshot(printer: Printer, out: string) {
   const auth = Buffer.alloc(80);
   auth.writeUInt32LE(0x40, 0);
@@ -73,6 +74,9 @@ async function snapshot(printer: Printer, out: string) {
       buffer = Buffer.concat([buffer, chunk]);
       if (buffer.length < 16) return;
       const size = buffer.readUInt32LE(0);
+      // A camera frame is a JPEG of a few hundred KB; anything past this is not one.
+      if (size > MAX_FRAME_BYTES)
+        return socket.destroy(new Error(`camera announced a ${size} byte frame`));
       if (buffer.length >= 16 + size) done(buffer.subarray(16, 16 + size));
     });
     socket.on("error", reject);

@@ -167,6 +167,8 @@ export function hasTexture(path: string, format: OutputFormat): boolean {
 // Only the JSON chunk changes, so meshes and textures are byte-identical.
 // Idempotent: a GLB that already has the node is returned unchanged.
 export const UPRIGHT_NODE = "bambu-upright";
+// Upstream's Python port named the same node differently; files it generated are Z-up too.
+export const UPRIGHT_NODES = new Set([UPRIGHT_NODE, "bambu-studio-ai: Y-up to Z-up"]);
 export function standUpright(glb: Buffer): Buffer {
   const jsonLength = glb.readUInt32LE(12);
   const doc = JSON.parse(glb.toString("utf8", 20, 20 + jsonLength)) as {
@@ -174,7 +176,7 @@ export function standUpright(glb: Buffer): Buffer {
     scenes?: { nodes?: number[] }[];
   };
   const nodes = (doc.nodes ??= []);
-  if (nodes.some((n) => n.name === UPRIGHT_NODE)) return glb;
+  if (nodes.some((n) => n.name !== undefined && UPRIGHT_NODES.has(n.name))) return glb;
   for (const scene of doc.scenes ?? []) {
     nodes.push({
       name: UPRIGHT_NODE,

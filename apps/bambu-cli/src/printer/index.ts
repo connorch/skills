@@ -131,13 +131,27 @@ export function register(program: Command, config: Config): void {
               if (!options.json) console.log(`\u{1F4E2} NOTIFY: ${event.title} - ${event.message}`);
             },
           );
+          // watch reports connection failures through its diagnostic and
+          // returns 1; under --json the last diagnostic becomes the error document.
+          let lastDiagnostic = "";
+          deps.diagnostic = (message) => {
+            lastDiagnostic = message;
+            console.error(message);
+          };
           process.exitCode = await watch(
             config.printer(),
             limitsFor(config.settings().model),
             { interval, waitStart, once: Boolean(options.once) },
             deps,
           );
-          if (options.json) output(true, { events }, () => "");
+          if (options.json)
+            output(
+              true,
+              process.exitCode === 1 && lastDiagnostic
+                ? { error: { type: "printer", message: lastDiagnostic }, events }
+                : { events },
+              () => "",
+            );
         } catch (error) {
           commandError(error, Boolean(options.json));
         }

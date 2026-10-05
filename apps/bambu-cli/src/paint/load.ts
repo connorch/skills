@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { extname, basename, dirname, resolve } from "node:path";
 import { NodeIO, type GLTF, type Node } from "@gltf-transform/core";
-import { UPRIGHT_NODE } from "../generate/download.ts";
+import { UPRIGHT_NODES } from "../generate/download.ts";
 import jpeg from "jpeg-js";
 import { PNG } from "pngjs";
 import { linearToSrgb, srgbToLinear, roundEven, type Vec3, type Vec4 } from "./lab.ts";
@@ -121,7 +121,7 @@ export async function loadColouredModel(
       if (scene) scene.traverse((node) => shown.add(node));
       // A generated GLB was already turned Z-up by its upright root node
       // (generate/download.ts); only a raw glTF needs the Y-up conversion.
-      const zUp = root.listNodes().some((n) => n.getName() === UPRIGHT_NODE);
+      const zUp = root.listNodes().some((n) => UPRIGHT_NODES.has(n.getName()));
       model.turned = !zUp;
       const toPrinter = (w: number[]): Vec3 =>
         zUp

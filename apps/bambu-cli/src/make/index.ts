@@ -1,5 +1,5 @@
 import { existsSync, realpathSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
+import { rename, writeFile } from "node:fs/promises";
 import { basename, extname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import Module from "manifold-3d";
@@ -49,7 +49,9 @@ export async function make(script: string, out?: string) {
 export async function writeModel(model: Manifold, destination: string) {
   try {
     const summary = summarize(model);
-    await writeFile(destination, binaryStl(model));
+    // Written beside the destination and renamed, so a failed rerun keeps the old STL.
+    await writeFile(`${destination}.tmp`, binaryStl(model));
+    await rename(`${destination}.tmp`, destination);
     return { output: destination, ...summary };
   } finally {
     model.delete();

@@ -24,7 +24,7 @@ const optionsSchema = z.object({
   wait: z.boolean().default(false),
   format: z.enum(formats).default("glb"),
   texture: z.boolean().default(true),
-  timeout: z.coerce.number().positive().default(900),
+  timeout: z.coerce.number().positive().finite().default(900),
   json: z.boolean().default(false),
   out: z.string().optional(),
   prompt: z.string().optional(),
