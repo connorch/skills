@@ -1,6 +1,7 @@
 import { defineConfig, mergeConfig } from "vite-plus";
 
 import baseConfig from "../../vite.config.ts";
+import { bundleManifoldWasm } from "./src/make/bundle.ts";
 
 // One self-contained file: the `ship:machine` script copies dist/bambu.mjs to
 // ~/.local/bin/bambu, so dependencies have to be inlined rather than resolved
@@ -21,10 +22,12 @@ export default mergeConfig(
           "@gltf-transform/core",
           "@gltf-transform/functions",
           "meshoptimizer",
+          "manifold-3d",
         ],
         onlyBundle: false,
       },
       banner: { js: "#!/usr/bin/env node\n" },
+      plugins: [bundleManifoldWasm()],
     },
   }),
 );
