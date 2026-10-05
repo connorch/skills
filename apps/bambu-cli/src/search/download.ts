@@ -40,6 +40,8 @@ export const MODEL_QUERY = `query DownloadModel($id: ID!) { print(id: $id) { id 
 export const LINK_MUTATION = `mutation DownloadFile($id: ID!, $modelId: ID!) { getDownloadLink(id: $id, printId: $modelId, fileType: stl, source: model_detail) { ok errors { field messages } output { link ttl } } }`;
 export const MAX_FILE_BYTES = 512 * 1024 * 1024;
 const STALL_MS = 30_000;
+const MODEL_EXTENSIONS = new Set([".stl", ".3mf", ".obj"]);
+const COMPANION_EXTENSIONS = new Set([".mtl", ".png", ".jpg", ".jpeg"]);
 // Download anonymous Printables Model files into a Print Job folder.
 export async function fetchModel(
   input: string,
@@ -74,11 +76,16 @@ export async function fetchModel(
   };
   // Every destination, provenance included, is checked before anything is
   // written so a folder holding another Model is refused up front unless forced.
-  const wanted: { name: string; fileId: string; fileSize: unknown }[] = [];
-  for (const file of mappings(model.stls)) {
-    const name = text(file.name);
-    // STEP is skipped: neither analyze nor Bambu Studio's CLI reads it.
-    if (![".stl", ".3mf", ".obj"].includes(extname(name).toLowerCase())) {
+  const wanted: { name: string; fileId: string; fileSize: unknown; model: boolean }[] = [];
+  const listed = mappings(model.stls),
+    textured = listed.some((f) => extname(text(f.name)).toLowerCase() === ".obj");
+  for (const file of listed) {
+    const name = text(file.name),
+      ext = extname(name).toLowerCase();
+    // STEP is skipped: neither analyze nor Bambu Studio's CLI reads it. An
+    // OBJ's material library and textures come along so paint can read it.
+    const isModel = MODEL_EXTENSIONS.has(ext);
+    if (!isModel && !(textured && COMPANION_EXTENSIONS.has(ext))) {
       skipped.push(name);
       continue;
     }
@@ -91,9 +98,9 @@ export async function fetchModel(
       throw new SiteError("Printables returned an unsafe filename");
     const fileId = modelId(file.id);
     if (!fileId) throw new SiteError("Printables returned an invalid file id");
-    wanted.push({ name, fileId, fileSize: file.fileSize });
+    wanted.push({ name, fileId, fileSize: file.fileSize, model: isModel });
   }
-  if (!wanted.length)
+  if (!wanted.some((f) => f.model))
     throw new SiteError(
       `no STL, 3MF, or OBJ file to download${skipped.length ? ` (skipped ${skipped.join(", ")})` : ""}`,
     );
@@ -116,7 +123,7 @@ export async function fetchModel(
   const files = staged.map(({ name, path, bytes }) => ({ name, path, bytes }));
   return { model: { id, name: source.title, url: source.url }, source, files, skipped };
   async function downloadAll() {
-    for (const { name, fileId, fileSize } of wanted) {
+    for (const { name, fileId, fileSize, model: isModel } of wanted) {
       const result = mapping(
         graphqlData(
           await requestJson(
@@ -187,11 +194,9 @@ export async function fetchModel(
         throw new SiteError(`${name}: received ${received} of ${expected} bytes`);
       // A signed host can answer 200 with an error page; the file must look
       // like the Model it is named as before the job is committed.
-      const problem = sniffProblem(
-        head,
-        extname(name).slice(1).toLowerCase() as OutputFormat,
-        received,
-      );
+      const problem = isModel
+        ? sniffProblem(head, extname(name).slice(1).toLowerCase() as OutputFormat, received)
+        : undefined;
       if (problem) throw new SiteError(`${name}: ${problem}`);
       staged[staged.length - 1]!.bytes = received;
     }

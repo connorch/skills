@@ -113,6 +113,10 @@ describe("Model file formats", () => {
       "data:application/octet-stream;base64," + Buffer.from(bytes).toString("base64");
     files.set("/model.gltf", strToU8(JSON.stringify(doc)));
     expect(bounds(load("/model.gltf", io)).extents).toEqual([2, 2, 0]);
+    // Points and lines beside the surface are ignored, not an error.
+    doc.meshes[0]!.primitives.push({ attributes: { POSITION: 0 }, mode: 1 } as never);
+    files.set("/model.gltf", strToU8(JSON.stringify(doc)));
+    expect(load("/model.gltf", io).indices.length).toBe(6);
   });
   it("chains derived names and falls back to STL for other extensions", () => {
     expect(derivedPath("/a/cup_scaled.glb", "_oriented")).toBe("/a/cup_scaled_oriented.glb");

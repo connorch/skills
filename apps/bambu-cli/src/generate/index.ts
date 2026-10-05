@@ -114,11 +114,11 @@ export function register(program: Command, config: Config, http = new HttpClient
           submitted.prompt_used = image
             ? !!options.prompt && provider.image_prompt_supported
             : null;
-          if (!options.wait) submitted.next_command += resumeFlags;
           return submitted;
         })();
-        // The requested format and texture policy travel with the download command.
-        if (verb === "status" && result.next_command.startsWith("bambu generate download "))
+        // The requested format, texture policy, and output directory travel
+        // with every download command, whichever verb produced it.
+        if (result.next_command.startsWith("bambu generate download "))
           result.next_command += resumeFlags;
         output(json, result, () =>
           [

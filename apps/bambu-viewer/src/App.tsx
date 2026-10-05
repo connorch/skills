@@ -242,8 +242,8 @@ function PrintColumn({ review, open, setOpen }: ColumnProps) {
       {review.palette ? (
         <div className="line palette">
           {review.palette.map((c) => (
-            <span key={c.slot} title={`${c.name} · ${c.areaPct.toFixed(0)}%`}>
-              <span className="swatch" style={{ background: c.hex }} /> {c.slot}
+            <span key={c.hex} title={`${c.name} · ${c.areaPct.toFixed(0)}%`}>
+              <span className="swatch" style={{ background: c.hex }} /> {c.slot || c.name}
             </span>
           ))}
         </div>

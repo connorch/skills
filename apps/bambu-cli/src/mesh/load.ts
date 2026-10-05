@@ -415,31 +415,39 @@ export function loadGLTF(json: unknown, buffers: Uint8Array[], format = "gltf"):
     }
     return result;
   }
-  const meshes = doc.meshes.map((m) =>
-    merge(
-      m.primitives
-        .filter((p) => p.attributes.POSITION !== undefined)
-        .map((p) => {
-          const positions = accessor(p.attributes.POSITION!, 3),
-            raw =
-              p.indices === undefined
-                ? Array.from({ length: positions.length / 3 }, (_, i) => i)
-                : accessor(p.indices, 1),
-            indices: number[] = [];
-          if (p.mode === 4) for (const i of raw) indices.push(i);
-          else if (p.mode === 5 || p.mode === 6)
-            for (let i = 2; i < raw.length; i++)
-              indices.push(
-                p.mode === 6 ? raw[0]! : raw[i - 2 + (i % 2)]!,
-                p.mode === 6 ? raw[i - 1]! : raw[i - 1 - (i % 2)]!,
-                raw[i]!,
-              );
-          else throw new MeshLoadError("glTF primitive is not triangles");
-          return model(positions, indices, format);
-        }),
+  // Points and lines (guides, annotations) are not surfaces; they are left out
+  // rather than failing the Model. A mesh with no surface primitive is empty.
+  const empty: Mesh = {
+    positions: new Float32Array(),
+    indices: new Uint32Array(),
+    source: { format },
+  };
+  const meshes = doc.meshes.map((m) => {
+    const surfaces = m.primitives.filter(
+      (p) => p.attributes.POSITION !== undefined && [4, 5, 6].includes(p.mode),
+    );
+    if (!surfaces.length) return empty;
+    return merge(
+      surfaces.map((p) => {
+        const positions = accessor(p.attributes.POSITION!, 3),
+          raw =
+            p.indices === undefined
+              ? Array.from({ length: positions.length / 3 }, (_, i) => i)
+              : accessor(p.indices, 1),
+          indices: number[] = [];
+        if (p.mode === 4) for (const i of raw) indices.push(i);
+        else if (p.mode === 5 || p.mode === 6)
+          for (let i = 2; i < raw.length; i++)
+            indices.push(
+              p.mode === 6 ? raw[0]! : raw[i - 2 + (i % 2)]!,
+              p.mode === 6 ? raw[i - 1]! : raw[i - 1 - (i % 2)]!,
+              raw[i]!,
+            );
+        return model(positions, indices, format);
+      }),
       format,
-    ),
-  );
+    );
+  });
   const instances: Mesh[] = [];
   function visit(index: number, parent: readonly number[], ancestors: Set<number>) {
     const n = doc.nodes[index];
