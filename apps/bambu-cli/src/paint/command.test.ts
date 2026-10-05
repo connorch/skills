@@ -3,7 +3,7 @@ import { Command } from "commander";
 import { Config } from "../config.ts";
 import { parseStatus, type Slot } from "../printer/report.ts";
 import { defaultDependencies, formatReport, register, runPaint } from "./index.ts";
-import { loadColouredModel, decodeTexture } from "./load.ts";
+import { loadColouredModel, decodeTexture, textureSize } from "./load.ts";
 import { nearestFilaments, nearestSlots } from "./filaments.ts";
 import { readProject } from "./project.ts";
 import { bands, box, glb, png, textured } from "./fixtures/builder.ts";
@@ -216,6 +216,15 @@ describe("paint command and AMS contract", () => {
     expect(decoded.width).toBe(8);
     expect(decoded.height).toBe(8);
     expect(Math.abs(decoded.data[0]! - 200)).toBeLessThan(3);
+  });
+  it("reads texture sizes from the header and refuses oversized ones undecoded", () => {
+    const image = bands([[200, 30, 30]], 8);
+    expect(textureSize(png(image))).toEqual([8, 8]);
+    expect(textureSize(jpeg.encode(image, 100).data)).toEqual([8, 8]);
+    const huge = Buffer.from(png(image));
+    huge.writeUInt32BE(20000, 16);
+    huge.writeUInt32BE(20000, 20);
+    expect(() => decodeTexture(huge)).toThrow("20000 x 20000");
   });
   it("reads textured and vertex-colour OBJ with injected files", async () => {
     const files = new Map([

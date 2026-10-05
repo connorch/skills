@@ -33,7 +33,30 @@ export interface ColouredModel {
 export class ModelLoadError extends Error {}
 export class NoColourError extends Error {}
 export type ReadFile = (path: string) => Promise<Uint8Array>;
+// Textures past this many pixels (a 256 MB RGBA bitmap) are refused before
+// decoding; the header carries the size, so the file is never expanded first.
+export const MAX_TEXTURE_PIXELS = 64 * 1024 * 1024;
+export function textureSize(bytes: Uint8Array): [number, number] | undefined {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes.length >= 24)
+    return [view.getUint32(16), view.getUint32(20)];
+  if (bytes[0] === 0xff && bytes[1] === 0xd8)
+    // JPEG: walk the markers to the first start-of-frame.
+    for (let p = 2; p + 9 < bytes.length && bytes[p] === 0xff;) {
+      const marker = bytes[p + 1]!,
+        length = view.getUint16(p + 2);
+      if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker))
+        return [view.getUint16(p + 7), view.getUint16(p + 5)];
+      p += 2 + length;
+    }
+  return undefined;
+}
 export function decodeTexture(bytes: Uint8Array): Texture {
+  const size = textureSize(bytes);
+  if (size && size[0] * size[1] > MAX_TEXTURE_PIXELS)
+    throw new ModelLoadError(
+      `texture is ${size[0]} x ${size[1]} pixels; the limit is ${MAX_TEXTURE_PIXELS} pixels`,
+    );
   const png =
     bytes[0] === 0xff && bytes[1] === 0xd8
       ? jpeg.decode(bytes, { useTArray: true })

@@ -135,8 +135,9 @@ function centred(mesh: PreviewMesh): PreviewMesh {
 // A textured or vertex-coloured Model (GLB, glTF, OBJ) is previewed as it
 // would print: each triangle in its Palette colour, with the Palette listed.
 // Anything else, or a Model without colour, previews in the filament colour.
-// `scale` maps the paint loader's millimetre coordinates onto the analysed mesh,
-// which follows the unit decision rather than glTF's metre convention.
+// `scale` maps the paint loader's coordinates onto the analysed mesh: glTF
+// comes back x1000 (metres to mm) while OBJ keeps the file's numbers, and the
+// analysis follows the unit decision rather than glTF's metre convention.
 // The coordinates are also turned back to the file's own axes when the loader
 // made them Z-up: analysis and the page both show a raw glTF as it is.
 async function paintedPreview(
@@ -198,24 +199,27 @@ export function register(program: Command, config: Config): void {
     .option("--no-publish", "write the page but do not upload it")
     .option("--json")
     .action(async (model: string, raw: unknown) => {
-      const options = z
-        .object({
-          output: z.string().optional(),
-          job: z.string().optional(),
-          printer: z.string().optional(),
-          material: z.string(),
-          purpose: z.enum(["general", "decorative", "functional"]),
-          publish: z.boolean(),
-          json: z.boolean().optional(),
-        })
-        .parse(raw);
+      const json = typeof raw === "object" && raw !== null && "json" in raw && raw.json === true;
       try {
-        await view(model, options, config);
+        const parsed = z
+          .object({
+            output: z.string().optional(),
+            job: z.string().optional(),
+            printer: z.string().optional(),
+            material: z.string(),
+            purpose: z.enum(["general", "decorative", "functional"]),
+            publish: z.boolean(),
+            json: z.boolean().optional(),
+          })
+          .safeParse(raw);
+        if (!parsed.success)
+          throw new UsageError("--purpose must be general, decorative, or functional");
+        await view(model, parsed.data, config);
       } catch (error) {
         // One JSON error document under --json, like analyze and the rest.
         const message = error instanceof Error ? error.message : String(error),
           usage = error instanceof UsageError;
-        if (options.json)
+        if (json)
           output(true, { error: { type: usage ? "usage" : "failed", message } }, () => message);
         console.error(`bambu: ${message}`);
         process.exitCode = usage ? EXIT_USAGE : EXIT_FAILED;
@@ -259,7 +263,10 @@ async function view(model: string, options: ViewOptions, config: Config): Promis
     printerName: printer?.name ?? "Unknown printer",
     plate: [px, py, pz],
   });
-  const painted = await paintedPreview(file, units.scale / 1000);
+  const painted = await paintedPreview(
+    file,
+    extname(file).toLowerCase() === ".obj" ? units.scale : units.scale / 1000,
+  );
   if (painted) review.palette = painted.palette;
   const glb = await buildGlb(
     centred(
