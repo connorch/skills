@@ -123,11 +123,6 @@ follow them except where the overrides below say otherwise:
    }
    ```
 
-   ```sh
-   cargo run --release --manifest-path "$S/Cargo.toml"
-   $PSY plan validate "$S/<slug>.reel.json"
-   ```
-
 4. **Narrate.** Kit's films time every beat to a spoken word. Write
    `$S/narration/script.json` as his skill describes, then voice it with
    `cd "$PP"` first (narrate.ts writes the clips next to the script):
@@ -161,6 +156,14 @@ follow them except where the overrides below say otherwise:
    digits ("58") and splits brand names ("Eleven Labs"). Check the
    `.words.json` files, or anchor with alternatives such as
    `.at_any(&["237", "two hundred"])`.
+
+   Build the reel only once narration exists, and rebuild it after every
+   narration or scene change, so its timings match the audio:
+
+   ```sh
+   cargo run --release --manifest-path "$S/Cargo.toml"
+   $PSY plan validate "$S/<slug>.reel.json"
+   ```
 
 5. **Review before rendering.** Get segment spans from
    `$PSY plan inspect "$S/<slug>.reel.json"`, then make contact sheets at each
