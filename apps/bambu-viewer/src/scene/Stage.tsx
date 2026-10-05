@@ -86,8 +86,9 @@ export function Stage({ model, plate, color, view, insets, labels, onUserOrbit }
 // Image-based lighting from three's RoomEnvironment: soft reflections on the
 // filament without any external HDR file.
 function RoomLighting() {
-  const { gl, scene } = useThree();
+  const get = useThree((s) => s.get);
   useEffect(() => {
+    const { gl, scene } = get();
     const pmrem = new THREE.PMREMGenerator(gl);
     const texture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     scene.environment = texture;
@@ -97,7 +98,7 @@ function RoomLighting() {
       scene.environment = null;
       texture.dispose();
     };
-  }, [gl, scene]);
+  }, [get]);
   return null;
 }
 
@@ -129,27 +130,24 @@ function CameraRig({
   view: ViewRequest;
   insets: Insets;
 }) {
-  const { camera, size, invalidate } = useThree();
+  const { get, size, invalidate } = useThree();
   const controls = useThree((s) => s.controls) as OrbitControlsImpl | null;
   const anim = useRef<((now: number) => boolean) | null>(null);
 
-  // Offset the projection so the Model centres in the free area, and return
-  // the camera distance that fits it there with some margin.
-  function fit(): number {
-    const cam = camera as THREE.PerspectiveCamera;
+  useEffect(() => {
+    const camera = get().camera as THREE.PerspectiveCamera;
+    // Offset the projection so the Model centres in the free area, and fit
+    // the camera distance to it with some margin.
     const { width: W, height: H } = size;
     const { top: t, bottom: b, left: l, right: r } = insets;
-    cam.aspect = W / H;
-    cam.setViewOffset(W, H, (r - l) / 2, (b - t) / 2, W, H);
-    cam.updateProjectionMatrix();
-    const half = Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2);
+    camera.aspect = W / H;
+    camera.setViewOffset(W, H, (r - l) / 2, (b - t) / 2, W, H);
+    camera.updateProjectionMatrix();
+    const half = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
     const ht = Math.min((half * (H - t - b)) / H, (half * (W / H) * (W - l - r)) / W);
-    return (model.radius * 1.3) / Math.sin(Math.atan(ht));
-  }
+    const dist = (model.radius * 1.3) / Math.sin(Math.atan(ht));
 
-  useEffect(() => {
     const to = new THREE.Vector3(...VIEW_DIRS[view.name]).normalize();
-    const dist = fit();
     if (!controls) {
       camera.position.copy(center).addScaledVector(to, dist);
       camera.lookAt(center);
@@ -176,18 +174,9 @@ function CameraRig({
       return k < 1;
     };
     invalidate();
-    // `view.nonce` changes on every request; insets and size changes re-fit.
-  }, [
-    view.name,
-    view.nonce,
-    insets.top,
-    insets.bottom,
-    insets.left,
-    insets.right,
-    size.width,
-    size.height,
-    controls,
-  ]);
+    // `view` is a new object on every request, so re-clicking the current
+    // view still re-frames; insets and size changes re-fit.
+  }, [get, invalidate, controls, model, center, view, insets, size]);
 
   useFrame(() => {
     if (!anim.current) return;

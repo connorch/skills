@@ -35,12 +35,11 @@ export function App({ review, model }: { review: Review; model: LoadedModel }) {
   // phones; the camera only needs to avoid it in the first case.
   useLayoutEffect(() => {
     const phone = matchMedia("(max-width: 700px)");
+    // Same values keep the same object, so the camera only re-fits on a change.
     const measure = () =>
-      setInsets({
-        top: 90,
-        left: 0,
-        right: 0,
-        bottom: phone.matches ? 0 : (dock.current?.offsetHeight ?? 0) - 24,
+      setInsets((prev) => {
+        const bottom = phone.matches ? 0 : (dock.current?.offsetHeight ?? 0) - 24;
+        return prev.bottom === bottom ? prev : { ...prev, bottom };
       });
     measure();
     const observer = new ResizeObserver(measure);

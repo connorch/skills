@@ -41,8 +41,9 @@ function extents(model: LoadedModel, view: ViewName): [number, number] {
 }
 
 function TileCamera({ model, view }: { model: LoadedModel; view: ViewName }) {
-  const { camera, size, invalidate } = useThree();
+  const { get, size, invalidate } = useThree();
   useLayoutEffect(() => {
+    const { camera } = get();
     const center = new THREE.Vector3(0, model.size.z / 2, 0);
     const dir = new THREE.Vector3(...VIEW_DIRS[view]).normalize();
     const aspect = size.width / Math.max(1, size.height);
@@ -64,6 +65,6 @@ function TileCamera({ model, view }: { model: LoadedModel; view: ViewName }) {
     camera.position.copy(center).addScaledVector(dir, dist);
     camera.lookAt(center);
     invalidate();
-  }, [camera, model, view, size.width, size.height]);
+  }, [get, invalidate, model, view, size.width, size.height]);
   return null;
 }
