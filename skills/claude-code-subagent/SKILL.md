@@ -46,7 +46,6 @@ claude -p \
   --permission-mode auto \
   --permission-prompts none \
   --output-format json \
-  --max-turns 80 \
   <"$PROMPT" >"$RESULT" 2>"$ARTIFACT_DIR/run.log"
 echo $? >"$ARTIFACT_DIR/exit_code"
 ```
@@ -61,7 +60,7 @@ If `claude` is not installed, is not logged in, or the command fails, report the
 
 `$RESULT` holds one JSON object. Check these fields:
 
-- `is_error` and `subtype`: `success` means Claude finished. `error_max_turns` means it hit `--max-turns`; resume it or narrow the scope.
+- `is_error` and `subtype`: `success` means Claude finished.
 - `result`: Claude's final report.
 - `session_id`: needed to resume for follow-ups.
 - `permission_denials`: actions auto mode or the prompt policy refused. Decide whether each one matters. Do not rerun with looser permissions to get around a denial; report it to the user instead.

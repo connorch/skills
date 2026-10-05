@@ -1,6 +1,6 @@
 ---
 name: claude-router
-description: Use when Claude Code hits a rate limit, when asked which account is serving, or to bypass or force an account through claude-router.
+description: Controls claude-router, the local proxy that spreads Claude Code requests across subscription accounts. Use when Claude Code hits a rate limit, when asked which account is serving, or to bypass or force an account.
 metadata:
   machines: [connors-mac-studio, connors-macbook-pro]
   requires: "the claude-router service and CLI installed by a Ship"

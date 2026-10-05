@@ -17,7 +17,6 @@ When adding or removing live skills, update these examples and the development l
 
 ```sh
 skills add connorch/skills --skill qa-ux-plan
-skills add connorch/skills --skill qa-ux-fix-loop
 skills add connorch/skills --skill qa-ux-verify
 skills add connorch/skills --skill codex-review
 skills add connorch/skills --skill codex-implementation
@@ -41,7 +40,7 @@ skills add connorch/skills --skill motion-explainer
 You can also install multiple specific skills in one command:
 
 ```sh
-skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr file-pr implement-and-review handoff html-communication wovn-file-hosting fleet-exec jev mac-vm bambu-print t3-browser motion-explainer
+skills add connorch/skills --skill qa-ux-plan qa-ux-verify codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr file-pr implement-and-review handoff html-communication wovn-file-hosting fleet-exec jev mac-vm bambu-print t3-browser motion-explainer
 ```
 
 ## Shipping to your machines
@@ -120,7 +119,6 @@ These skills help you plan, verify, write, refactor, and fix code.
 
 - **qa-ux-plan** — Generate end-to-end QA UX verification plans from the current branch's diff without executing tests.
 - **qa-ux-verify** — Execute QA UX plans with browser automation and generate evidence-backed HTML reports without fixing issues.
-- **qa-ux-fix-loop** — Execute QA UX plans, record issues, fix them serially, and require evaluator signoff.
 - **codex-review** — Ask Codex CLI for an independent review of uncommitted changes, branch diffs, commits, or specific implementations.
 - **codex-implementation** — Delegate bounded code changes to Codex CLI, then inspect the resulting diff and verification.
 - **claude-code-subagent** — For non-Claude agents (Codex, Hermes, etc.): delegate bounded implementation, review, or investigation to Claude Code CLI (`claude -p`) on the user's Claude subscription, then inspect the result and diff.
@@ -180,3 +178,4 @@ rename `SKILL.archived.md` to `SKILL.md`.
 - **codex-computer-use** — Archived because it is no longer part of the live skill set.
 - **sb-ingest** - Archived because it is no longer part of the live skill set.
 - **sb-ingest-superwhisper-meeting** - Archived because it is no longer part of the live skill set.
+- **qa-ux-fix-loop** - Archived because it is no longer part of the live skill set.

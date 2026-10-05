@@ -14,7 +14,7 @@ Jev is a decision model: a state plus typed questions (choice, noul, score) in,
 calibrated probabilities out, in tens of milliseconds. It never generates text,
 plans, or knows much trivia. Use it where code needs judgments at volume or
 inside a loop; keep planning, text generation, and final verification yourself.
-For question design and the API, use the `typesafe-ai` skill.
+For question design and the API, use the $typesafe-ai skill.
 
 If the user says "Kev", use Jev. Kev (an open-source clone of Jev) is not set up.
 

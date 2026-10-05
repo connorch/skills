@@ -35,4 +35,4 @@ GOOD
 > worktrees. Super unintuitive. Now your preferences always apply.
 
 Open a real PR rather than a draft so review bots run. If the user also asked
-to babysit it, continue with the `babysit-pr` skill.
+to babysit it, continue with the $babysit-pr skill.
