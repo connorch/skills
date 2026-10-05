@@ -25,6 +25,8 @@ export default mergeConfig(
           "meshoptimizer",
           "manifold-3d",
           "fflate",
+          "pngjs",
+          "jpeg-js",
         ],
         onlyBundle: false,
       },

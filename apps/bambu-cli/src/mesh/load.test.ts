@@ -40,6 +40,24 @@ describe("Model file formats", () => {
     expect(mesh.indices.length).toBe(6);
     expect(bounds(mesh).extents).toEqual([7, 5, 0]);
   });
+  it("follows production-extension p:path references to object files", () => {
+    const { io, files } = memoryIO();
+    files.set(
+      "/project.3mf",
+      zipSync({
+        "3D/3dmodel.model": strToU8(
+          '<model unit="millimeter"><resources><object id="2"><components><component p:path="/3D/Objects/object_1.model" objectid="1" transform="1 0 0 0 1 0 0 0 1 0 0 0"/></components></object></resources><build><item objectid="2" transform="1 0 0 0 1 0 0 0 1 128 128 0"/></build></model>',
+        ),
+        "3D/Objects/object_1.model": strToU8(
+          '<model unit="millimeter"><resources><object id="1"><mesh><vertices><vertex x="0" y="0" z="0"/><vertex x="2" y="0" z="0"/><vertex x="0" y="3" z="0"/></vertices><triangles><triangle v1="0" v2="1" v3="2"/></triangles></mesh></object></resources></model>',
+        ),
+      }),
+    );
+    const mesh = load("/project.3mf", io);
+    expect(mesh.indices.length).toBe(3);
+    expect(bounds(mesh).min).toEqual([128, 128, 0]);
+    expect(bounds(mesh).extents).toEqual([2, 3, 0]);
+  });
   it("rejects cyclic components and corrupt or empty Models", () => {
     const { io, files } = memoryIO();
     files.set(

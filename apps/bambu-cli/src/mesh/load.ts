@@ -133,19 +133,32 @@ function mfTransform(text?: string): number[] {
   ];
 }
 export function load3MF(bytes: Uint8Array): Mesh {
-  const archive = unzipSync(bytes),
-    data = archive["3D/3dmodel.model"];
-  if (!data) throw new MeshLoadError("3MF has no 3D/3dmodel.model");
-  const root = children(xmlElements(strFromU8(data)), "model")[0];
-  if (!root) throw new MeshLoadError("3MF has no model");
-  const objects = new Map(
-    children(children(root, "resources")[0], "object").map((o) => [o.attrs.id!, o]),
-  );
-  function object(id: string, ancestors: Set<string>): Mesh {
-    if (ancestors.has(id)) throw new MeshLoadError("cyclic 3MF components");
-    const resource = objects.get(id);
+  const archive = unzipSync(bytes);
+  // Objects by "<model file>#<id>": the production extension (Bambu Studio
+  // projects) keeps each object in its own file under 3D/Objects, referenced
+  // from a component's p:path.
+  const roots = new Map<string, Element>(),
+    objects = new Map<string, Element>();
+  function modelFile(path: string): Element {
+    const known = roots.get(path);
+    if (known) return known;
+    const data = archive[path.replace(/^\//, "")];
+    if (!data) throw new MeshLoadError(`3MF has no ${path}`);
+    const root = children(xmlElements(strFromU8(data)), "model")[0];
+    if (!root) throw new MeshLoadError(`${path} has no model`);
+    roots.set(path, root);
+    for (const o of children(children(root, "resources")[0], "object"))
+      objects.set(`${path}#${o.attrs.id!}`, o);
+    return root;
+  }
+  const root = modelFile("/3D/3dmodel.model");
+  function object(path: string, id: string, ancestors: Set<string>): Mesh {
+    const key = `${path}#${id}`;
+    if (ancestors.has(key)) throw new MeshLoadError("cyclic 3MF components");
+    modelFile(path);
+    const resource = objects.get(key);
     if (!resource) throw new MeshLoadError(`missing 3MF object ${id}`);
-    const ancestry = new Set([...ancestors, id]),
+    const ancestry = new Set([...ancestors, key]),
       mesh = children(resource, "mesh")[0];
     if (mesh) {
       const vertices = children(children(mesh, "vertices")[0], "vertex"),
@@ -158,7 +171,10 @@ export function load3MF(bytes: Uint8Array): Mesh {
     }
     return merge(
       children(children(resource, "components")[0], "component").map((c) =>
-        transform(object(c.attrs.objectid!, ancestry), mfTransform(c.attrs.transform)),
+        transform(
+          object(c.attrs["p:path"] ?? path, c.attrs.objectid!, ancestry),
+          mfTransform(c.attrs.transform),
+        ),
       ),
       "3mf",
     );
@@ -167,9 +183,15 @@ export function load3MF(bytes: Uint8Array): Mesh {
   const mesh = merge(
     items.length
       ? items.map((i) =>
-          transform(object(i.attrs.objectid!, new Set()), mfTransform(i.attrs.transform)),
+          transform(
+            object(i.attrs["p:path"] ?? "/3D/3dmodel.model", i.attrs.objectid!, new Set()),
+            mfTransform(i.attrs.transform),
+          ),
         )
-      : [...objects.keys()].map((id) => object(id, new Set())),
+      : [...objects.keys()].map((key) => {
+          const [path, id] = key.split("#") as [string, string];
+          return object(path, id, new Set());
+        }),
     "3mf",
   );
   mesh.unit = root.attrs.unit ?? "millimeter";
