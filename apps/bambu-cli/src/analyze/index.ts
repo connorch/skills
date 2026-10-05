@@ -261,7 +261,7 @@ export function formatReport(doc: PrintabilityReport): string {
 export function register(program: Command, config: Config, io: MeshIO = fileIO): void {
   program
     .command("analyze")
-    .description("Check a Model and produce its Printability Report")
+    .description("check a Model: the Printability Report, repair, and orientation")
     .argument("<file>", "Model file (.stl, .3mf, .obj, .glb, .gltf)")
     .option("--printer <model>", "printer model (configured model, else P1S)")
     .option("--material <material>", "filament material", "PLA")

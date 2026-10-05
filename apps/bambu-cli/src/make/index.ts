@@ -54,7 +54,7 @@ export async function writeModel(model: Manifold, destination: string) {
 export function register(program: Command, _config: Config): void {
   program
     .command("make")
-    .description("Make a Model from a TypeScript or JavaScript script (millimetres)")
+    .description("make a Model from a TypeScript script (millimetres)")
     .argument("<script>")
     .option("--out <file.stl>", "Output STL (default: beside the script)")
     .option("--json", "Print JSON")

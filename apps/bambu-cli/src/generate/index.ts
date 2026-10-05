@@ -32,7 +32,9 @@ const optionsSchema = z.object({
 
 // Adds the Generate Route without modifying the CLI entry point.
 export function register(program: Command, config: Config, http = new HttpClient()): void {
-  const group = program.command("generate").description("Generate a Model from text or an image");
+  const group = program
+    .command("generate")
+    .description("generate a Model from text or an image with an AI provider");
   for (const verb of ["text", "image", "status", "download"] as const) {
     const command = group.command(
       `${verb} <${verb === "text" ? "prompt" : verb === "image" ? "image" : "task-id"}>`,

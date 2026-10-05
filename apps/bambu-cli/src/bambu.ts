@@ -80,7 +80,18 @@ async function snapshot(printer: Printer, out: string) {
   console.log(out);
 }
 
-const program = new Command("bambu").description("LAN tooling for a Bambu Lab printer");
+const program = new Command("bambu").description(
+  "a Bambu Lab printer: find, generate, make, check, review, slice, and watch Models",
+);
+
+// Commands in workflow order (skills/bambu-print/SKILL.md), then the printer.
+registerSearch(program, config);
+registerGenerate(program, config);
+registerMake(program, config);
+registerAnalyze(program, config);
+registerView(program, config);
+registerSlice(program, config);
+registerPrinter(program, config);
 
 program
   .command("snapshot")
@@ -181,14 +192,6 @@ configCommand
         : "no access code found to copy",
     );
   });
-
-registerAnalyze(program, config);
-registerGenerate(program, config);
-registerMake(program, config);
-registerPrinter(program, config);
-registerSearch(program, config);
-registerSlice(program, config);
-registerView(program, config);
 
 program
   .command("doctor")

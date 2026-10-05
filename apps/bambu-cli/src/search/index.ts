@@ -50,6 +50,7 @@ export function register(
 ): void {
   program
     .command("search")
+    .description("find Models on MakerWorld and Printables")
     .argument("<query>")
     .option("-s, --source <site>", "{all,makerworld,printables}", "all")
     .option(
@@ -128,6 +129,7 @@ export function register(
     });
   program
     .command("fetch")
+    .description("download a Printables Model into a Print Job folder")
     .argument("<url-or-id>")
     .option("--out <dir>")
     .option("--force", "overwrite existing files")
