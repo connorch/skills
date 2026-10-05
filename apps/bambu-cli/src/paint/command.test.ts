@@ -250,6 +250,13 @@ describe("paint command and AMS contract", () => {
     );
     expect(vertex.vertexColours[0]).toEqual([1, 0, 0, 1]);
   });
+  it("refuses companion files outside the Model's folder", async () => {
+    const read = async (p: string) =>
+      p === "/job/escape.obj"
+        ? Buffer.from("mtllib ../secret.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n")
+        : Buffer.from("newmtl m\nKd 1 0 0\n");
+    await expect(loadColouredModel("/job/escape.obj", read)).rejects.toThrow("outside its folder");
+  });
   it("exports OBJ vertex labels by incident triangle majority", () => {
     const cube = box([40, 40, 40]),
       labels = cube.faces.map((_, i) => i % 2),

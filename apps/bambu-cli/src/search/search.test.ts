@@ -324,7 +324,7 @@ describe("Printables fetching", () => {
                   user: { publicUsername: "FH" },
                   license: { abbreviation: "CC-BY-SA" },
                   stls: [
-                    { id: "1", name: "model.stl", fileSize: 4 },
+                    { id: "1", name: "model.stl", fileSize: 10 },
                     { id: "2", name: "model.f3d" },
                     { id: "3", name: "model.step" },
                   ],

@@ -6,7 +6,7 @@
 // apply to this port. `bambu config` edits all of it; `bambu doctor` checks it.
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
@@ -152,7 +152,10 @@ export class Config {
 
   save(settings: Settings): void {
     mkdirSync(this.dir, { recursive: true });
-    writeFileSync(this.file, `${JSON.stringify(Settings.parse(settings), null, 2)}\n`);
+    // Written beside the file and renamed, so an interrupted write cannot leave
+    // a half-written config.json behind.
+    writeFileSync(`${this.file}.tmp`, `${JSON.stringify(Settings.parse(settings), null, 2)}\n`);
+    renameSync(`${this.file}.tmp`, this.file);
   }
 
   set(updates: Record<string, string>): Settings {

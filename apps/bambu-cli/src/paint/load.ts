@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
-import { extname, basename, dirname, resolve } from "node:path";
+import { extname, basename } from "node:path";
 import { NodeIO, type GLTF, type Node } from "@gltf-transform/core";
 import { UPRIGHT_NODES } from "../generate/download.ts";
+import { companionPath } from "../mesh/load.ts";
 import jpeg from "jpeg-js";
 import { PNG } from "pngjs";
 import { linearToSrgb, srgbToLinear, roundEven, type Vec3, type Vec4 } from "./lab.ts";
@@ -109,7 +110,7 @@ export async function loadColouredModel(
               for (const item of [...(json.buffers ?? []), ...(json.images ?? [])])
                 if (item.uri && !item.uri.startsWith("data:"))
                   resources[item.uri] = new Uint8Array(
-                    await read(resolve(dirname(path), decodeURIComponent(item.uri))),
+                    await read(companionPath(path, decodeURIComponent(item.uri))),
                   );
               return io.readJSON({ json, resources });
             })();
@@ -228,6 +229,7 @@ export async function loadColouredModel(
 // numbers); what follows them is the file.
 const MAP_OPTION_VALUES: Record<string, number> = {
   "-blendu": 1,
+  "-boost": 1,
   "-blendv": 1,
   "-cc": 1,
   "-clamp": 1,
@@ -263,7 +265,7 @@ async function loadObj(path: string, read: ReadFile, model: ColouredModel) {
     const [kind, ...words] = line.replace(/#.*/, "").trim().split(/\s+/);
     if (kind === "mtllib") {
       for (const file of words) {
-        const materialPath = resolve(dirname(path), file);
+        const materialPath = companionPath(path, file);
         const mtl = Buffer.from(await read(materialPath)).toString();
         let current: { factor: Vec4; texture?: Texture } | undefined;
         for (const row of mtl.split(/\r?\n/)) {
@@ -283,7 +285,7 @@ async function loadObj(path: string, read: ReadFile, model: ColouredModel) {
           if (key === "d") current.factor[3] = Number(args[0]);
           if (key === "map_Kd")
             current.texture = decodeTexture(
-              await read(resolve(dirname(materialPath), textureFile(args))),
+              await read(companionPath(materialPath, textureFile(args))),
             );
         }
       }

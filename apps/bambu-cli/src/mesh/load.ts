@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, dirname, extname, join } from "node:path";
+import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { unzipSync, zipSync, strFromU8, strToU8 } from "fflate";
 import { z } from "zod";
 import {
@@ -17,6 +17,16 @@ import type { Mesh } from "./geometry.ts";
 import { loadPLY } from "./ply.ts";
 
 export class MeshLoadError extends Error {}
+// A file a Model refers to (glTF buffer, MTL, texture) must sit beside it: a
+// downloaded Model cannot reach outside its own folder.
+export function companionPath(model: string, reference: string): string {
+  const dir = dirname(model),
+    target = resolve(dir, reference),
+    inside = relative(dir, target);
+  if (!inside || inside.startsWith("..") || isAbsolute(inside))
+    throw new MeshLoadError(`${basename(model)} refers to ${reference}, outside its folder`);
+  return target;
+}
 export const MAX_ACCESSOR_COUNT = 20_000_000;
 const MAX_MODEL_FILE_BYTES = 1024 * 1024 * 1024;
 export class MeshSaveError extends Error {}
@@ -495,7 +505,7 @@ export function load(path: string, io: MeshIO = fileIO): Mesh {
           }
           if (/^[a-z]+:/i.test(b.uri))
             throw new MeshLoadError("remote glTF buffers are unsupported");
-          return io.read(join(dirname(path), decodeURIComponent(b.uri)));
+          return io.read(companionPath(path, decodeURIComponent(b.uri)));
         });
       mesh = loadGLTF(json, buffers, format);
     } else throw new MeshLoadError(`unsupported format: ${format}`);

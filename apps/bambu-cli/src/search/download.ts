@@ -180,6 +180,11 @@ export async function fetchModel(
         clearTimeout(timer);
         await handle.close();
       }
+      // Printables reports each file's exact size, so a body that ended early
+      // (chunked, no Content-Length) is caught here rather than saved truncated.
+      const expected = Number(fileSize) || 0;
+      if (expected && received !== expected)
+        throw new SiteError(`${name}: received ${received} of ${expected} bytes`);
       // A signed host can answer 200 with an error page; the file must look
       // like the Model it is named as before the job is committed.
       const problem = sniffProblem(

@@ -116,7 +116,7 @@ export async function fetchListedOutput(
         );
       const problem = sniffProblem(readHead(tmp, io), chosen, written);
       if (problem) throw new ProviderError("not_a_model", problem);
-      if (chosen === "glb") io.writeFileSync(tmp, standUpright(io.readFileSync(tmp)));
+      if (chosen === "glb") standUprightFile(tmp, io);
       io.renameSync(tmp, path);
       return { path, output_format: chosen };
     } catch (error) {
@@ -169,14 +169,15 @@ export function hasTexture(path: string, format: OutputFormat): boolean {
 export const UPRIGHT_NODE = "bambu-upright";
 // Upstream's Python port named the same node differently; files it generated are Z-up too.
 export const UPRIGHT_NODES = new Set([UPRIGHT_NODE, "bambu-studio-ai: Y-up to Z-up"]);
-export function standUpright(glb: Buffer): Buffer {
-  const jsonLength = glb.readUInt32LE(12);
-  const doc = JSON.parse(glb.toString("utf8", 20, 20 + jsonLength)) as {
+// The new JSON chunk (padded, with its 8-byte chunk header) for a GLB whose
+// JSON chunk is `json`, or undefined when the file is already upright.
+export function uprightChunk(json: string): Buffer | undefined {
+  const doc = JSON.parse(json) as {
     nodes?: { name?: string; children?: number[]; rotation?: number[] }[];
     scenes?: { nodes?: number[] }[];
   };
   const nodes = (doc.nodes ??= []);
-  if (nodes.some((n) => n.name !== undefined && UPRIGHT_NODES.has(n.name))) return glb;
+  if (nodes.some((n) => n.name !== undefined && UPRIGHT_NODES.has(n.name))) return undefined;
   for (const scene of doc.scenes ?? []) {
     nodes.push({
       name: UPRIGHT_NODE,
@@ -185,13 +186,51 @@ export function standUpright(glb: Buffer): Buffer {
     });
     scene.nodes = [nodes.length - 1];
   }
-  const json = Buffer.from(JSON.stringify(doc));
-  const padded = Buffer.alloc(Math.ceil(json.length / 4) * 4, 0x20);
-  json.copy(padded);
-  const rest = glb.subarray(20 + jsonLength);
-  const out = Buffer.concat([glb.subarray(0, 12), Buffer.alloc(8), padded, rest]);
+  const text = Buffer.from(JSON.stringify(doc));
+  const chunk = Buffer.alloc(8 + Math.ceil(text.length / 4) * 4, 0x20);
+  chunk.writeUInt32LE(chunk.length - 8, 0);
+  chunk.writeUInt32LE(0x4e4f534a, 4);
+  text.copy(chunk, 8);
+  return chunk;
+}
+export function standUpright(glb: Buffer): Buffer {
+  const jsonLength = glb.readUInt32LE(12);
+  const chunk = uprightChunk(glb.toString("utf8", 20, 20 + jsonLength));
+  if (!chunk) return glb;
+  const out = Buffer.concat([glb.subarray(0, 12), chunk, glb.subarray(20 + jsonLength)]);
   out.writeUInt32LE(out.length, 8);
-  out.writeUInt32LE(padded.length, 12);
-  out.writeUInt32LE(0x4e4f534a, 16);
   return out;
+}
+// The same rewrite on disk: only the JSON chunk is held in memory, the binary
+// chunk is copied through in pieces, so a large download is never loaded whole.
+export function standUprightFile(path: string, io: typeof fs): void {
+  const input = io.openSync(path, "r");
+  let output: number | undefined;
+  const out = `${path}.upright`;
+  try {
+    const header = Buffer.alloc(20);
+    io.readSync(input, header, 0, 20, 0);
+    const jsonLength = header.readUInt32LE(12),
+      json = Buffer.alloc(jsonLength);
+    io.readSync(input, json, 0, jsonLength, 20);
+    const chunk = uprightChunk(json.toString("utf8"));
+    if (!chunk) return;
+    output = io.openSync(out, "w");
+    const total = io.fstatSync(input).size,
+      rest = total - 20 - jsonLength;
+    header.writeUInt32LE(12 + chunk.length + rest, 8);
+    io.writeSync(output, header, 0, 12);
+    io.writeSync(output, chunk);
+    const piece = Buffer.alloc(1 << 20);
+    for (let position = 20 + jsonLength; position < total;) {
+      const read = io.readSync(input, piece, 0, piece.length, position);
+      if (!read) break;
+      io.writeSync(output, piece, 0, read);
+      position += read;
+    }
+  } finally {
+    io.closeSync(input);
+    if (output !== undefined) io.closeSync(output);
+  }
+  io.renameSync(out, path);
 }
