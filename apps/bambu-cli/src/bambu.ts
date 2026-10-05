@@ -28,6 +28,7 @@ import { Argument, Command, Option } from "commander";
 import { fail } from "./cli.ts";
 import { Config, mask, type Printer, SECRET_KEYS, type SecretKey, SETTING_KEYS } from "./config.ts";
 import { diagnose, report } from "./doctor.ts";
+import { register as registerGenerate } from "./generate/index.ts";
 import { register as registerMake } from "./make/index.ts";
 import { register as registerPrinter } from "./printer/index.ts";
 import { register as registerSearch } from "./search/index.ts";
@@ -327,6 +328,7 @@ configCommand
     );
   });
 
+registerGenerate(program, config);
 registerMake(program, config);
 registerPrinter(program, config);
 registerSearch(program, config);
