@@ -40,4 +40,4 @@ A clean textual merge is not a correct merge. Upstream may have renamed an API t
 
 ## 6. Report
 
-At the end, summarize what came in from upstream, each conflict and how it was resolved, each fork feature and its verification result, and any open questions that need Connor's call. Leave the result on the working branch; merging it into the fork's main branch is Connor's decision unless already authorized. Build the report with the `/html-communication` skill and give Connor the private URL.
+At the end, summarize what came in from upstream, each conflict and how it was resolved, each fork feature and its verification result, and any open questions that need Connor's call. Leave the result on the working branch; merging it into the fork's main branch is Connor's decision unless already authorized. Build the report with the $html-communication skill and give Connor the private URL.

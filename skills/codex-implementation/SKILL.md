@@ -1,6 +1,6 @@
 ---
 name: codex-implementation
-description: Ask Codex CLI (gpt-5.6-sol) to implement scoped code changes in the current repository, then have Claude inspect the resulting diff and verification. This is how gpt-5.6-sol is invoked for implementation work. Use when the user asks Claude to delegate implementation to Codex or gpt-5.6-sol, when the model-selection rubric routes the work to gpt-5.6-sol, or when a bounded task would benefit from another coding agent producing a patch.
+description: Implements scoped code changes with Codex CLI, then inspects the diff. This is how the GPT model rated intelligence 9 in the model-selection table is invoked for implementation work. Use when the user asks to delegate implementation to Codex or a GPT model, when the model-selection rubric routes the work to that model, or when a bounded task would benefit from another coding agent producing a patch.
 metadata:
   agents: [claude-code]
 ---

@@ -1,13 +1,10 @@
 ---
 name: qa-ux-verify
 description: >-
-  Use when asked to execute, validate, test, or browser-check a QA guide,
-  QA plan, PR QA checklist, UX test plan, browser-based product test plan, or
-  output from the qa-ux-plan skill and generate an evidence-backed HTML report
-  without fixing product issues. Applies to workflows that should run browser
-  automation across every planned scenario, capture screenshots and observable
-  results, classify pass/fail/blocked/skipped outcomes, and produce a
-  qa-ux-report.html artifact similar to qa-ux-fix-loop reports.
+  Runs a QA plan in a browser and reports the results without fixing anything.
+  Use when asked to execute, validate, test, or browser-check a QA guide, QA
+  plan, PR QA checklist, UX test plan, browser-based product test plan, or
+  output from the $qa-ux-plan skill.
 ---
 
 # QA UX Verify
@@ -28,7 +25,7 @@ label the evidence clearly.
 
 1. **Orient**
    - Read the requested QA guide or plan completely.
-   - If the input appears to be output from `$qa-ux-plan`, read
+   - If the input appears to be output from the $qa-ux-plan skill, read
      `references/qa-ux-plan-output.md` and use that mapping to normalize the
      plan before execution.
    - Create or choose an artifact directory before browser testing starts.
@@ -195,7 +192,7 @@ workspace-local log is appropriate:
 
 ## Publish
 
-When the report is final, invoke the `wovn-file-hosting` skill: upload the
+When the report is final, invoke the $wovn-file-hosting skill: upload the
 screenshots first, rewrite the report's image links to the returned URLs, then
 upload `qa-ux-report.html` privately. Publishing the HTML alone leaves the hosted
 report with broken images.

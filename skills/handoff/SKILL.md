@@ -5,7 +5,7 @@ argument-hint: "What will the next session be used for?"
 disable-model-invocation: true
 ---
 
-Write a handoff document summarizing the current conversation so a fresh agent can continue the work. Save it to a temp directory locally, and host it with $wovn-file-hosting.
+Write a handoff document summarizing the current conversation so a fresh agent can continue the work. Save it to a temp directory locally, and host it with the $wovn-file-hosting skill.
 
 Include a "suggested skills" section in the document, naming which skills the next agent should load.
 

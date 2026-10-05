@@ -3,7 +3,7 @@ name: bambu-print
 description: Use when the user asks to 3D print something, find or design a model to print, check a model for printability, slice it, check on the Bambu printer or the AMS, or see what is on the print bed. Covers finding models on MakerWorld and Printables, generating them with AI, making them from a script, the Printability Report and Review Page, multi-colour painting, slicing, printer status, and starting prints through Bambu Connect.
 metadata:
   machines: [connors-mac-studio]
-  requires: "the bambu CLI on PATH (apps/bambu-cli, `pnpm ship:machine`), Bambu Studio in /Applications for slicing, wovn on PATH for Review Pages, the mac-vm skill with Bambu Connect in the guest for starting prints, and optionally an AI provider key for generation"
+  requires: "the bambu CLI on PATH (apps/bambu-cli, `pnpm ship:machine`), Bambu Studio in /Applications for slicing, wovn on PATH for Review Pages, the $mac-vm skill with Bambu Connect in the guest for starting prints, and optionally an AI provider key for generation"
 ---
 
 # Bambu print
@@ -172,9 +172,21 @@ Report the estimate (`≈ 1 h 12 min incl. start sequence · 23.4 g PLA`) and sh
 
 The printer's firmware rejects unsigned LAN control commands (HMS `0500-0500-0001-0007`) and
 Developer Mode would turn off cloud printing and Bambu Handy, so prints start from **Bambu
-Connect** in the `mac-vm` guest, driven through computer use. Connect sends the sliced file
+Connect** in the guest VM from the $mac-vm skill, driven through computer use. Connect sends the sliced file
 over Connor's Bambu cloud account; he is already signed in. Bambu Studio itself crashes in the
 guest, and Connect's LAN Discover can't see the printer through Tart's NAT.
+
+Copy this checklist and track your progress:
+
+```
+- [ ] 1. Connor confirmed, and a fresh snapshot shows a clear plate
+- [ ] 2. VM up (noting whether it was already running), 3mf copied in
+- [ ] 3. Imported in Connect, preview checked
+- [ ] 4. Sent with Connor's Slot, Timelapse off, Bed leveling on
+- [ ] 5. Filament loaded from the chosen Slot
+- [ ] 6. First layer checked in a snapshot
+- [ ] 7. VM down, unless it was already running
+```
 
 1. Confirm with Connor and check the plate (Ground rules 1-3).
 2. Note whether `mac-vm status` shows the VM already running. Then `mac-vm up --forward 18789`
