@@ -35,12 +35,13 @@ skills add connorch/skills --skill jev
 skills add connorch/skills --skill mac-vm
 skills add connorch/skills --skill bambu-print
 skills add connorch/skills --skill t3-browser
+skills add connorch/skills --skill motion-explainer
 ```
 
 You can also install multiple specific skills in one command:
 
 ```sh
-skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr file-pr implement-and-review handoff html-communication wovn-file-hosting fleet-exec jev mac-vm bambu-print t3-browser
+skills add connorch/skills --skill qa-ux-plan qa-ux-verify qa-ux-fix-loop codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr file-pr implement-and-review handoff html-communication wovn-file-hosting fleet-exec jev mac-vm bambu-print t3-browser motion-explainer
 ```
 
 ## Shipping to your machines
@@ -131,6 +132,7 @@ These skills help you plan, verify, write, refactor, and fix code.
 - **html-communication** — Create self-contained HTML writeups (plans, specs, findings, UI mocks) and publish them privately to files.wovn.org with the wovn CLI. Adapted from a skill by Theo Browne.
 - **wovn-file-hosting** - Upload any local file to files.wovn.org and return a permanent URL (private by default, public on request), backed by the Cloudflare Worker in `apps/wovn-files/` and the `wovn` CLI in `apps/wovn-cli/`. Adapted from a skill by Theo Browne.
 - **t3-browser** - Drive T3 Code's built-in Browser panel, which the user watches live, for browser QA and screenshots whenever its `preview_*` tools are available, reaching dev servers by environment port so they resolve to the machine running the code.
+- **motion-explainer** - Turn a pull request, or a question about how something works, into a 1080p60 motion graphic explainer in the style of [Kit Langton's PR films](https://x.com/kitlangton/status/2106623769146233112), rendered with his [psychopomp](https://github.com/kitlangton/psychopomp) engine and published privately to files.wovn.org. Ships to macOS only.
 - **jev** - Use TypeSafe's Jev decision model for bulk classification and fast Jev-driven browsing in the Agents Chrome, through the `jevx` CLI in `apps/jevx-cli/`. Ships only to connors-mac-studio.
 
 ## Fleet
@@ -154,6 +156,7 @@ domain docs).
 - `apps/mac-vm` - the `mac-vm` CLI the `mac-vm` skill calls (connors-mac-studio only).
 - `apps/bambu-cli` - the `bambu` CLI for the P1S on the home LAN (connors-mac-studio only).
 - `apps/claude-router` - the `claude-router` proxy and CLI the `claude-router` skill describes (both Macs).
+- `apps/psychopomp` - clones Kit Langton's psychopomp engine to `~/.local/share/psychopomp` at a pinned commit and builds it, for the `motion-explainer` skill (macOS only).
 - `apps/ship` - `pnpm ship:fleet` and `pnpm ship:machine`.
 - `instructions` - the global agent instructions (see above).
 
