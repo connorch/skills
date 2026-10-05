@@ -15,7 +15,7 @@ Only act on checks and comments newer than the latest push. Fix findings that pa
 
 Keep an eye on changes to `main` and rebase when needed. If an overlapping PR makes this one obsolete, stop monitoring, report it to the user, and ask before closing the PR unless closure was explicitly authorized.
 
-Resolving a thread means marking it resolved in GitHub (e.g. via the `resolveReviewThread` GraphQL mutation with `gh api graphql`), not just replying. Format comments left on Connor's behalf as:
+Always reply before resolving a thread, and resolving means marking it resolved in GitHub (e.g. via the `resolveReviewThread` GraphQL mutation with `gh api graphql`), not just replying. Format comments left on Connor's behalf as:
 
 ```md
 ## [MODEL-SLUG] RESPONDING ON BEHALF OF CONNOR
