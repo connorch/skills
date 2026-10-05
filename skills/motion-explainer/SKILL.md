@@ -74,7 +74,9 @@ follow them except where the overrides below say otherwise:
    - Mechanism with no fix: setup, the mechanism step by step, the payoff, then
      the code that does it.
    - Slug: `<repo>-pr-<number>` or a kebab-case topic, such as
-     `skills-pr-57` or `wovn-token-rotation`.
+     `skills-pr-57` or `wovn-token-rotation`. It is also the crate name, so use
+     only lowercase letters, digits, and hyphens, starting with a letter
+     (`next.js` becomes `nextjs-pr-12`).
 
 3. **Create the scene crate.**
 
@@ -206,8 +208,9 @@ follow them except where the overrides below say otherwise:
    wovn put --at videos/<slug>-poster.png "$S/output/<slug>-poster.png"
    ```
 
-   Add `--force` when you re-render a slug that is already published. Use
-   `--public` only when the user asks. GitHub plays only videos uploaded to its
+   Add `--force` when you re-render a slug that is already published; the
+   files keep their current visibility, so one the user made public stays
+   public. Use `--public` only when the user asks. GitHub plays only videos uploaded to its
    own CDN, so a public video goes into a PR as a link, with the poster as an
    image.
 

@@ -2,8 +2,7 @@
 # Installs Kit Langton's psychopomp motion graphics engine
 # (github.com/kitlangton/psychopomp) at ~/.local/share/psychopomp, pinned to
 # REV, and builds its renderer. The motion-explainer skill renders from that
-# checkout. Bump REV to update; local edits in the checkout block the update
-# instead of being overwritten.
+# checkout, which the skill treats as read-only. Bump REV to update.
 set -eu
 
 REV=b517dd423fd19282898c33e43acb8eb67546ebab
