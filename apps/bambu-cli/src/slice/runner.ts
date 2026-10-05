@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import {
   closeSync,
   copyFileSync,
+  renameSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -74,6 +75,7 @@ export function spawnSlicer(invocation: ProcessInvocation): ProcessResult {
 }
 export const sliceFileSystem = {
   copyFileSync,
+  renameSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -272,7 +274,15 @@ export function runSlice(
     const version =
       /^; BambuStudio (\S+)/m.exec([...gcodes.values()][0]?.slice(0, 512) ?? "")?.[1] ?? "";
     checkOutput(job.model, job.output, fs);
-    fs.copyFileSync(sliced, resolve(job.output));
+    // Copied beside the destination, then renamed, so a failed copy never
+    // damages a previous slice at the same path.
+    const staged = `${resolve(job.output)}.tmp`;
+    try {
+      fs.copyFileSync(sliced, staged);
+      fs.renameSync(staged, resolve(job.output));
+    } finally {
+      fs.rmSync(staged, { force: true });
+    }
     succeeded = true;
     return {
       output_file: resolve(job.output),

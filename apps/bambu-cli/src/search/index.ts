@@ -103,12 +103,20 @@ export function register(
       // The Candidates page is how Connor picks: a numbered gallery, published
       // privately, that he answers with a number.
       let page: { file: string; url?: string } | undefined;
-      if (options.page && report.results.length) {
-        const file = resolve(typeof options.page === "string" ? options.page : "candidates.html");
-        writeFileSync(file, renderCandidatesPage(query, report.results, options.sort));
-        page = { file };
-        if (options.publish) page.url = publish(file, `bambu/candidates/${slug(query)}.html`);
-      }
+      if (options.page && report.results.length)
+        try {
+          const file = resolve(typeof options.page === "string" ? options.page : "candidates.html");
+          writeFileSync(file, renderCandidatesPage(query, report.results, options.sort));
+          page = { file };
+          if (options.publish) page.url = publish(file, `bambu/candidates/${slug(query)}.html`);
+        } catch (error) {
+          // The search itself succeeded; the page failure keeps the --json contract.
+          const message = `Candidates page failed: ${error instanceof Error ? error.message : String(error)}`;
+          if (options.json) output(true, { error: { type: "page_failed", message } }, () => "");
+          console.error(`bambu: ${message}`);
+          process.exitCode = 1;
+          return;
+        }
       if (
         options.json ||
         report.results.length ||

@@ -141,12 +141,12 @@ export async function fetchModel(
         throw new SiteError("Printables returned an unsafe download link");
       // Large Models take minutes on a home connection, so the deadline is on
       // inactivity: the request is abandoned after 30 s without a byte.
-      const controller = new AbortController();
-      let timer = setTimeout(() => controller.abort(), STALL_MS);
       const path = resolve(out, name),
         tmp = `${path}.tmp`;
       staged.push({ name, path, tmp, bytes: 0 });
       const handle = await fs.open(tmp, "w");
+      const controller = new AbortController();
+      let timer = setTimeout(() => controller.abort(), STALL_MS);
       let received = 0,
         head = Buffer.alloc(0);
       try {

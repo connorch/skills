@@ -254,7 +254,7 @@ async function loadObj(path: string, read: ReadFile, model: ColouredModel) {
         const mtl = Buffer.from(await read(materialPath)).toString();
         let current: { factor: Vec4; texture?: Texture } | undefined;
         for (const row of mtl.split(/\r?\n/)) {
-          const [key, ...args] = row.trim().split(/\s+/);
+          const [key, ...args] = row.replace(/#.*/, "").trim().split(/\s+/);
           if (key === "newmtl") {
             current = { factor: [1, 1, 1, 1] };
             materials.set(args.join(" "), current);

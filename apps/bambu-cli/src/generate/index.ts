@@ -138,23 +138,25 @@ export function register(program: Command, config: Config, http = new HttpClient
         const resume = task
           ? `bambu generate ${verb === "status" ? "status" : "download"} ${task.token}${verb === "status" ? "" : resumeFlags}`
           : null;
-        output(
-          json,
-          {
-            error: {
-              type: notConfigured
-                ? "not_configured"
-                : error instanceof InputError
-                  ? "bad_input"
-                  : "provider",
-              message,
+        // The document goes to stdout under --json; diagnostics always go to stderr.
+        if (json)
+          output(
+            true,
+            {
+              error: {
+                type: notConfigured
+                  ? "not_configured"
+                  : error instanceof InputError
+                    ? "bad_input"
+                    : "provider",
+                message,
+              },
+              task_id: task?.token ?? null,
+              next_command: resume,
             },
-            task_id: task?.token ?? null,
-            next_command: resume,
-          },
-          () => `bambu: ${message}${resume ? `\n${next(resume)}` : ""}`,
-        );
-        if (json) console.error(`bambu: ${message}`);
+            () => "",
+          );
+        console.error(`bambu: ${message}${resume ? `\n${next(resume)}` : ""}`);
         if (error instanceof ProviderError && error.code === "network" && !task)
           console.error(
             "The request may have reached the provider. Check its dashboard before submitting again to avoid paying twice.",
