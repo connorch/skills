@@ -7,13 +7,15 @@
   "type": "module",
   "scripts": {
     "build": "vp pack",
+    "test": "vp test run",
     "typecheck": "tsc --noEmit",
     "ship:machine": "vp pack && mkdir -p ~/.local/bin && install -m 755 dist/bambu.mjs ~/.local/bin/bambu"
   },
   "dependencies": {
     "basic-ftp": "^6.2.1",
     "commander": "^14.0.0",
-    "mqtt": "^5.16.0"
+    "mqtt": "^5.16.0",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@types/node": "catalog:",

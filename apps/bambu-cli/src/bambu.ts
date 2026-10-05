@@ -1,16 +1,12 @@
-// bambu - LAN tooling for a Bambu Lab printer: status, camera, SD card, and
-// headless slicing. The agent-facing guide is skills/bambu-print/SKILL.md.
+// bambu - tooling for a Bambu Lab printer: status, camera, SD card, headless
+// slicing, and setup. The agent-facing guide is skills/bambu-print/SKILL.md.
 //
 // Firmware 01.08+ rejects unsigned LAN control commands (HMS
 // 0500-0500-0001-0007) unless Developer Mode is on, so this CLI only reads
-// state and moves files. Starting a print goes through Bambu Studio.
-//
-// The printer is configured in ~/.config/bambu/printer.json:
-//   { "host": "10.128.1.128", "serial": "01P00C...", "keychainService": "openclaw-bambu-p1s" }
-// and its LAN access code lives in the macOS Keychain under that service,
-// account "bblp".
+// state and moves files. Starting a print goes through Bambu Connect in the
+// agent VM (docs/adr/0003). Settings and secrets: see config.ts.
 
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import {
   closeSync,
   copyFileSync,
@@ -24,23 +20,17 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { connect as tlsConnect, type TLSSocket } from "node:tls";
 import { Client as FtpClient } from "basic-ftp";
-import { Command, Option } from "commander";
+import { Argument, Command, Option } from "commander";
 import mqtt from "mqtt";
+import { Config, mask, type Printer, SECRET_KEYS, type SecretKey, SETTING_KEYS } from "./config.ts";
+import { diagnose, report } from "./doctor.ts";
+import { PROFILES, STUDIO_CLI } from "./studio.ts";
 
 const USER = "bblp";
-const CONFIG_FILE = join(homedir(), ".config", "bambu", "printer.json");
-const STUDIO = "/Applications/BambuStudio.app";
-const PROFILES = `${STUDIO}/Contents/Resources/profiles/BBL`;
-
-interface PrinterConfig {
-  host: string;
-  serial: string;
-  keychainService: string;
-}
 
 // The subset of the printer's `print` report this CLI reads.
 interface PrinterStatus {
@@ -72,33 +62,15 @@ function fail(message: string): never {
   process.exit(1);
 }
 
-function config(): PrinterConfig {
-  try {
-    return JSON.parse(readFileSync(CONFIG_FILE, "utf8")) as PrinterConfig;
-  } catch {
-    fail(`no printer config at ${CONFIG_FILE}`);
-  }
-}
-
-function accessCode(printer: PrinterConfig): string {
-  try {
-    return execFileSync(
-      "security",
-      ["find-generic-password", "-a", USER, "-s", printer.keychainService, "-w"],
-      { encoding: "utf8" },
-    ).trim();
-  } catch {
-    fail(`no access code in the Keychain (service ${printer.keychainService}, account ${USER})`);
-  }
-}
+const config = new Config();
 
 // The printer serves a self-signed cert from Bambu's own CA.
 const insecureTls = { rejectUnauthorized: false } as const;
 
-async function fetchStatus(printer: PrinterConfig): Promise<PrinterStatus> {
+async function fetchStatus(printer: Printer): Promise<PrinterStatus> {
   const client = await mqtt.connectAsync(`mqtts://${printer.host}:8883`, {
     username: USER,
-    password: accessCode(printer),
+    password: printer.accessCode,
     ...insecureTls,
     connectTimeout: 10_000,
     reconnectPeriod: 0,
@@ -159,14 +131,14 @@ function summarize(s: PrinterStatus): string {
 
 // Implicit FTPS on 990. The printer never sends a TLS close_notify after a
 // transfer, which is fine for basic-ftp but hangs clients that wait for it.
-async function withFtp<T>(printer: PrinterConfig, run: (ftp: FtpClient) => Promise<T>) {
+async function withFtp<T>(printer: Printer, run: (ftp: FtpClient) => Promise<T>) {
   const ftp = new FtpClient(15_000);
   try {
     await ftp.access({
       host: printer.host,
       port: 990,
       user: USER,
-      password: accessCode(printer),
+      password: printer.accessCode,
       secure: "implicit",
       secureOptions: insecureTls,
     });
@@ -178,12 +150,12 @@ async function withFtp<T>(printer: PrinterConfig, run: (ftp: FtpClient) => Promi
 
 // One JPEG from the camera stream on 6000: an 80-byte auth packet, then a
 // 16-byte frame header whose first 4 bytes are the JPEG size.
-async function snapshot(printer: PrinterConfig, out: string) {
+async function snapshot(printer: Printer, out: string) {
   const auth = Buffer.alloc(80);
   auth.writeUInt32LE(0x40, 0);
   auth.writeUInt32LE(0x3000, 4);
   auth.write(USER, 16, "ascii");
-  auth.write(accessCode(printer), 48, "ascii");
+  auth.write(printer.accessCode, 48, "ascii");
   const socket: TLSSocket = tlsConnect({ host: printer.host, port: 6000, ...insecureTls });
   socket.setTimeout(10_000, () => socket.destroy(new Error("camera timed out")));
   const jpeg = await new Promise<Buffer>((done, reject) => {
@@ -258,7 +230,7 @@ function slice(
   const logPath = join(work, "slice.log");
   const log = openSync(logPath, "w");
   const result = spawnSync(
-    `${STUDIO}/Contents/MacOS/BambuStudio`,
+    STUDIO_CLI,
     [
       "--orient",
       "0",
@@ -336,7 +308,7 @@ program
   .description("print state, temperatures, AMS trays, alerts")
   .option("--json", "raw status report")
   .action(async (o: { json?: boolean }) => {
-    const s = await fetchStatus(config());
+    const s = await fetchStatus(config.printer());
     console.log(o.json ? JSON.stringify(s, null, 2) : summarize(s));
   });
 
@@ -344,13 +316,13 @@ program
   .command("snapshot")
   .description("save one camera frame")
   .argument("[out]", "output JPEG", join(tmpdir(), "bambu-snapshot.jpg"))
-  .action((out: string) => snapshot(config(), resolve(out)));
+  .action((out: string) => snapshot(config.printer(), resolve(out)));
 
 program
   .command("files")
   .description("list the SD card root")
   .action(() =>
-    withFtp(config(), async (ftp) => {
+    withFtp(config.printer(), async (ftp) => {
       for (const f of await ftp.list()) console.log(f.name);
     }),
   );
@@ -360,7 +332,7 @@ program
   .description("copy a file to the SD card root")
   .argument("<file>")
   .action((file: string) =>
-    withFtp(config(), async (ftp) => {
+    withFtp(config.printer(), async (ftp) => {
       await ftp.uploadFrom(createReadStream(file), basename(file));
       console.log(`uploaded ${basename(file)}`);
     }),
@@ -378,5 +350,88 @@ program
     new Option("--plate <type>", "build plate").choices(Object.keys(PLATES)).default("textured"),
   )
   .action(slice);
+
+// Secrets arrive on stdin unless --value is given, so they stay out of shell
+// history and process listings.
+function readSecretValue(value?: string): string {
+  const secret = (value ?? readFileSync(0, "utf8")).trim();
+  if (!secret) fail("empty secret");
+  return secret;
+}
+
+const configCommand = program
+  .command("config")
+  .description("settings in config.json and secrets in the Keychain");
+configCommand
+  .command("show")
+  .description("current settings, secrets masked")
+  .action(() => {
+    const settings = config.settings();
+    for (const key of SETTING_KEYS) console.log(`${key}: ${settings[key] ?? "(not set)"}`);
+    for (const key of SECRET_KEYS) console.log(`${key}: ${mask(config.secret(key))}`);
+  });
+configCommand
+  .command("set")
+  .description("set settings, e.g. set printer_ip 10.0.0.5 serial 01P00A")
+  .argument("<pairs...>", `key value pairs; keys: ${SETTING_KEYS.join(", ")}`)
+  .action((pairs: string[]) => {
+    if (pairs.length % 2) fail("expected key value pairs");
+    const updates: Record<string, string> = {};
+    for (let i = 0; i < pairs.length; i += 2) updates[pairs[i]!] = pairs[i + 1]!;
+    config.set(updates);
+    console.log(`saved ${config.file}`);
+  });
+configCommand
+  .command("unset")
+  .argument("<keys...>")
+  .description("remove settings")
+  .action((keys: string[]) => {
+    config.unset(keys);
+    console.log(`saved ${config.file}`);
+  });
+configCommand
+  .command("secret")
+  .description("store a secret in the Keychain, read from stdin unless --value is given")
+  .addArgument(new Argument("<name>").choices(SECRET_KEYS))
+  .option("--value <secret>", "the secret itself")
+  .option("--unset", "remove it instead")
+  .action((name: SecretKey, options: { value?: string; unset?: boolean }) => {
+    if (options.unset) {
+      config.unsetSecret(name);
+      console.log(`removed ${name}`);
+      return;
+    }
+    config.setSecret(name, readSecretValue(options.value));
+    console.log(`stored ${name} in the Keychain`);
+  });
+configCommand
+  .command("path")
+  .description("print the settings file path")
+  .action(() => console.log(config.file));
+configCommand
+  .command("migrate")
+  .description("move a pre-port printer.json and its Keychain entry to the current layout")
+  .action(() => {
+    const result = config.migrate();
+    if (!result) {
+      console.log(`nothing to migrate: no ${config.legacyFile}`);
+      return;
+    }
+    console.log(`saved ${config.file}`);
+    console.log(
+      result.accessCode
+        ? "copied the access code into the Keychain"
+        : "no access code found to copy",
+    );
+  });
+
+program
+  .command("doctor")
+  .description("check Bambu Studio, the VM tooling, settings, and secrets")
+  .action(() => {
+    const { text, ok } = report(diagnose(config));
+    console.log(text);
+    if (!ok) process.exit(1);
+  });
 
 await program.parseAsync().catch((error: Error) => fail(error.message));

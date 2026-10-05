@@ -10,6 +10,8 @@ const IGNORE_PATTERNS = [
   "**/.wrangler/**",
   "output/**",
   ".context/**",
+  // Upstream reference code (see vendor/README.md): read, never built.
+  "vendor/**",
 ];
 
 export default defineConfig({

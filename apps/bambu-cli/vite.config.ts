@@ -12,7 +12,7 @@ export default mergeConfig(
       entry: ["src/bambu.ts"],
       outDir: "dist",
       clean: true,
-      deps: { alwaysBundle: ["commander", "mqtt", "basic-ftp"], onlyBundle: false },
+      deps: { alwaysBundle: ["commander", "mqtt", "basic-ftp", "zod"], onlyBundle: false },
       banner: { js: "#!/usr/bin/env node\n" },
     },
   }),
