@@ -165,7 +165,7 @@ configCommand
   .description("set settings, e.g. set printer_ip 10.0.0.5 serial 01P00A")
   .argument("<pairs...>", `key value pairs; keys: ${SETTING_KEYS.join(", ")}`)
   .action((pairs: string[]) => {
-    if (pairs.length % 2) fail("expected key value pairs");
+    if (pairs.length % 2) fail("expected key value pairs", EXIT_USAGE);
     const updates: Record<string, string> = {};
     for (let i = 0; i < pairs.length; i += 2) updates[pairs[i]!] = pairs[i + 1]!;
     config.set(updates);

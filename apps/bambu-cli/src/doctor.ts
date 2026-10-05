@@ -44,7 +44,13 @@ export function diagnose(config: Config): Finding[] {
 
   // The same discovery slice uses, so BAMBU_STUDIO_CLI / BAMBU_STUDIO_PROFILES apply.
   const cli = findCli()?.[0];
-  if (cli) add("ok", `Bambu Studio ${studioVersion(cli) ?? "(version unknown)"} at ${cli}`);
+  const version = cli ? studioVersion(cli) : undefined;
+  if (cli && version && /^02\.05\.0[01](\.|$)/.test(version))
+    add(
+      "missing",
+      `Bambu Studio ${version} at ${cli} crashes in command-line mode; update to 02.05.02 or newer.`,
+    );
+  else if (cli) add("ok", `Bambu Studio ${version ?? "(version unknown)"} at ${cli}`);
   else
     add(
       "missing",

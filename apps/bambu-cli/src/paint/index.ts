@@ -10,6 +10,18 @@ import { ColorsLostError, paintModel, validateOptions } from "./pipeline.ts";
 import { buildProject } from "./project.ts";
 import { deltaE2000, parseHex, srgbToLab } from "./lab.ts";
 import { filamentCatalogue, nearestFilaments } from "./filaments.ts";
+import { printer } from "../mesh/hardware.ts";
+
+// The configured model goes through the same normalisation as analyze and
+// slice (case, aliases), so "p1s" selects the P1S paint profile.
+function paintPrinterKey(model: string | undefined): string {
+  if (!model) return "P1S";
+  try {
+    return printer(model).key;
+  } catch {
+    return model;
+  }
+}
 export * from "./lab.ts";
 export * from "./palette.ts";
 export * from "./load.ts";
@@ -111,7 +123,7 @@ export async function runPaint(
         result.labels,
         result.palette.hex,
         stem,
-        config.settings().model ?? "P1S",
+        paintPrinterKey(config.settings().model),
       ),
     );
   } catch (error) {

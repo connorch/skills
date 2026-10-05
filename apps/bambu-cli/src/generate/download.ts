@@ -135,10 +135,20 @@ export async function fetchListedOutput(
 
 export function hasTexture(path: string, format: OutputFormat): boolean {
   if (format !== "glb") return false;
-  const data = fs.readFileSync(path);
-  if (data.length < 20 || data.readUInt32LE(16) !== 0x4e4f534a) return false;
+  // Only the header and JSON chunk are read; the binary chunk stays on disk.
+  const handle = fs.openSync(path, "r");
+  let json: Buffer;
   try {
-    const document: unknown = JSON.parse(data.toString("utf8", 20, 20 + data.readUInt32LE(12)));
+    const header = Buffer.alloc(20);
+    if (fs.readSync(handle, header, 0, 20, 0) < 20 || header.readUInt32LE(16) !== 0x4e4f534a)
+      return false;
+    json = Buffer.alloc(header.readUInt32LE(12));
+    fs.readSync(handle, json, 0, json.length, 20);
+  } finally {
+    fs.closeSync(handle);
+  }
+  try {
+    const document: unknown = JSON.parse(json.toString("utf8"));
     if (
       typeof document !== "object" ||
       document === null ||

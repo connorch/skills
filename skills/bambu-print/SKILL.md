@@ -16,8 +16,10 @@ request → get a Model (Search / Generate / Make / Own File)
         → watch
 ```
 
-The `bambu` CLI does the work. Every command has `--help` and `--json`, and ends with a
-`➡️` line naming what to do next; take file names from its output rather than guessing.
+The `bambu` CLI does the work. Every command has `--help`; the workflow commands (search,
+fetch, generate, make, analyze, paint, view, slice, status, ams, watch) take `--json`, and
+each ends with a `➡️` line naming what to do next; take file names from its output rather
+than guessing. `snapshot`, `files`, `upload`, `config`, and `doctor` print plain text.
 Commands print a `bambu: ...` line to stderr and exit 1 (failed) or 2 (usage) on error.
 
 ## Ground rules

@@ -340,7 +340,17 @@ export function loadGLTF(json: unknown, buffers: Uint8Array[], format = "gltf"):
       }
     return result;
   }
+  // Primitives split by material share accessors; each is decoded once.
+  const decoded = new Map<string, number[]>();
   function accessor(index: number, components: number): number[] {
+    const key = `${index}:${components}`,
+      cached = decoded.get(key);
+    if (cached) return cached;
+    const values = decodeAccessor(index, components);
+    decoded.set(key, values);
+    return values;
+  }
+  function decodeAccessor(index: number, components: number): number[] {
     const a = doc.accessors[index];
     if (!a) throw new MeshLoadError("missing glTF accessor");
     // A sparse accessor without a buffer view is allocated from its count alone.
