@@ -100,7 +100,8 @@ export async function loadColouredModel(
           matrix[4]! * (matrix[1]! * matrix[10]! - matrix[2]! * matrix[9]!) +
           matrix[8]! * (matrix[1]! * matrix[6]! - matrix[2]! * matrix[5]!);
         for (const primitive of mesh.listPrimitives()) {
-          if (primitive.getMode() !== 4) continue;
+          const mode = primitive.getMode();
+          if (mode !== 4 && mode !== 5 && mode !== 6) continue;
           const positions = primitive.getAttribute("POSITION");
           if (!positions) continue;
           const colors = primitive.getAttribute("COLOR_0"),
@@ -136,9 +137,19 @@ export async function loadColouredModel(
             ]);
           }
           const indices = primitive.getIndices();
-          const ids = indices
+          const raw = indices
             ? Array.from({ length: indices.getCount() }, (_, i) => indices.getScalar(i))
             : Array.from({ length: positions.getCount() }, (_, i) => i);
+          // Strips and fans unroll to a triangle per index past the first two.
+          const ids: number[] = [];
+          if (mode === 4) ids.push(...raw.slice(0, raw.length - (raw.length % 3)));
+          else
+            for (let i = 2; i < raw.length; i++)
+              ids.push(
+                mode === 6 ? raw[0]! : raw[i - 2 + (i % 2)]!,
+                mode === 6 ? raw[i - 1]! : raw[i - 1 - (i % 2)]!,
+                raw[i]!,
+              );
           for (let i = 0; i + 2 < ids.length; i += 3) {
             const face: Face = [ids[i]! + offset, ids[i + 1]! + offset, ids[i + 2]! + offset];
             model.faces.push(determinant < 0 ? [face[2], face[1], face[0]] : face);
@@ -177,7 +188,8 @@ export async function loadColouredModel(
   return model;
 }
 // OBJ numbers are millimetres; MTL diffuse colours are display sRGB.
-// MTL map options take a fixed number of values; what follows them is the file.
+// MTL map options take up to this many values (-o/-s/-t accept one to three
+// numbers); what follows them is the file.
 const MAP_OPTION_VALUES: Record<string, number> = {
   "-blendu": 1,
   "-blendv": 1,
@@ -194,9 +206,13 @@ const MAP_OPTION_VALUES: Record<string, number> = {
 function textureFile(args: string[]): string {
   let i = 0;
   while (i < args.length) {
-    const values = MAP_OPTION_VALUES[args[i]!];
+    const option = args[i]!,
+      values = MAP_OPTION_VALUES[option];
     if (values === undefined) break;
-    i += 1 + values;
+    i++;
+    if (["-o", "-s", "-t"].includes(option))
+      while (i < args.length && /^-?\d*\.?\d+$/.test(args[i]!)) i++;
+    else i += values;
   }
   return args.slice(i).join(" ");
 }
@@ -208,7 +224,7 @@ async function loadObj(path: string, read: ReadFile, model: ColouredModel) {
   const materials = new Map<string, { factor: Vec4; texture?: Texture }>();
   model.turned = true;
   for (const line of text.split(/\r?\n/)) {
-    const [kind, ...words] = line.trim().split(/\s+/);
+    const [kind, ...words] = line.replace(/#.*/, "").trim().split(/\s+/);
     if (kind === "mtllib") {
       for (const file of words) {
         const materialPath = resolve(dirname(path), file);
@@ -247,7 +263,7 @@ async function loadObj(path: string, read: ReadFile, model: ColouredModel) {
   const index = (text: string, length: number) =>
     Number(text) < 0 ? length + Number(text) : Number(text) - 1;
   for (const line of text.split(/\r?\n/)) {
-    const [kind, ...words] = line.trim().split(/\s+/);
+    const [kind, ...words] = line.replace(/#.*/, "").trim().split(/\s+/);
     if (kind === "usemtl") name = words.join(" ");
     if (kind !== "f" || words.length < 3) continue;
     const start = model.faces.length,

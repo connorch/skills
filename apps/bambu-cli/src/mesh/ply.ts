@@ -101,8 +101,13 @@ export function loadPLY(bytes: Uint8Array): Mesh {
   const positions: number[] = [],
     indices: number[] = [];
   for (const element of elements) {
+    // Each record takes at least one token or byte, so a count past what is
+    // left in the file is wrong before any of it is read.
+    const remaining = ascii ? tokens.length - cursor : bytes.length - offset;
     if (!Number.isSafeInteger(element.count) || element.count < 0)
       throw new Error("invalid PLY element count");
+    if (element.properties.length && element.count > remaining)
+      throw new Error(`PLY declares ${element.count} ${element.name} records but holds fewer`);
     for (let i = 0; i < element.count; i++) {
       const record: Record<string, number> = {};
       let face: number[] = [];

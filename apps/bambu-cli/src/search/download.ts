@@ -1,7 +1,9 @@
 import { existsSync } from "node:fs";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, open, rename, rm, writeFile } from "node:fs/promises";
 import { basename, extname, resolve } from "node:path";
 import { SOURCE_FILE, type Source } from "../job.ts";
+import { SNIFF_BYTES, sniffProblem } from "../generate/download.ts";
+import type { OutputFormat } from "../generate/core.ts";
 import {
   graphqlData,
   isSiteUrl,
@@ -45,12 +47,12 @@ export async function fetchModel(
     out = process.cwd(),
     force = false,
     fetcher = globalThis.fetch,
-    fs = { mkdir, writeFile, rm },
+    fs = { mkdir, writeFile, rm, open, rename },
   }: {
     out?: string;
     force?: boolean;
     fetcher?: Fetch;
-    fs?: Pick<typeof import("node:fs/promises"), "mkdir" | "writeFile" | "rm">;
+    fs?: Pick<typeof import("node:fs/promises"), "mkdir" | "writeFile" | "rm" | "open" | "rename">;
   } = {},
 ) {
   const id = printablesId(input);
@@ -60,8 +62,7 @@ export async function fetchModel(
     ).print,
   );
   if (!modelId(model.id)) throw new SiteError("Printables model was not found");
-  const files: { name: string; path: string; bytes: number }[] = [],
-    skipped: string[] = [];
+  const skipped: string[] = [];
   await fs.mkdir(resolve(out), { recursive: true });
   const source: Source = {
     route: "Search",
@@ -100,15 +101,19 @@ export async function fetchModel(
     for (const name of [SOURCE_FILE, ...wanted.map((f) => f.name)])
       if (existsSync(resolve(out, name)))
         throw new Error(`EEXIST: ${resolve(out, name)} exists; pass --force to replace it`);
-  // Whatever this attempt wrote is removed on failure, so a plain retry works.
-  const written: string[] = [resolve(out, SOURCE_FILE)];
-  await fs.writeFile(resolve(out, SOURCE_FILE), `${JSON.stringify(source, null, 2)}\n`);
+  // Each file streams to a .tmp beside its destination; the job is committed
+  // (renames and source.json) only once every download is complete, so a
+  // failure leaves nothing behind and --force never destroys the old job.
+  const staged: { name: string; path: string; tmp: string; bytes: number }[] = [];
   try {
     await downloadAll();
+    for (const { path, tmp } of staged) await fs.rename(tmp, path);
+    await fs.writeFile(resolve(out, SOURCE_FILE), `${JSON.stringify(source, null, 2)}\n`);
   } catch (error) {
-    await Promise.all(written.map((path) => fs.rm(path, { force: true })));
+    await Promise.all(staged.map(({ tmp }) => fs.rm(tmp, { force: true })));
     throw error;
   }
+  const files = staged.map(({ name, path, bytes }) => ({ name, path, bytes }));
   return { model: { id, name: source.title, url: source.url }, source, files, skipped };
   async function downloadAll() {
     for (const { name, fileId, fileSize } of wanted) {
@@ -138,15 +143,20 @@ export async function fetchModel(
       // inactivity: the request is abandoned after 30 s without a byte.
       const controller = new AbortController();
       let timer = setTimeout(() => controller.abort(), STALL_MS);
-      const chunks: Uint8Array[] = [];
+      const path = resolve(out, name),
+        tmp = `${path}.tmp`;
+      staged.push({ name, path, tmp, bytes: 0 });
+      const handle = await fs.open(tmp, "w");
+      let received = 0,
+        head = Buffer.alloc(0);
       try {
         const response = await fetcher(link, {
           headers: { "User-Agent": USER_AGENT },
           signal: controller.signal,
         });
         if (!response.ok) throw new SiteError(`HTTP ${response.status}`);
-        // The file is read into memory, so refuse anything past what a printable
-        // Model could be: by the declared size first, then by the bytes received.
+        // Refuse anything past what a printable Model could be: by the
+        // declared size first, then by the bytes received.
         const declared = Math.max(
           Number(fileSize) || 0,
           Number(response.headers.get("content-length")) || 0,
@@ -154,7 +164,6 @@ export async function fetchModel(
         const over = () =>
           new SiteError(`${name} is over the ${MAX_FILE_BYTES / 1024 / 1024} MB limit`);
         if (declared > MAX_FILE_BYTES) throw over();
-        let received = 0;
         for await (const chunk of response.body ?? []) {
           clearTimeout(timer);
           timer = setTimeout(() => controller.abort(), STALL_MS);
@@ -163,16 +172,23 @@ export async function fetchModel(
             await response.body?.cancel();
             throw over();
           }
-          chunks.push(chunk);
+          if (head.length < SNIFF_BYTES)
+            head = Buffer.concat([head, chunk]).subarray(0, SNIFF_BYTES);
+          await handle.write(chunk);
         }
       } finally {
         clearTimeout(timer);
+        await handle.close();
       }
-      const bytes = Buffer.concat(chunks),
-        path = resolve(out, name);
-      written.push(path);
-      await fs.writeFile(path, bytes);
-      files.push({ name, path, bytes: bytes.length });
+      // A signed host can answer 200 with an error page; the file must look
+      // like the Model it is named as before the job is committed.
+      const problem = sniffProblem(
+        head,
+        extname(name).slice(1).toLowerCase() as OutputFormat,
+        received,
+      );
+      if (problem) throw new SiteError(`${name}: ${problem}`);
+      staged[staged.length - 1]!.bytes = received;
     }
   }
 }

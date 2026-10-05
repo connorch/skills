@@ -306,7 +306,7 @@ describe("Printables fetching", () => {
   it("downloads supported files, skips others, and protects existing files", async () => {
     const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
     const fetcher: Fetch = vi.fn(async (input, init) => {
-      if (String(input).includes("files.example")) return new Response("mesh");
+      if (String(input).includes("files.example")) return new Response("solid mesh");
       const body = String(init?.body);
       return Response.json(
         body.includes("getDownloadLink")
@@ -338,9 +338,9 @@ describe("Printables fetching", () => {
         out: dir,
         fetcher,
       });
-      expect(report.files.map((f) => f.bytes)).toEqual([4]);
+      expect(report.files.map((f) => f.bytes)).toEqual([10]);
       expect(report.skipped).toEqual(["model.f3d", "model.step"]);
-      expect(await readFile(join(dir, "model.stl"), "utf8")).toBe("mesh");
+      expect(await readFile(join(dir, "model.stl"), "utf8")).toBe("solid mesh");
       expect(JSON.parse(await readFile(join(dir, "source.json"), "utf8"))).toEqual({
         route: "Search",
         site: "Printables",
@@ -353,7 +353,7 @@ describe("Printables fetching", () => {
       await expect(fetchModel("42", { out: dir, fetcher })).rejects.toThrow("EEXIST");
       expect(await readFile(join(dir, "model.stl"), "utf8")).toBe("original");
       await fetchModel("42", { out: dir, force: true, fetcher });
-      expect(await readFile(join(dir, "model.stl"), "utf8")).toBe("mesh");
+      expect(await readFile(join(dir, "model.stl"), "utf8")).toBe("solid mesh");
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -363,7 +363,11 @@ describe("Printables fetching", () => {
     let served = 0;
     const fetcher: Fetch = async (input, init) => {
       if (String(input).includes("files.example"))
-        return served++ ? new Response("nope", { status: 500 }) : new Response("mesh");
+        return served++ < 0
+          ? new Response("<html>login</html>")
+          : served > 1
+            ? new Response("nope", { status: 500 })
+            : new Response("solid mesh");
       return Response.json(
         String(init?.body).includes("getDownloadLink")
           ? { data: { getDownloadLink: { ok: true, output: { link: "https://files.example/m" } } } }
@@ -385,7 +389,20 @@ describe("Printables fetching", () => {
     try {
       await expect(fetchModel("42", { out: dir, fetcher })).rejects.toThrow("HTTP 500");
       expect(existsSync(join(dir, "a.stl"))).toBe(false);
+      expect(existsSync(join(dir, "a.stl.tmp"))).toBe(false);
       expect(existsSync(join(dir, "source.json"))).toBe(false);
+      // --force keeps the old job when the replacement does not complete.
+      await writeFile(join(dir, "a.stl"), "solid old");
+      served = 0;
+      await expect(fetchModel("42", { out: dir, force: true, fetcher })).rejects.toThrow(
+        "HTTP 500",
+      );
+      expect(await readFile(join(dir, "a.stl"), "utf8")).toBe("solid old");
+      // A 200 that is not a Model is refused rather than saved under its name.
+      served = -1;
+      await expect(fetchModel("42", { out: dir, force: true, fetcher })).rejects.toThrow(
+        "HTML/JSON",
+      );
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
