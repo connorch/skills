@@ -10,9 +10,14 @@ export function safeFilename(stem: string, suffix: string): string {
       .slice(0, 80) || "model"
   }.${suffix}`;
 }
-export function sniffProblem(data: Buffer, format: OutputFormat): string | undefined {
-  if (!data.length) return "the download is empty";
-  const head = data.subarray(0, 1024);
+// Only the first kilobyte and the file length are needed to tell a Model from an error page.
+export const SNIFF_BYTES = 1024;
+export function sniffProblem(
+  head: Buffer,
+  format: OutputFormat,
+  length = head.length,
+): string | undefined {
+  if (!length) return "the download is empty";
   const text = head.toString().trimStart();
   if (/^[<{]/.test(text)) return `expected ${format.toUpperCase()} but got an HTML/JSON document`;
   const valid =
@@ -21,7 +26,7 @@ export function sniffProblem(data: Buffer, format: OutputFormat): string | undef
       : format === "3mf"
         ? head.toString("ascii", 0, 2) === "PK"
         : format === "stl"
-          ? (data.length >= 84 && data.length === 84 + 50 * data.readUInt32LE(80)) ||
+          ? (length >= 84 && head.length >= 84 && length === 84 + 50 * head.readUInt32LE(80)) ||
             /^solid/i.test(text)
           : /^(v|vn|vt|f|o|g|mtllib|usemtl|s)\s/.test(
               text
@@ -34,6 +39,15 @@ export function sniffProblem(data: Buffer, format: OutputFormat): string | undef
 
 // Signed download URLs are refreshed from the task, with no credentials sent to file hosts.
 const DOWNLOAD_STALL_MS = 120_000;
+function readHead(path: string, io: typeof fs): Buffer {
+  const handle = io.openSync(path, "r"),
+    head = Buffer.alloc(SNIFF_BYTES);
+  try {
+    return head.subarray(0, io.readSync(handle, head, 0, SNIFF_BYTES, 0));
+  } finally {
+    io.closeSync(handle);
+  }
+}
 export async function fetchListedOutput(
   http: HttpClient,
   poll: () => Promise<Status>,
@@ -100,7 +114,7 @@ export async function fetchListedOutput(
           `download stopped at ${written} of ${declared} bytes`,
           true,
         );
-      const problem = sniffProblem(io.readFileSync(tmp), chosen);
+      const problem = sniffProblem(readHead(tmp, io), chosen, written);
       if (problem) throw new ProviderError("not_a_model", problem);
       if (chosen === "glb") io.writeFileSync(tmp, standUpright(io.readFileSync(tmp)));
       io.renameSync(tmp, path);

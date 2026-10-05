@@ -22,7 +22,7 @@ export function paintFilament(code: string): number | undefined {
 // Resize all audited per-filament settings, selecting the configured printer profiles.
 export function projectSettings(colours: string[], model = "P1S"): Record<string, unknown> {
   if (!colours.length) throw new RangeError("a project needs at least one filament");
-  const aliases: Record<string, string> = { X1C: "X1 Carbon" };
+  const aliases: Record<string, string> = { X1C: "X1 Carbon", "A1 Mini": "A1 mini" };
   const family = aliases[model] ?? model;
   const printer = family.startsWith("Bambu Lab ")
     ? family.endsWith(" nozzle")

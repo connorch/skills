@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { basename, extname, resolve } from "node:path";
 import { SOURCE_FILE, type Source } from "../job.ts";
 import {
@@ -45,12 +45,12 @@ export async function fetchModel(
     out = process.cwd(),
     force = false,
     fetcher = globalThis.fetch,
-    fs = { mkdir, writeFile },
+    fs = { mkdir, writeFile, rm },
   }: {
     out?: string;
     force?: boolean;
     fetcher?: Fetch;
-    fs?: Pick<typeof import("node:fs/promises"), "mkdir" | "writeFile">;
+    fs?: Pick<typeof import("node:fs/promises"), "mkdir" | "writeFile" | "rm">;
   } = {},
 ) {
   const id = printablesId(input);
@@ -100,68 +100,79 @@ export async function fetchModel(
     for (const name of [SOURCE_FILE, ...wanted.map((f) => f.name)])
       if (existsSync(resolve(out, name)))
         throw new Error(`EEXIST: ${resolve(out, name)} exists; pass --force to replace it`);
+  // Whatever this attempt wrote is removed on failure, so a plain retry works.
+  const written: string[] = [resolve(out, SOURCE_FILE)];
   await fs.writeFile(resolve(out, SOURCE_FILE), `${JSON.stringify(source, null, 2)}\n`);
-  for (const { name, fileId, fileSize } of wanted) {
-    const result = mapping(
-      graphqlData(
-        await requestJson(
-          PRINTABLES_ENDPOINT,
-          { query: LINK_MUTATION, variables: { id: fileId, modelId: id } },
-          fetcher,
-        ),
-      ).getDownloadLink,
-    );
-    if (result.ok !== true)
-      throw new SiteError(
-        `Printables could not create a download link: ${JSON.stringify(result.errors ?? [])}`,
-      );
-    const link = text(mapping(result.output).link);
-    let url: URL;
-    try {
-      url = new URL(link);
-    } catch {
-      throw new SiteError("Printables returned an invalid download link");
-    }
-    if (url.protocol !== "https:" || url.username || url.password)
-      throw new SiteError("Printables returned an unsafe download link");
-    // Large Models take minutes on a home connection, so the deadline is on
-    // inactivity: the request is abandoned after 30 s without a byte.
-    const controller = new AbortController();
-    let timer = setTimeout(() => controller.abort(), STALL_MS);
-    const chunks: Uint8Array[] = [];
-    try {
-      const response = await fetcher(link, {
-        headers: { "User-Agent": USER_AGENT },
-        signal: controller.signal,
-      });
-      if (!response.ok) throw new SiteError(`HTTP ${response.status}`);
-      // The file is read into memory, so refuse anything past what a printable
-      // Model could be: by the declared size first, then by the bytes received.
-      const declared = Math.max(
-        Number(fileSize) || 0,
-        Number(response.headers.get("content-length")) || 0,
-      );
-      const over = () =>
-        new SiteError(`${name} is over the ${MAX_FILE_BYTES / 1024 / 1024} MB limit`);
-      if (declared > MAX_FILE_BYTES) throw over();
-      let received = 0;
-      for await (const chunk of response.body ?? []) {
-        clearTimeout(timer);
-        timer = setTimeout(() => controller.abort(), STALL_MS);
-        received += chunk.length;
-        if (received > MAX_FILE_BYTES) {
-          await response.body?.cancel();
-          throw over();
-        }
-        chunks.push(chunk);
-      }
-    } finally {
-      clearTimeout(timer);
-    }
-    const bytes = Buffer.concat(chunks),
-      path = resolve(out, name);
-    await fs.writeFile(path, bytes);
-    files.push({ name, path, bytes: bytes.length });
+  try {
+    await downloadAll();
+  } catch (error) {
+    await Promise.all(written.map((path) => fs.rm(path, { force: true })));
+    throw error;
   }
   return { model: { id, name: source.title, url: source.url }, source, files, skipped };
+  async function downloadAll() {
+    for (const { name, fileId, fileSize } of wanted) {
+      const result = mapping(
+        graphqlData(
+          await requestJson(
+            PRINTABLES_ENDPOINT,
+            { query: LINK_MUTATION, variables: { id: fileId, modelId: id } },
+            fetcher,
+          ),
+        ).getDownloadLink,
+      );
+      if (result.ok !== true)
+        throw new SiteError(
+          `Printables could not create a download link: ${JSON.stringify(result.errors ?? [])}`,
+        );
+      const link = text(mapping(result.output).link);
+      let url: URL;
+      try {
+        url = new URL(link);
+      } catch {
+        throw new SiteError("Printables returned an invalid download link");
+      }
+      if (url.protocol !== "https:" || url.username || url.password)
+        throw new SiteError("Printables returned an unsafe download link");
+      // Large Models take minutes on a home connection, so the deadline is on
+      // inactivity: the request is abandoned after 30 s without a byte.
+      const controller = new AbortController();
+      let timer = setTimeout(() => controller.abort(), STALL_MS);
+      const chunks: Uint8Array[] = [];
+      try {
+        const response = await fetcher(link, {
+          headers: { "User-Agent": USER_AGENT },
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new SiteError(`HTTP ${response.status}`);
+        // The file is read into memory, so refuse anything past what a printable
+        // Model could be: by the declared size first, then by the bytes received.
+        const declared = Math.max(
+          Number(fileSize) || 0,
+          Number(response.headers.get("content-length")) || 0,
+        );
+        const over = () =>
+          new SiteError(`${name} is over the ${MAX_FILE_BYTES / 1024 / 1024} MB limit`);
+        if (declared > MAX_FILE_BYTES) throw over();
+        let received = 0;
+        for await (const chunk of response.body ?? []) {
+          clearTimeout(timer);
+          timer = setTimeout(() => controller.abort(), STALL_MS);
+          received += chunk.length;
+          if (received > MAX_FILE_BYTES) {
+            await response.body?.cancel();
+            throw over();
+          }
+          chunks.push(chunk);
+        }
+      } finally {
+        clearTimeout(timer);
+      }
+      const bytes = Buffer.concat(chunks),
+        path = resolve(out, name);
+      written.push(path);
+      await fs.writeFile(path, bytes);
+      files.push({ name, path, bytes: bytes.length });
+    }
+  }
 }

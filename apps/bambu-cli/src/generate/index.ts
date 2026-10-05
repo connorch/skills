@@ -85,7 +85,7 @@ export function register(program: Command, config: Config, http = new HttpClient
         const result = await (async () => {
           if (task)
             return verb === "status"
-              ? generator.status(task)
+              ? generator.status(task, options.format, texture)
               : generator.complete(task, options.format, texture, options.timeout);
           if (image && options.prompt && !provider.image_prompt_supported)
             console.error(`${name} image-to-3D has no prompt field; --prompt was not sent.`);
@@ -112,10 +112,12 @@ export function register(program: Command, config: Config, http = new HttpClient
           submitted.prompt_used = image
             ? !!options.prompt && provider.image_prompt_supported
             : null;
-          if (!options.wait)
-            submitted.next_command += `${options.format !== "glb" ? ` --format ${options.format}` : ""}${!texture ? " --no-texture" : ""}`;
+          if (!options.wait) submitted.next_command += resumeFlags;
           return submitted;
         })();
+        // The requested format and texture policy travel with the download command.
+        if (verb === "status" && result.next_command.startsWith("bambu generate download "))
+          result.next_command += resumeFlags;
         output(json, result, () =>
           [
             result.output_file

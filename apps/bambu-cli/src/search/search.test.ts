@@ -275,7 +275,9 @@ describe("Search command", () => {
   });
   it("rejects blank query and explains help", async () => {
     const result = await run(["search", "   ", "--json"]);
-    expect(result.out).toBe("");
+    expect(JSON.parse(result.out)).toEqual({
+      error: { type: "usage", message: "the search query is empty" },
+    });
     expect(result.code).toBe(2);
     const p = new Command();
     register(p, new Config());
@@ -352,6 +354,38 @@ describe("Printables fetching", () => {
       expect(await readFile(join(dir, "model.stl"), "utf8")).toBe("original");
       await fetchModel("42", { out: dir, force: true, fetcher });
       expect(await readFile(join(dir, "model.stl"), "utf8")).toBe("mesh");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+  it("removes what a failed fetch wrote so a plain retry works", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
+    let served = 0;
+    const fetcher: Fetch = async (input, init) => {
+      if (String(input).includes("files.example"))
+        return served++ ? new Response("nope", { status: 500 }) : new Response("mesh");
+      return Response.json(
+        String(init?.body).includes("getDownloadLink")
+          ? { data: { getDownloadLink: { ok: true, output: { link: "https://files.example/m" } } } }
+          : {
+              data: {
+                print: {
+                  id: "42",
+                  name: "Model",
+                  slug: "model",
+                  stls: [
+                    { id: "1", name: "a.stl" },
+                    { id: "2", name: "b.stl" },
+                  ],
+                },
+              },
+            },
+      );
+    };
+    try {
+      await expect(fetchModel("42", { out: dir, fetcher })).rejects.toThrow("HTTP 500");
+      expect(existsSync(join(dir, "a.stl"))).toBe(false);
+      expect(existsSync(join(dir, "source.json"))).toBe(false);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

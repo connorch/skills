@@ -73,28 +73,21 @@ export function register(
           json: z.boolean().optional(),
         })
         .safeParse(raw);
-      if (!parsed.success) {
-        console.error("bambu: invalid search arguments (limit must be between 1 and 50)");
+      // Usage errors keep the --json contract: one error document, exit 2.
+      const usage = (message: string) => {
+        const json = typeof raw === "object" && raw !== null && "json" in raw && raw.json === true;
+        if (json) output(true, { error: { type: "usage", message } }, () => message);
+        console.error(`bambu: ${message}`);
         process.exitCode = 2;
-        return;
-      }
+      };
+      if (!parsed.success)
+        return usage("invalid search arguments (limit must be between 1 and 50)");
       const options = parsed.data;
-      if (["thangs", "thingiverse"].includes(options.source)) {
-        console.error(REMOVED_MESSAGE(options.source));
-        process.exitCode = 2;
-        return;
-      }
+      if (["thangs", "thingiverse"].includes(options.source))
+        return usage(REMOVED_MESSAGE(options.source));
       const source = z.enum(["all", ...SITES]).safeParse(options.source);
-      if (!source.success) {
-        console.error("bambu: source must be all, makerworld or printables");
-        process.exitCode = 2;
-        return;
-      }
-      if (!query.trim()) {
-        console.error("bambu: the search query is empty");
-        process.exitCode = 2;
-        return;
-      }
+      if (!source.success) return usage("source must be all, makerworld or printables");
+      if (!query.trim()) return usage("the search query is empty");
       const report = await search(query, {
         sites: source.data === "all" ? [...SITES] : [source.data],
         limit: options.limit,

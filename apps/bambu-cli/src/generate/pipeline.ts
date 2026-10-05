@@ -73,13 +73,17 @@ export class Generator {
     readonly pause = sleep,
     readonly clock = () => performance.now() / 1000,
   ) {}
-  async status(ref: TaskRef): Promise<GenerationResult> {
+  async status(
+    ref: TaskRef,
+    format: OutputFormat = "glb",
+    texture = true,
+  ): Promise<GenerationResult> {
     const recorded = this.ledger.startedFrom(ref.token);
     const current = recorded ? TaskRef.parse(recorded) : ref;
     const observation = await this.provider.poll(current);
     const result = generationResult(current, observation);
     if (observation.state === "succeeded") {
-      const step = this.provider.followUp(current, observation, "glb", true);
+      const step = this.provider.followUp(current, observation, format, texture);
       if (step) result.message = `finished; \`download\` starts the ${step.description}`;
     }
     return result;

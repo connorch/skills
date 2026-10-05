@@ -103,9 +103,12 @@ export async function loadColouredModel(
           if (primitive.getMode() !== 4) continue;
           const positions = primitive.getAttribute("POSITION");
           if (!positions) continue;
-          const uv = primitive.getAttribute("TEXCOORD_0"),
-            colors = primitive.getAttribute("COLOR_0"),
-            material = primitive.getMaterial();
+          const colors = primitive.getAttribute("COLOR_0"),
+            material = primitive.getMaterial(),
+            // The base colour texture names its UV set; default set 0.
+            uv = primitive.getAttribute(
+              `TEXCOORD_${material?.getBaseColorTextureInfo()?.getTexCoord() ?? 0}`,
+            );
           const offset = model.vertices.length,
             start = model.faces.length;
           for (let i = 0; i < positions.getCount(); i++) {
