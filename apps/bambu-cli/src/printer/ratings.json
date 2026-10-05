@@ -1,0 +1,67 @@
+[
+  {
+    "names": ["A1 Mini", "A1 mini", "Bambu Lab A1 mini", "N1", "A1M"],
+    "nozzle_c": 300,
+    "bed_c": 80
+  },
+  {
+    "names": ["A1", "A1", "Bambu Lab A1", "N2S"],
+    "nozzle_c": 300,
+    "bed_c": 100
+  },
+  {
+    "names": ["A2L", "A2L", "Bambu Lab A2L", "N9"],
+    "nozzle_c": 300,
+    "bed_c": 80
+  },
+  {
+    "names": ["P1P", "P1P", "Bambu Lab P1P", "C11"],
+    "nozzle_c": 300,
+    "bed_c": 100
+  },
+  {
+    "names": ["P1S", "P1S", "Bambu Lab P1S", "C12"],
+    "nozzle_c": 300,
+    "bed_c": 100
+  },
+  {
+    "names": ["P2S", "P2S", "Bambu Lab P2S", "N7"],
+    "nozzle_c": 300,
+    "bed_c": 110
+  },
+  {
+    "names": ["X1C", "X1 Carbon", "Bambu Lab X1 Carbon", "BL-P001"],
+    "nozzle_c": 300,
+    "bed_c": 110
+  },
+  {
+    "names": ["X1E", "X1E", "Bambu Lab X1E", "C13"],
+    "nozzle_c": 320,
+    "bed_c": 110
+  },
+  {
+    "names": ["X2D", "X2D", "Bambu Lab X2D", "N6"],
+    "nozzle_c": 300,
+    "bed_c": 120
+  },
+  {
+    "names": ["H2C", "H2C", "Bambu Lab H2C", "O1C", "O1C2"],
+    "nozzle_c": 350,
+    "bed_c": 120
+  },
+  {
+    "names": ["H2S", "H2S", "Bambu Lab H2S", "O1S"],
+    "nozzle_c": 350,
+    "bed_c": 120
+  },
+  {
+    "names": ["H2D", "H2D", "Bambu Lab H2D", "O1D"],
+    "nozzle_c": 350,
+    "bed_c": 120
+  },
+  {
+    "names": ["H2D Pro", "H2D Pro", "Bambu Lab H2D Pro", "O1E", "H2DP"],
+    "nozzle_c": 350,
+    "bed_c": 120
+  }
+]

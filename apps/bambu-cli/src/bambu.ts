@@ -25,106 +25,19 @@ import { basename, join, resolve } from "node:path";
 import { connect as tlsConnect, type TLSSocket } from "node:tls";
 import { Client as FtpClient } from "basic-ftp";
 import { Argument, Command, Option } from "commander";
-import mqtt from "mqtt";
 import { fail } from "./cli.ts";
 import { Config, mask, type Printer, SECRET_KEYS, type SecretKey, SETTING_KEYS } from "./config.ts";
 import { diagnose, report } from "./doctor.ts";
+import { register as registerPrinter } from "./printer/index.ts";
 import { register as registerSearch } from "./search/index.ts";
 import { PROFILES, STUDIO_CLI } from "./studio.ts";
 
 const USER = "bblp";
 
-// The subset of the printer's `print` report this CLI reads.
-interface PrinterStatus {
-  gcode_state?: string;
-  subtask_name?: string;
-  mc_percent?: number;
-  mc_remaining_time?: number;
-  layer_num?: number;
-  total_layer_num?: number;
-  nozzle_temper?: number;
-  nozzle_target_temper?: number;
-  bed_temper?: number;
-  bed_target_temper?: number;
-  wifi_signal?: string;
-  print_error?: number;
-  hms?: unknown[];
-  lights_report?: { node: string; mode: string }[];
-  ams?: {
-    ams?: {
-      id: string;
-      humidity_raw?: string;
-      tray?: { id: string; tray_type?: string; tray_color?: string }[];
-    }[];
-  };
-}
-
 const config = new Config();
 
 // The printer serves a self-signed cert from Bambu's own CA.
 const insecureTls = { rejectUnauthorized: false } as const;
-
-async function fetchStatus(printer: Printer): Promise<PrinterStatus> {
-  const client = await mqtt.connectAsync(`mqtts://${printer.host}:8883`, {
-    username: USER,
-    password: printer.accessCode,
-    ...insecureTls,
-    connectTimeout: 10_000,
-    reconnectPeriod: 0,
-  });
-  try {
-    const report = new Promise<PrinterStatus>((done) => {
-      client.on("message", (_topic, payload) => {
-        const doc = JSON.parse(payload.toString()) as { print?: PrinterStatus };
-        // The printer also pushes partial deltas; wait for the full pushall
-        // reply, which is the one carrying temperatures and AMS state.
-        const p = doc.print;
-        if (p?.gcode_state && p.nozzle_temper !== undefined && p.ams) done(p);
-      });
-    });
-    await client.subscribeAsync(`device/${printer.serial}/report`);
-    await client.publishAsync(
-      `device/${printer.serial}/request`,
-      JSON.stringify({ pushing: { sequence_id: "0", command: "pushall" } }),
-    );
-    let timer: NodeJS.Timeout | undefined;
-    const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error("timed out waiting for a status report")), 15_000);
-    });
-    // Clear the losing timer, or it holds the process open for the full 15s.
-    return await Promise.race([report, timeout]).finally(() => clearTimeout(timer));
-  } finally {
-    await client.endAsync(true);
-  }
-}
-
-function summarize(s: PrinterStatus): string {
-  const lines = [`State: ${s.gcode_state}`];
-  if (["RUNNING", "PAUSE", "PREPARE"].includes(s.gcode_state ?? "")) {
-    const mins = s.mc_remaining_time ?? 0;
-    lines.push(
-      `Job: ${s.subtask_name} - ${s.mc_percent}%, layer ${s.layer_num}/${s.total_layer_num}, ` +
-        `${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, "0")}m left`,
-    );
-  }
-  const temp = (n?: number) => (n ?? 0).toFixed(0);
-  lines.push(
-    `Nozzle ${temp(s.nozzle_temper)}/${temp(s.nozzle_target_temper)}C, ` +
-      `bed ${temp(s.bed_temper)}/${temp(s.bed_target_temper)}C`,
-  );
-  const light = s.lights_report?.find((l) => l.node === "chamber_light")?.mode ?? "?";
-  lines.push(`Light: ${light}, wifi ${s.wifi_signal}`);
-  for (const unit of s.ams?.ams ?? []) {
-    const trays = (unit.tray ?? []).map(
-      (t) =>
-        `A${Number(unit.id) * 4 + Number(t.id) + 1}:${t.tray_type || "empty"}#${(t.tray_color ?? "").slice(0, 6)}`,
-    );
-    lines.push(`AMS ${unit.id} (${unit.humidity_raw ?? "?"}% RH): ${trays.join("  ")}`);
-  }
-  if (s.print_error) lines.push(`Print error: ${s.print_error}`);
-  if (s.hms?.length) lines.push(`HMS alerts: ${JSON.stringify(s.hms)}`);
-  return lines.join("\n");
-}
 
 // Implicit FTPS on 990. The printer never sends a TLS close_notify after a
 // transfer, which is fine for basic-ftp but hangs clients that wait for it.
@@ -301,15 +214,6 @@ function slice(
 const program = new Command("bambu").description("LAN tooling for a Bambu Lab printer");
 
 program
-  .command("status")
-  .description("print state, temperatures, AMS trays, alerts")
-  .option("--json", "raw status report")
-  .action(async (o: { json?: boolean }) => {
-    const s = await fetchStatus(config.printer());
-    console.log(o.json ? JSON.stringify(s, null, 2) : summarize(s));
-  });
-
-program
   .command("snapshot")
   .description("save one camera frame")
   .argument("[out]", "output JPEG", join(tmpdir(), "bambu-snapshot.jpg"))
@@ -422,6 +326,7 @@ configCommand
     );
   });
 
+registerPrinter(program, config);
 registerSearch(program, config);
 
 program
