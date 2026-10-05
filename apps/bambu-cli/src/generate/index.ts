@@ -31,6 +31,10 @@ const optionsSchema = z.object({
 });
 
 // Adds the Generate Route without modifying the CLI entry point.
+// POSIX single quoting for a path echoed into a command line.
+function shellQuote(value: string): string {
+  return /^[\w./-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;
+}
 export function register(program: Command, config: Config, http = new HttpClient()): void {
   const group = program
     .command("generate")
@@ -59,7 +63,7 @@ export function register(program: Command, config: Config, http = new HttpClient
         if (!parsed.success)
           throw new InputError(parsed.error.issues[0]?.message || "invalid arguments");
         const options = parsed.data;
-        resumeFlags = `${options.format !== "glb" ? ` --format ${options.format}` : ""}${!options.texture || options.format !== "glb" ? " --no-texture" : ""}${options.out ? ` --out ${JSON.stringify(options.out)}` : ""}`;
+        resumeFlags = `${options.format !== "glb" ? ` --format ${options.format}` : ""}${!options.texture || options.format !== "glb" ? " --no-texture" : ""}${options.out ? ` --out ${shellQuote(options.out)}` : ""}`;
         if (verb === "status" && options.wait)
           throw new InputError("status never waits; use `generate download` to wait for the Model");
         const image = verb === "image" ? loadImage(value) : undefined;

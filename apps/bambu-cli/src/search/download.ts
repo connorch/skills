@@ -79,8 +79,11 @@ export async function fetchModel(
   const wanted: { name: string; fileId: string; fileSize: unknown; model: boolean }[] = [];
   const listed = mappings(model.stls),
     textured = listed.some((f) => extname(text(f.name)).toLowerCase() === ".obj");
+  const names = new Set<string>();
   for (const file of listed) {
-    const name = text(file.name),
+    // The name is kept verbatim (an MTL refers to its texture by exact name);
+    // only its safety is checked.
+    const name = typeof file.name === "string" ? file.name : "",
       ext = extname(name).toLowerCase();
     // STEP is skipped: neither analyze nor Bambu Studio's CLI reads it. An
     // OBJ's material library and textures come along so paint can read it.
@@ -98,6 +101,8 @@ export async function fetchModel(
       throw new SiteError("Printables returned an unsafe filename");
     const fileId = modelId(file.id);
     if (!fileId) throw new SiteError("Printables returned an invalid file id");
+    if (names.has(name)) throw new SiteError(`Printables lists ${name} twice`);
+    names.add(name);
     wanted.push({ name, fileId, fileSize: file.fileSize, model: isModel });
   }
   if (!wanted.some((f) => f.model))

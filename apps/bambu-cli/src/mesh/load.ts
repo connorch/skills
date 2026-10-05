@@ -19,9 +19,11 @@ import { loadPLY } from "./ply.ts";
 export class MeshLoadError extends Error {}
 // A file a Model refers to (glTF buffer, MTL, texture) must sit beside it: a
 // downloaded Model cannot reach outside its own folder.
-export function companionPath(model: string, reference: string): string {
+// `reference` is resolved beside `from` (the MTL, say) but must stay in the
+// Model's own folder.
+export function companionPath(model: string, reference: string, from = model): string {
   const dir = dirname(model),
-    target = resolve(dir, reference);
+    target = resolve(dirname(from), reference);
   const outside = (from: string, to: string) => {
     const inside = relative(from, to);
     return !inside || inside.startsWith("..") || isAbsolute(inside);
@@ -40,6 +42,7 @@ export function companionPath(model: string, reference: string): string {
   return target;
 }
 export const MAX_ACCESSOR_COUNT = 20_000_000;
+const MAX_TRIANGLES = 20_000_000;
 const MAX_MODEL_FILE_BYTES = 1024 * 1024 * 1024;
 export class MeshSaveError extends Error {}
 export interface MeshIO {
@@ -70,6 +73,10 @@ export function loadSTL(bytes: Uint8Array): Mesh {
   const positions: number[] = [],
     view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (bytes.length >= 84 && 84 + view.getUint32(80, true) * 50 === bytes.length) {
+    if (view.getUint32(80, true) > MAX_TRIANGLES)
+      throw new MeshLoadError(
+        `STL has ${view.getUint32(80, true)} triangles; the limit is ${MAX_TRIANGLES}`,
+      );
     for (let f = 0; f < view.getUint32(80, true); f++)
       for (let k = 0; k < 9; k++) positions.push(view.getFloat32(84 + f * 50 + 12 + k * 4, true));
   } else {
@@ -422,7 +429,18 @@ export function loadGLTF(json: unknown, buffers: Uint8Array[], format = "gltf"):
     indices: new Uint32Array(),
     source: { format },
   };
-  const meshes = doc.meshes.map((m) => {
+  // Decoded on first use from the scene walk, so an unused mesh costs nothing.
+  const decodedMeshes = new Map<number, Mesh>();
+  const meshAt = (index: number): Mesh => {
+    const cached = decodedMeshes.get(index);
+    if (cached) return cached;
+    const m = doc.meshes[index];
+    if (!m) throw new MeshLoadError("missing glTF mesh");
+    const mesh = decodeMesh(m);
+    decodedMeshes.set(index, mesh);
+    return mesh;
+  };
+  const decodeMesh = (m: (typeof doc.meshes)[number]): Mesh => {
     const surfaces = m.primitives.filter(
       (p) => p.attributes.POSITION !== undefined && [4, 5, 6].includes(p.mode),
     );
@@ -447,7 +465,7 @@ export function loadGLTF(json: unknown, buffers: Uint8Array[], format = "gltf"):
       }),
       format,
     );
-  });
+  };
   const instances: Mesh[] = [];
   function visit(index: number, parent: readonly number[], ancestors: Set<number>) {
     const n = doc.nodes[index];
@@ -477,18 +495,14 @@ export function loadGLTF(json: unknown, buffers: Uint8Array[], format = "gltf"):
       ];
     }
     const world = matrixMultiply(parent, local);
-    if (n.mesh !== undefined) {
-      const m = meshes[n.mesh];
-      if (!m) throw new MeshLoadError("missing glTF mesh");
-      instances.push(transform(m, world));
-    }
+    if (n.mesh !== undefined) instances.push(transform(meshAt(n.mesh), world));
     for (const child of n.children) visit(child, world, new Set([...ancestors, index]));
   }
   const roots =
     doc.scenes[doc.scene ?? 0]?.nodes ??
     doc.nodes.map((_, i) => i).filter((i) => !doc.nodes.some((n) => n.children.includes(i)));
   for (const root of roots) visit(root, identity, new Set());
-  return merge(doc.nodes.length ? instances : meshes, format);
+  return merge(doc.nodes.length ? instances : doc.meshes.map((_, i) => meshAt(i)), format);
 }
 // Loaders read only local files or embedded buffers; no network requests.
 export function load(path: string, io: MeshIO = fileIO): Mesh {

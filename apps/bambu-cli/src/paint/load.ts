@@ -116,6 +116,13 @@ export async function loadColouredModel(
             })();
       // Only what the default scene shows; a GLB can carry other scenes or
       // staging nodes that are not part of the Model.
+      // One decode per image however many primitives share it.
+      const decoded = new Map<object, Texture>();
+      const decodedTexture = (key: object, image: Uint8Array): Texture => {
+        let result = decoded.get(key);
+        if (!result) decoded.set(key, (result = decodeTexture(image)));
+        return result;
+      };
       const root = document.getRoot(),
         scene = root.getDefaultScene() ?? root.listScenes()[0],
         shown = new Set<Node>();
@@ -191,7 +198,8 @@ export async function loadColouredModel(
             const face: Face = [ids[i]! + offset, ids[i + 1]! + offset, ids[i + 2]! + offset];
             model.faces.push(determinant < 0 ? [face[2], face[1], face[0]] : face);
           }
-          const image = material?.getBaseColorTexture()?.getImage(),
+          const texture = material?.getBaseColorTexture(),
+            image = texture?.getImage(),
             factor = material?.getBaseColorFactor() ?? [1, 1, 1, 1];
           if (image && !uv)
             model.warnings.push(
@@ -200,7 +208,7 @@ export async function loadColouredModel(
           model.parts.push({
             start,
             end: model.faces.length,
-            ...(image && uv ? { texture: decodeTexture(image) } : {}),
+            ...(image && uv && texture ? { texture: decodedTexture(texture, image) } : {}),
             factor: [factor[0]!, factor[1]!, factor[2]!, factor[3]!],
             alphaMode: material?.getAlphaMode() ?? "OPAQUE",
             alphaCutoff: material?.getAlphaCutoff() ?? 0.5,
@@ -286,7 +294,7 @@ async function loadObj(path: string, read: ReadFile, model: ColouredModel) {
             ];
           if (key === "d") current.factor[3] = Number(args[0]);
           if (key === "map_Kd")
-            current.texturePath = companionPath(materialPath, textureFile(args));
+            current.texturePath = companionPath(path, textureFile(args), materialPath);
         }
       }
     }

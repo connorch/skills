@@ -114,7 +114,7 @@ export function loadPLY(bytes: Uint8Array): Mesh {
     if (!Number.isSafeInteger(element.count) || element.count < 0)
       throw new Error("invalid PLY element count");
     records += element.count;
-    if (element.count > remaining || records > MAX_RECORDS)
+    if ((element.properties.length && element.count > remaining) || records > MAX_RECORDS)
       throw new Error(`PLY declares ${element.count} ${element.name} records but holds fewer`);
     for (let i = 0; i < element.count; i++) {
       const record: Record<string, number> = {};

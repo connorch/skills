@@ -39,6 +39,21 @@ export function sniffProblem(
 
 // Signed download URLs are refreshed from the task, with no credentials sent to file hosts.
 const DOWNLOAD_STALL_MS = 120_000;
+// A chunked body can end cleanly mid-file; an ASCII STL must at least close.
+function asciiStlProblem(path: string, format: OutputFormat, io: typeof fs): string | undefined {
+  if (format !== "stl") return undefined;
+  const head = readHead(path, io);
+  if (!/^\s*solid/i.test(head.toString("latin1"))) return undefined;
+  const size = io.statSync(path).size,
+    tail = Buffer.alloc(Math.min(SNIFF_BYTES, size)),
+    handle = io.openSync(path, "r");
+  try {
+    io.readSync(handle, tail, 0, tail.length, size - tail.length);
+  } finally {
+    io.closeSync(handle);
+  }
+  return /endsolid/i.test(tail.toString("latin1")) ? undefined : "the ASCII STL is truncated";
+}
 function readHead(path: string, io: typeof fs): Buffer {
   const handle = io.openSync(path, "r"),
     head = Buffer.alloc(SNIFF_BYTES);
@@ -114,7 +129,8 @@ export async function fetchListedOutput(
           `download stopped at ${written} of ${declared} bytes`,
           true,
         );
-      const problem = sniffProblem(readHead(tmp, io), chosen, written);
+      const problem =
+        sniffProblem(readHead(tmp, io), chosen, written) ?? asciiStlProblem(tmp, chosen, io);
       if (problem) throw new ProviderError("not_a_model", problem);
       if (chosen === "glb") standUprightFile(tmp, io);
       io.renameSync(tmp, path);
