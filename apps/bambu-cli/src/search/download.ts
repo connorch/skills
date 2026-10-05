@@ -1,9 +1,9 @@
 import { existsSync } from "node:fs";
 import { mkdir, open, rename, rm, writeFile } from "node:fs/promises";
 import { basename, extname, resolve } from "node:path";
+import { UsageError } from "../cli.ts";
 import { SOURCE_FILE, type Source } from "../job.ts";
-import { SNIFF_BYTES, sniffProblem } from "../generate/download.ts";
-import type { OutputFormat } from "../generate/core.ts";
+import { sniffProblem, stallGuard, streamBody, type SniffFormat } from "../download.ts";
 import {
   graphqlData,
   isSiteUrl,
@@ -18,13 +18,12 @@ import {
   USER_AGENT,
   type Fetch,
 } from "./core.ts";
-export class FetchUsageError extends Error {}
 export function printablesId(input: string): string {
   if (modelId(input)) return input;
   try {
     const url = new URL(input);
     if (["makerworld.com", "www.makerworld.com"].includes(url.hostname))
-      throw new FetchUsageError(
+      throw new UsageError(
         "MakerWorld needs a login. Download the file into the Print Job folder yourself.",
       );
     if (isSiteUrl("printables", input)) {
@@ -32,9 +31,9 @@ export function printablesId(input: string): string {
       if (id) return id;
     }
   } catch (error) {
-    if (error instanceof FetchUsageError) throw error;
+    if (error instanceof UsageError) throw error;
   }
-  throw new FetchUsageError("Expected a Printables model URL or numeric id.");
+  throw new UsageError("Expected a Printables model URL or numeric id.");
 }
 export const MODEL_QUERY = `query DownloadModel($id: ID!) { print(id: $id) { id name slug user { publicUsername } license { abbreviation } stls { id name fileSize } } }`;
 export const LINK_MUTATION = `mutation DownloadFile($id: ID!, $modelId: ID!) { getDownloadLink(id: $id, printId: $modelId, fileType: stl, source: model_detail) { ok errors { field messages } output { link ttl } } }`;
@@ -151,20 +150,19 @@ export async function fetchModel(
       }
       if (url.protocol !== "https:" || url.username || url.password)
         throw new SiteError("Printables returned an unsafe download link");
-      // Large Models take minutes on a home connection, so the deadline is on
-      // inactivity: the request is abandoned after 30 s without a byte.
+      // The request is abandoned after 30 s without a byte, however long the
+      // whole Model takes.
       const path = resolve(out, name),
         tmp = `${path}.tmp`;
       staged.push({ name, path, tmp, bytes: 0 });
       const handle = await fs.open(tmp, "w");
-      const controller = new AbortController();
-      let timer = setTimeout(() => controller.abort(), STALL_MS);
+      const stall = stallGuard(STALL_MS);
       let received = 0,
-        head = Buffer.alloc(0);
+        head: Buffer = Buffer.alloc(0);
       try {
         const response = await fetcher(link, {
           headers: { "User-Agent": USER_AGENT },
-          signal: controller.signal,
+          signal: stall.signal,
         });
         if (!response.ok) throw new SiteError(`HTTP ${response.status}`);
         // Refuse anything past what a printable Model could be: by the
@@ -176,20 +174,16 @@ export async function fetchModel(
         const over = () =>
           new SiteError(`${name} is over the ${MAX_FILE_BYTES / 1024 / 1024} MB limit`);
         if (declared > MAX_FILE_BYTES) throw over();
-        for await (const chunk of response.body ?? []) {
-          clearTimeout(timer);
-          timer = setTimeout(() => controller.abort(), STALL_MS);
-          received += chunk.length;
-          if (received > MAX_FILE_BYTES) {
-            await response.body?.cancel();
-            throw over();
-          }
-          if (head.length < SNIFF_BYTES)
-            head = Buffer.concat([head, chunk]).subarray(0, SNIFF_BYTES);
-          await handle.write(chunk);
-        }
+        ({ bytes: received, head } = await streamBody(response, {
+          stall,
+          maxBytes: MAX_FILE_BYTES,
+          over,
+          write: async (chunk) => {
+            await handle.write(chunk);
+          },
+        }));
       } finally {
-        clearTimeout(timer);
+        stall.clear();
         await handle.close();
       }
       // Printables reports each file's exact size, so a body that ended early
@@ -200,7 +194,7 @@ export async function fetchModel(
       // A signed host can answer 200 with an error page; the file must look
       // like the Model it is named as before the job is committed.
       const problem = isModel
-        ? sniffProblem(head, extname(name).slice(1).toLowerCase() as OutputFormat | "ply", received)
+        ? sniffProblem(head, extname(name).slice(1).toLowerCase() as SniffFormat, received)
         : undefined;
       if (problem) throw new SiteError(`${name}: ${problem}`);
       staged[staged.length - 1]!.bytes = received;

@@ -7,10 +7,10 @@ import { existsSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, resolve } from "node:path";
 import { Command } from "commander";
 import { z } from "zod";
-import { EXIT_FAILED, EXIT_USAGE, next, output } from "../cli.ts";
+import { jsonFlag, next, output, reportError, UsageError } from "../cli.ts";
 import type { Config } from "../config.ts";
 import { readSource, type Source } from "../job.ts";
-import { UsageError, resolveMaterial, resolvePrinter } from "../analyze/index.ts";
+import { resolveMaterial, resolvePrinter } from "../analyze/index.ts";
 import {
   analyze,
   bounds,
@@ -193,6 +193,18 @@ async function paintedPreview(
   };
 }
 
+const viewOptions = z.object({
+  output: z.string().optional(),
+  job: z.string().optional(),
+  printer: z.string().optional(),
+  material: z.string(),
+  purpose: z.enum(["general", "decorative", "functional"]),
+  height: z.coerce.number().positive().finite().optional(),
+  maxColors: z.coerce.number().int().min(1).max(8),
+  publish: z.boolean(),
+  json: z.boolean().optional(),
+});
+type ViewOptions = z.infer<typeof viewOptions>;
 export function register(program: Command, config: Config): void {
   program
     .command("view")
@@ -208,49 +220,19 @@ export function register(program: Command, config: Config): void {
     .option("--no-publish", "write the page but do not upload it")
     .option("--json")
     .action(async (model: string, raw: unknown) => {
-      const json = typeof raw === "object" && raw !== null && "json" in raw && raw.json === true;
       try {
-        const parsed = z
-          .object({
-            output: z.string().optional(),
-            job: z.string().optional(),
-            printer: z.string().optional(),
-            material: z.string(),
-            purpose: z.enum(["general", "decorative", "functional"]),
-            height: z.coerce.number().positive().finite().optional(),
-            maxColors: z.coerce.number().int().min(1).max(8),
-            publish: z.boolean(),
-            json: z.boolean().optional(),
-          })
-          .safeParse(raw);
+        const parsed = viewOptions.safeParse(raw);
         if (!parsed.success)
           throw new UsageError(
             "--purpose must be general, decorative, or functional; --height a positive number of mm; --max-colors 1-8",
           );
         await view(model, parsed.data, config);
       } catch (error) {
-        // One JSON error document under --json, like analyze and the rest.
-        const message = error instanceof Error ? error.message : String(error),
-          usage = error instanceof UsageError;
-        if (json)
-          output(true, { error: { type: usage ? "usage" : "failed", message } }, () => message);
-        console.error(`bambu: ${message}`);
-        process.exitCode = usage ? EXIT_USAGE : EXIT_FAILED;
+        reportError(jsonFlag(raw), error);
       }
     });
 }
 
-type ViewOptions = {
-  output?: string;
-  job?: string;
-  printer?: string;
-  material: string;
-  purpose: "general" | "decorative" | "functional";
-  height?: number;
-  maxColors: number;
-  publish: boolean;
-  json?: boolean;
-};
 async function view(model: string, options: ViewOptions, config: Config): Promise<void> {
   const file = resolve(model);
   const page = resolve(options.output ?? resolve(dirname(file), "review.html"));
@@ -262,11 +244,11 @@ async function view(model: string, options: ViewOptions, config: Config): Promis
   // The same unit decision analyze makes, so the report describes the
   // Model at its printed size; --height overrides it the way analyze and
   // paint do, so a generated GLB is reviewed at the size it will print.
-  const loaded = load(file);
-  const units = decideUnits(Math.max(...bounds(loaded).extents), { declared: loaded.unit });
+  const loaded = load(file),
+    extents = bounds(loaded).extents;
+  const units = decideUnits(Math.max(...extents), { declared: loaded.unit });
   let factor = units.scale;
-  if (options.height !== undefined && bounds(loaded).extents[2] >= 0.01)
-    factor = options.height / bounds(loaded).extents[2];
+  if (options.height !== undefined && extents[2] >= 0.01) factor = options.height / extents[2];
   else if (options.height !== undefined) notes.push("--height ignored: the model is flat along Z.");
   else if (units.doubtful)
     notes.push(units.note.replace("pass --unit", "run `bambu analyze --unit` first"));

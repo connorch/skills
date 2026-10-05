@@ -1,5 +1,6 @@
 import * as fs from "node:fs";
 import { join } from "node:path";
+import { SNIFF_BYTES, sniffProblem, stallGuard, streamBody } from "../download.ts";
 import { formats, HttpClient, ProviderError, type OutputFormat, type Status } from "./core.ts";
 
 export function safeFilename(stem: string, suffix: string): string {
@@ -10,73 +11,39 @@ export function safeFilename(stem: string, suffix: string): string {
       .slice(0, 80) || "model"
   }.${suffix}`;
 }
-// Only the first kilobyte and the file length are needed to tell a Model from an error page.
-export const SNIFF_BYTES = 1024;
-export function sniffProblem(
-  head: Buffer,
-  format: OutputFormat | "ply",
-  length = head.length,
-): string | undefined {
-  if (!length) return "the download is empty";
-  const text = head.toString().trimStart();
-  if (/^[<{]/.test(text)) return `expected ${format.toUpperCase()} but got an HTML/JSON document`;
-  const valid =
-    format === "glb"
-      ? head.toString("ascii", 0, 4) === "glTF"
-      : format === "3mf"
-        ? head.toString("ascii", 0, 2) === "PK"
-        : format === "ply"
-          ? /^ply\r?\n/.test(text)
-          : format === "stl"
-            ? (length >= 84 && head.length >= 84 && length === 84 + 50 * head.readUInt32LE(80)) ||
-              /^solid/i.test(text)
-            : /^(v|vn|vt|f|o|g|mtllib|usemtl|s)\s/.test(
-                text
-                  .split("\n")
-                  .map((l) => l.trim())
-                  .find((l) => l && !l.startsWith("#")) || "",
-              );
-  return valid ? undefined : `the download is not a ${format.toUpperCase()} file`;
-}
-
 // Signed download URLs are refreshed from the task, with no credentials sent to file hosts.
 const DOWNLOAD_STALL_MS = 120_000;
+const MAX_OUTPUT_BYTES = 1024 ** 3;
+// The last `bytes` of a file, for the checks that look at how it ends.
+function readTail(path: string, bytes: number, io: typeof fs): Buffer {
+  const size = io.statSync(path).size,
+    tail = Buffer.alloc(Math.min(bytes, size)),
+    handle = io.openSync(path, "r");
+  try {
+    io.readSync(handle, tail, 0, tail.length, size - tail.length);
+  } finally {
+    io.closeSync(handle);
+  }
+  return tail;
+}
 // A 3MF is a ZIP: its end-of-central-directory record sits in the last 64 KB.
 function zipProblem(path: string, format: OutputFormat, io: typeof fs): string | undefined {
   if (format !== "3mf") return undefined;
-  const size = io.statSync(path).size,
-    tail = Buffer.alloc(Math.min(65_557, size)),
-    handle = io.openSync(path, "r");
-  try {
-    io.readSync(handle, tail, 0, tail.length, size - tail.length);
-  } finally {
-    io.closeSync(handle);
-  }
-  return tail.includes(Buffer.from([0x50, 0x4b, 0x05, 0x06])) ? undefined : "the 3MF is truncated";
+  return readTail(path, 65_557, io).includes(Buffer.from([0x50, 0x4b, 0x05, 0x06]))
+    ? undefined
+    : "the 3MF is truncated";
 }
 // A chunked body can end cleanly mid-file; an ASCII STL must at least close.
-function asciiStlProblem(path: string, format: OutputFormat, io: typeof fs): string | undefined {
-  if (format !== "stl") return undefined;
-  const head = readHead(path, io);
-  if (!/^\s*solid/i.test(head.toString("latin1"))) return undefined;
-  const size = io.statSync(path).size,
-    tail = Buffer.alloc(Math.min(SNIFF_BYTES, size)),
-    handle = io.openSync(path, "r");
-  try {
-    io.readSync(handle, tail, 0, tail.length, size - tail.length);
-  } finally {
-    io.closeSync(handle);
-  }
-  return /endsolid/i.test(tail.toString("latin1")) ? undefined : "the ASCII STL is truncated";
-}
-function readHead(path: string, io: typeof fs): Buffer {
-  const handle = io.openSync(path, "r"),
-    head = Buffer.alloc(SNIFF_BYTES);
-  try {
-    return head.subarray(0, io.readSync(handle, head, 0, SNIFF_BYTES, 0));
-  } finally {
-    io.closeSync(handle);
-  }
+function asciiStlProblem(
+  path: string,
+  head: Buffer,
+  format: OutputFormat,
+  io: typeof fs,
+): string | undefined {
+  if (format !== "stl" || !/^\s*solid/i.test(head.toString("latin1"))) return undefined;
+  return /endsolid/i.test(readTail(path, SNIFF_BYTES, io).toString("latin1"))
+    ? undefined
+    : "the ASCII STL is truncated";
 }
 export async function fetchListedOutput(
   http: HttpClient,
@@ -105,39 +72,32 @@ export async function fetchListedOutput(
         );
       // Upstream's download read timeout: abandon a transfer that goes
       // 120 s without a byte, however long a large Model takes overall.
-      const controller = new AbortController();
-      let stall = setTimeout(() => controller.abort(), DOWNLOAD_STALL_MS);
-      let response: Response;
+      const stall = stallGuard(DOWNLOAD_STALL_MS);
+      const over = () => new ProviderError("too_large", `model exceeds ${MAX_OUTPUT_BYTES} bytes`);
+      let response: Response,
+        written = 0,
+        head: Buffer = Buffer.alloc(0);
       try {
-        response = await http.send(url, { signal: controller.signal });
-      } catch (error) {
-        clearTimeout(stall);
-        throw error;
+        response = await http.send(url, { signal: stall.signal });
+        if (Number(response.headers.get("content-length") || 0) > MAX_OUTPUT_BYTES) throw over();
+        const handle = io.openSync(tmp, "w");
+        try {
+          ({ bytes: written, head } = await streamBody(response, {
+            stall,
+            maxBytes: MAX_OUTPUT_BYTES,
+            over,
+            write: (chunk) => void io.writeSync(handle, chunk),
+          }));
+        } catch (error) {
+          if (error instanceof ProviderError) throw error;
+          throw new ProviderError("network", "download interrupted", true);
+        } finally {
+          io.closeSync(handle);
+        }
+      } finally {
+        stall.clear();
       }
       const declared = Number(response.headers.get("content-length") || 0);
-      if (declared > 1024 ** 3) {
-        clearTimeout(stall);
-        throw new ProviderError("too_large", "model exceeds 1073741824 bytes");
-      }
-      const handle = io.openSync(tmp, "w");
-      let written = 0;
-      try {
-        if (response.body)
-          for await (const chunk of response.body) {
-            clearTimeout(stall);
-            stall = setTimeout(() => controller.abort(), DOWNLOAD_STALL_MS);
-            written += chunk.byteLength;
-            if (written > 1024 ** 3)
-              throw new ProviderError("too_large", "model exceeds 1073741824 bytes");
-            io.writeSync(handle, chunk);
-          }
-      } catch (error) {
-        if (error instanceof ProviderError) throw error;
-        throw new ProviderError("network", "download interrupted", true);
-      } finally {
-        clearTimeout(stall);
-        io.closeSync(handle);
-      }
       if (declared && !response.headers.get("content-encoding") && declared !== written)
         throw new ProviderError(
           "truncated",
@@ -145,20 +105,12 @@ export async function fetchListedOutput(
           true,
         );
       const problem =
-        sniffProblem(readHead(tmp, io), chosen, written) ??
-        asciiStlProblem(tmp, chosen, io) ??
+        sniffProblem(head, chosen, written) ??
+        asciiStlProblem(tmp, head, chosen, io) ??
         zipProblem(tmp, chosen, io);
       if (problem) throw new ProviderError("not_a_model", problem);
-      if (chosen === "glb") {
-        // Validates the header and chunk boundaries as well.
-        const handle = io.openSync(tmp, "r");
-        try {
-          readJsonChunk(handle, io);
-        } finally {
-          io.closeSync(handle);
-        }
-        standUprightFile(tmp, io);
-      }
+      // Checks the header and chunk boundaries on the way.
+      if (chosen === "glb") standUprightFile(tmp, io);
       io.renameSync(tmp, path);
       return { path, output_format: chosen };
     } catch (error) {
@@ -243,16 +195,6 @@ export function uprightChunk(json: string): Buffer | undefined {
   text.copy(chunk, 8);
   return chunk;
 }
-export function standUpright(glb: Buffer): Buffer {
-  const jsonLength = glb.readUInt32LE(12);
-  const chunk = uprightChunk(glb.toString("utf8", 20, 20 + jsonLength));
-  if (!chunk) return glb;
-  const out = Buffer.concat([glb.subarray(0, 12), chunk, glb.subarray(20 + jsonLength)]);
-  out.writeUInt32LE(out.length, 8);
-  return out;
-}
-// The same rewrite on disk: only the JSON chunk is held in memory, the binary
-// chunk is copied through in pieces, so a large download is never loaded whole.
 // Header and JSON chunk of an open GLB, checked against the file before the
 // chunk is allocated: a bad header or a chunk the file cannot hold is refused.
 const MAX_JSON_CHUNK = 64 * 1024 * 1024;
@@ -283,6 +225,9 @@ function readJsonChunk(
   io.readSync(handle, json, 0, jsonLength, 20);
   return { header, json, total };
 }
+// Stand a downloaded GLB upright in place: only the JSON chunk is held in
+// memory, the binary chunk is copied through in pieces, so a large download is
+// never loaded whole.
 export function standUprightFile(path: string, io: typeof fs): void {
   const input = io.openSync(path, "r");
   let output: number | undefined;

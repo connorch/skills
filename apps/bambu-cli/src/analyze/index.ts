@@ -1,7 +1,7 @@
 import { basename } from "node:path";
 import { Command, Option } from "commander";
 import type { Config } from "../config.ts";
-import { next, output } from "../cli.ts";
+import { jsonFlag, next, output, reportError, UsageError } from "../cli.ts";
 import { z } from "zod";
 import {
   analyze,
@@ -41,7 +41,6 @@ export const optionsSchema = z.object({
   json: z.boolean().default(false),
 });
 export type AnalyzeOptions = z.infer<typeof optionsSchema>;
-export class UsageError extends Error {}
 export function resolvePrinter(
   requested: string | undefined,
   configured: string | undefined,
@@ -286,21 +285,13 @@ export function register(program: Command, config: Config, io: MeshIO = fileIO):
     .addOption(new Option("--no-clean").hideHelp())
     .addOption(new Option("--no-simplify").hideHelp())
     .action((file: string, raw: unknown) => {
-      const args = optionsSchema.safeParse(raw),
-        json = args.success
-          ? args.data.json
-          : typeof raw === "object" && raw !== null && "json" in raw && raw.json === true;
+      const json = jsonFlag(raw);
       try {
         const doc = analyzeFile(file, raw, config.settings().model, io);
         output(json, doc, () => formatReport(doc));
         if (json) console.error(next(`Use this file: ${doc.output_file}`));
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error),
-          usage = error instanceof UsageError;
-        if (json)
-          output(true, { error: { type: usage ? "usage" : "file", message } }, () => message);
-        console.error(`bambu: ${message}`);
-        process.exitCode = usage ? 2 : 1;
+        reportError(json, error, "file");
       }
     });
 }

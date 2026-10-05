@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
+import { sniffProblem } from "../download.ts";
 import {
   FollowUpLedger,
   Generator,
@@ -19,9 +20,8 @@ import {
   parseRodinFiles,
   parseRodinStatus,
   parseTripoTask,
-  sniffProblem,
-  standUpright,
   status,
+  uprightChunk,
   waitForTask,
   type GenerationRequest,
 } from "./index.ts";
@@ -206,8 +206,9 @@ describe("provider requests and downloads", () => {
     });
     // The saved GLB is the provider's, stood upright: one extra root node.
     const saved = readFileSync(result.output_file!);
-    expect(standUpright(saved)).toEqual(saved);
-    expect(JSON.parse(saved.toString("utf8", 20, 20 + saved.readUInt32LE(12))).nodes).toEqual([
+    const savedJson = saved.toString("utf8", 20, 20 + saved.readUInt32LE(12));
+    expect(uprightChunk(savedJson)).toBeUndefined();
+    expect(JSON.parse(savedJson).nodes).toEqual([
       { name: "body" },
       { name: "bambu-upright", rotation: [Math.SQRT1_2, 0, 0, Math.SQRT1_2], children: [0] },
     ]);

@@ -17,6 +17,26 @@ export function output(json: boolean, doc: unknown, human: () => string): void {
   console.log(json ? JSON.stringify(doc, null, 2) : human());
 }
 
+// Bad arguments, as opposed to a command that ran and failed.
+export class UsageError extends Error {}
+
+// Whether `--json` was asked for, read from Commander's raw options so the
+// contract holds even when the options themselves fail to parse.
+export function jsonFlag(raw: unknown): boolean {
+  return typeof raw === "object" && raw !== null && "json" in raw && raw.json === true;
+}
+
+// Report a command's error the one way: the error document under --json
+// (`type` is "usage" for a UsageError, else `failedType`), the message on
+// stderr, and exit 2 or 1.
+export function reportError(json: boolean, error: unknown, failedType = "failed"): void {
+  const message = error instanceof Error ? error.message : String(error),
+    usage = error instanceof UsageError;
+  if (json) output(true, { error: { type: usage ? "usage" : failedType, message } }, () => "");
+  console.error(`bambu: ${message}`);
+  process.exitCode = usage ? EXIT_USAGE : EXIT_FAILED;
+}
+
 // POSIX single quoting for a path echoed into a suggested command line.
 export function shellQuote(value: string): string {
   return /^[\w./-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;

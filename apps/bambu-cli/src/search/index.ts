@@ -1,9 +1,9 @@
 import { Command } from "commander";
 import { z } from "zod";
 import type { Config } from "../config.ts";
-import { next, output } from "../cli.ts";
+import { jsonFlag, next, output, reportError, UsageError } from "../cli.ts";
 import { search, SITE_NAMES, SITES, SORTS, type Fetch, type ModelResult } from "./core.ts";
-import { fetchModel, FetchUsageError } from "./download.ts";
+import { fetchModel } from "./download.ts";
 import { renderCandidatesPage } from "../view/candidates.ts";
 import { publish, slug } from "../view/publish.ts";
 import { writeFileSync } from "node:fs";
@@ -68,13 +68,7 @@ export function register(
           json: z.boolean().optional(),
         })
         .safeParse(raw);
-      // Usage errors keep the --json contract: one error document, exit 2.
-      const usage = (message: string) => {
-        const json = typeof raw === "object" && raw !== null && "json" in raw && raw.json === true;
-        if (json) output(true, { error: { type: "usage", message } }, () => message);
-        console.error(`bambu: ${message}`);
-        process.exitCode = 2;
-      };
+      const usage = (message: string) => reportError(jsonFlag(raw), new UsageError(message));
       if (!parsed.success)
         return usage("invalid search arguments (limit must be between 1 and 50)");
       const options = parsed.data;
@@ -151,11 +145,7 @@ export function register(
           ].join("\n"),
         );
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error),
-          type = error instanceof FetchUsageError ? "usage" : "fetch_failed";
-        if (options.json) output(true, { error: { type, message } }, () => "");
-        console.error(`bambu: ${message}`);
-        process.exitCode = type === "usage" ? 2 : 1;
+        reportError(Boolean(options.json), error, "fetch_failed");
       }
     });
 }

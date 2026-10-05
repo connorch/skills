@@ -14,7 +14,7 @@ import { basename, join, resolve } from "node:path";
 import { connect as tlsConnect, type TLSSocket } from "node:tls";
 import { Client as FtpClient } from "basic-ftp";
 import { Argument, Command, CommanderError } from "commander";
-import { EXIT_USAGE, fail } from "./cli.ts";
+import { EXIT_USAGE, fail, reportError, UsageError } from "./cli.ts";
 import { Config, mask, type Printer, SECRET_KEYS, type SecretKey, SETTING_KEYS } from "./config.ts";
 import { diagnose, report } from "./doctor.ts";
 import { register as registerAnalyze } from "./analyze/index.ts";
@@ -228,17 +228,10 @@ program
 // every other usage error, with the error document when --json was asked for;
 // help and version keep exit 0.
 await program.parseAsync().catch((error: Error) => {
-  if (error instanceof CommanderError) {
-    if (error.exitCode === 0) process.exit(0);
-    if (process.argv.includes("--json"))
-      console.log(
-        JSON.stringify(
-          { error: { type: "usage", message: error.message.replace(/^error: /, "") } },
-          null,
-          2,
-        ),
-      );
-    process.exit(EXIT_USAGE);
-  }
-  fail(error.message);
+  if (!(error instanceof CommanderError)) fail(error.message);
+  if (error.exitCode === 0) process.exit(0);
+  reportError(
+    process.argv.includes("--json"),
+    new UsageError(error.message.replace(/^error: /, "")),
+  );
 });
