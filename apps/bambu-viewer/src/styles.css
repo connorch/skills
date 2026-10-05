@@ -98,10 +98,11 @@ button {
   color: var(--z);
 }
 
+/* Top clears the wovn banner, which overlays the page when it is published. */
 .head {
   position: fixed;
   left: 28px;
-  top: 22px;
+  top: 52px;
   right: 28px;
   display: flex;
   align-items: flex-start;
@@ -246,6 +247,9 @@ h1 {
 .line .dot,
 .line .swatch {
   align-self: center;
+}
+.line .k {
+  white-space: nowrap;
 }
 .line .rest {
   color: var(--dim);

@@ -319,6 +319,8 @@ describe("Printables fetching", () => {
                   id: "42",
                   name: "Model",
                   slug: "model",
+                  user: { publicUsername: "FH" },
+                  license: { abbreviation: "CC-BY-SA" },
                   stls: [
                     { id: "1", name: "model.stl", fileSize: 4 },
                     { id: "2", name: "model.f3d" },
@@ -337,6 +339,14 @@ describe("Printables fetching", () => {
       expect(report.files.map((f) => f.bytes)).toEqual([4, 4]);
       expect(report.skipped).toEqual(["model.f3d"]);
       expect(await readFile(join(dir, "model.stl"), "utf8")).toBe("mesh");
+      expect(JSON.parse(await readFile(join(dir, "source.json"), "utf8"))).toEqual({
+        route: "Search",
+        site: "Printables",
+        title: "Model",
+        author: "FH",
+        url: "https://www.printables.com/model/42-model",
+        license: "CC-BY-SA",
+      });
       await writeFile(join(dir, "model.stl"), "original");
       await expect(fetchModel("42", { out: dir, fetcher })).rejects.toThrow("EEXIST");
       expect(await readFile(join(dir, "model.stl"), "utf8")).toBe("original");

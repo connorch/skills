@@ -183,7 +183,7 @@ function ReportColumn({ review, open, setOpen }: ColumnProps) {
           issues.map((c) => (
             <div className="line" key={c.key} title={c.detail}>
               <i className={`dot ${c.status}`} />
-              <span>{c.label}</span>
+              <span className="k">{c.label}</span>
               <span className="warn-v">{c.value}</span>
               <span className="rest">{c.detail}</span>
             </div>

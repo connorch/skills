@@ -21,6 +21,7 @@ import { register as registerMake } from "./make/index.ts";
 import { register as registerPrinter } from "./printer/index.ts";
 import { register as registerSearch } from "./search/index.ts";
 import { register as registerSlice } from "./slice/index.ts";
+import { register as registerView } from "./view/index.ts";
 
 const USER = "bblp";
 
@@ -183,6 +184,7 @@ registerMake(program, config);
 registerPrinter(program, config);
 registerSearch(program, config);
 registerSlice(program, config);
+registerView(program, config);
 
 program
   .command("doctor")

@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, extname, resolve } from "node:path";
+import { SOURCE_FILE, type Source } from "../job.ts";
 import {
   graphqlData,
   isSiteUrl,
@@ -32,7 +33,7 @@ export function printablesId(input: string): string {
   }
   throw new FetchUsageError("Expected a Printables model URL or numeric id.");
 }
-export const MODEL_QUERY = `query DownloadModel($id: ID!) { print(id: $id) { id name slug stls { id name fileSize } } }`;
+export const MODEL_QUERY = `query DownloadModel($id: ID!) { print(id: $id) { id name slug user { publicUsername } license { abbreviation } stls { id name fileSize } } }`;
 export const LINK_MUTATION = `mutation DownloadFile($id: ID!, $modelId: ID!) { getDownloadLink(id: $id, printId: $modelId, fileType: stl, source: model_detail) { ok errors { field messages } output { link ttl } } }`;
 // Download anonymous Printables Model files into a Print Job folder.
 export async function fetchModel(
@@ -106,9 +107,15 @@ export async function fetchModel(
     await fs.writeFile(path, bytes, { flag: force ? "w" : "wx" });
     files.push({ name, path, bytes: bytes.length });
   }
-  return {
-    model: { id, name: text(model.name), url: pageUrl("printables", id, model.slug) },
-    files,
-    skipped,
+  const source: Source = {
+    route: "Search",
+    site: "Printables",
+    title: text(model.name),
+    author: text(mapping(model.user).publicUsername) || undefined,
+    url: pageUrl("printables", id, model.slug),
+    license: text(mapping(model.license).abbreviation) || undefined,
   };
+  if (files.length)
+    await fs.writeFile(resolve(out, SOURCE_FILE), `${JSON.stringify(source, null, 2)}\n`);
+  return { model: { id, name: source.title, url: source.url }, source, files, skipped };
 }
