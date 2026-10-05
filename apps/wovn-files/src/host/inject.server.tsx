@@ -3,7 +3,8 @@
 // declarative Shadow DOM - the server-rendered Banner and the app stylesheet
 // inside <template shadowrootmode="open">, the Page as JSON, and the one
 // module script that hydrates it. The File's own head, styles, scripts, and
-// links are untouched.
+// links are untouched; the one rule added to its document reserves room for
+// the fixed strip (STRIP_SPACE).
 import { renderToString } from "react-dom/server";
 
 import { BannerApp } from "@/banner/app";
@@ -21,12 +22,19 @@ export const BANNER_SCRIPT = "/_/banner.js";
 // light DOM. Computed once per isolate: the stylesheet is a build constant.
 const PROPERTY_RULES = stylesheet.match(/@property[^{]+\{[^}]*\}/g)?.join("") ?? "";
 
+// The Banner is fixed to the top of the viewport (the :host rule in
+// styles.css), so the File's document starts below the 2rem strip and anchor
+// jumps stop short of it. Padding on <html> leaves the File's body styles
+// alone; rem resolves against the File's root in the shadow tree too, so the
+// space tracks the strip's height.
+const STRIP_SPACE = "html{padding-top:2rem;scroll-padding-top:2rem}";
+
 export function injectBanner(object: R2ObjectBody, page: FilePage): Response {
   const markup = renderToString(<BannerApp page={page} />);
   // "</script" inside the JSON would end the data block early.
   const json = JSON.stringify(page).replace(/</g, "\\u003c");
   const fragment =
-    `<style>${PROPERTY_RULES}</style>` +
+    `<style>${STRIP_SPACE}${PROPERTY_RULES}</style>` +
     `<${BANNER_HOST}><template shadowrootmode="open"><style>${stylesheet}</style>` +
     `<div id="${BANNER_ROOT_ID}">${markup}</div></template></${BANNER_HOST}>` +
     `<script type="application/json" id="${BANNER_PAGE_ID}">${json}</script>` +

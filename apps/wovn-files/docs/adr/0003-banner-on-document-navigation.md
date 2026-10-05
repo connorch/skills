@@ -29,7 +29,10 @@ humans and the Banner's own raw link. Browsers that do not send
 An HTML File is streamed through HTMLRewriter with the Banner injected at the
 top of `<body>` as declarative Shadow DOM: the server-rendered Banner markup
 and the app stylesheet inside `<template shadowrootmode="open">`, plus one
-module script that hydrates it. The File's own head, styles, scripts,
+module script that hydrates it. The Banner is fixed to the top of the
+viewport, so a File's body styles cannot offset it, and the one rule added
+to the File's document pads `<html>` by the strip's height so the File
+starts below it. The File's own head, styles, scripts,
 relative links, and fragment links keep normal browser behaviour, and every
 link to another File lands on that File with its own Banner. We rejected
 framing HTML Files in an iframe (breaks fragment links, find-in-page, print,
