@@ -173,7 +173,7 @@ const removedOptions = z.object({
   simplify: z.boolean().optional(),
 });
 const removedReasons = {
-  render: "ignored the view direction. Use bambu preview for images.",
+  render: "ignored the view direction. Use bambu view for a Review Page.",
   outputDir: "only chose where rendered images went. Derived Models are written next to the input.",
   clean: "did nothing: loose bodies are only ever removed with --keep-main.",
   simplify:

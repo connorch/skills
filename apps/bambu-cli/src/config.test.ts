@@ -1,5 +1,5 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import { Config, ConfigError, type Keychain, mask } from "./config.ts";
@@ -58,6 +58,14 @@ describe("settings", () => {
     expect(config.settings()).toEqual({ printer_ip: "192.168.1.9", "3d_provider": "tripo" });
     // The file itself is untouched by the override.
     expect(config.stored()).toEqual({ printer_ip: "10.0.0.5", "3d_provider": "meshy" });
+  });
+  it("expands ~ in output_dir, from the file or the environment", () => {
+    const config = new Config({ dir, env: {}, keychain: fakeKeychain() });
+    config.set({ output_dir: "~/prints" });
+    expect(config.settings().output_dir).toBe(join(homedir(), "prints"));
+    expect(config.stored().output_dir).toBe("~/prints");
+    const env = new Config({ dir, env: { BAMBU_OUTPUT_DIR: "~" }, keychain: fakeKeychain() });
+    expect(env.settings().output_dir).toBe(homedir());
   });
 });
 

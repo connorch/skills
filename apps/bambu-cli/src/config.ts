@@ -140,13 +140,16 @@ export class Config {
     return parseSettings(raw, this.file);
   }
 
-  // Settings with environment overrides applied.
+  // Settings with environment overrides applied, and `~` in output_dir
+  // expanded as upstream's expanduser did.
   settings(): Settings {
     const result: Record<string, string> = { ...this.stored() };
     for (const [envKey, key] of Object.entries(ENV_KEYS)) {
       const value = this.env[envKey];
       if (value && (SETTING_KEYS as string[]).includes(key)) result[key] = value;
     }
+    if (result.output_dir && /^~(?:\/|$)/.test(result.output_dir))
+      result.output_dir = join(homedir(), result.output_dir.slice(1));
     return Settings.parse(result);
   }
 
