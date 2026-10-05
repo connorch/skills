@@ -5,7 +5,7 @@
 // override both, under the names bambu-studio-ai documented, so its docs still
 // apply to this port. `bambu config` edits all of it; `bambu doctor` checks it.
 
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -53,43 +53,36 @@ export interface Keychain {
   remove(account: string): void;
 }
 
-// The real Keychain through the `security` CLI. Writes use -U so re-setting a
-// secret updates the item instead of failing on the duplicate.
+// `security` exits 44 (errSecItemNotFound) when the item is not there; any
+// other failure (a locked Keychain, denied access) is an error worth seeing.
+const NOT_FOUND = 44;
+
+class KeychainError extends Error {}
+
+function security(args: string[], input?: string): string | undefined {
+  const result = spawnSync("security", args, { encoding: "utf8", input });
+  if (result.status === 0) return result.stdout.trim();
+  if (result.status === NOT_FOUND) return undefined;
+  // Never echo the command line: with -i the secret travels on stdin, but the
+  // stderr text is all a person needs.
+  throw new KeychainError(
+    `Keychain ${args[0] ?? "command"} failed: ${result.stderr.trim() || result.error?.message || `exit ${result.status}`}`,
+  );
+}
+
+// The real Keychain through the `security` CLI. Writes go through its
+// interactive mode so the secret is on stdin, not in the process arguments;
+// -U updates an existing item instead of failing on the duplicate.
 export const macKeychain: Keychain = {
   read(account, service = KEYCHAIN_SERVICE) {
-    try {
-      return execFileSync(
-        "security",
-        ["find-generic-password", "-a", account, "-s", service, "-w"],
-        {
-          encoding: "utf8",
-          stdio: ["ignore", "pipe", "ignore"],
-        },
-      ).trim();
-    } catch {
-      return undefined;
-    }
+    return security(["find-generic-password", "-a", account, "-s", service, "-w"]);
   },
   write(account, value) {
-    execFileSync("security", [
-      "add-generic-password",
-      "-U",
-      "-a",
-      account,
-      "-s",
-      KEYCHAIN_SERVICE,
-      "-w",
-      value,
-    ]);
+    const quoted = `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
+    security(["-i"], `add-generic-password -U -a ${account} -s ${KEYCHAIN_SERVICE} -w ${quoted}\n`);
   },
   remove(account) {
-    try {
-      execFileSync("security", ["delete-generic-password", "-a", account, "-s", KEYCHAIN_SERVICE], {
-        stdio: "ignore",
-      });
-    } catch {
-      // Nothing to delete.
-    }
+    security(["delete-generic-password", "-a", account, "-s", KEYCHAIN_SERVICE]);
   },
 };
 
@@ -161,6 +154,12 @@ export class Config {
   }
 
   set(updates: Record<string, string>): Settings {
+    const unknown = Object.keys(updates).filter((k) => !(SETTING_KEYS as string[]).includes(k));
+    if (unknown.length) {
+      throw new ConfigError(
+        `unknown setting ${unknown.join(", ")}; settings are ${SETTING_KEYS.join(", ")}`,
+      );
+    }
     const next = parseSettings({ ...this.stored(), ...updates });
     this.save(next);
     return next;
@@ -217,7 +216,8 @@ export class Config {
   // Move a pre-port printer.json ({ host, serial, keychainService }, access
   // code in the Keychain under that service, account "bblp") to config.json
   // and the "bambu" service. Returns what it migrated, or undefined if there
-  // was nothing to migrate.
+  // was nothing to migrate. printer.json is only removed once the access code
+  // is copied, since it is the only record of the old service name.
   migrate(): { settings: Settings; accessCode: boolean } | undefined {
     if (!existsSync(this.legacyFile)) return undefined;
     const legacy = z
@@ -225,8 +225,10 @@ export class Config {
       .parse(JSON.parse(readFileSync(this.legacyFile, "utf8")));
     const settings = this.set({ printer_ip: legacy.host, serial: legacy.serial });
     const code = this.keychain.read("bblp", legacy.keychainService);
-    if (code) this.setSecret("access_code", code);
-    rmSync(this.legacyFile);
+    if (code) {
+      this.setSecret("access_code", code);
+      rmSync(this.legacyFile);
+    }
     return { settings, accessCode: Boolean(code) };
   }
 }

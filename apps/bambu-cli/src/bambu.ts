@@ -189,7 +189,7 @@ configCommand
     console.log(
       result.accessCode
         ? "copied the access code into the Keychain"
-        : "no access code found to copy",
+        : `no access code found to copy; kept ${config.legacyFile}. Set it with \`bambu config secret access_code\`, then delete that file`,
     );
   });
 

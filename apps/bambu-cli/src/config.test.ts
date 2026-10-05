@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
@@ -42,6 +42,7 @@ describe("settings", () => {
   it("rejects values outside the schema", () => {
     const config = new Config({ dir, env: {}, keychain: fakeKeychain() });
     expect(() => config.set({ "3d_provider": "openai" })).toThrow(/3d_provider/);
+    expect(() => config.set({ printer_i: "10.0.0.5" })).toThrow(/unknown setting printer_i/);
     writeFileSync(config.file, '{"preferred_format": "step"}');
     expect(() => config.settings()).toThrow(ConfigError);
   });
@@ -108,6 +109,16 @@ describe("printer()", () => {
     });
     expect(keychain.items["bambu/access_code"]).toBe("11223344");
     expect(config.migrate()).toBeUndefined();
+  });
+
+  it("keeps printer.json when the old access code cannot be read", () => {
+    const config = new Config({ dir, env: {}, keychain: fakeKeychain({}) });
+    writeFileSync(
+      config.legacyFile,
+      JSON.stringify({ host: "10.128.1.128", serial: "01P00C", keychainService: "old" }),
+    );
+    expect(config.migrate()?.accessCode).toBe(false);
+    expect(existsSync(config.legacyFile)).toBe(true);
   });
 });
 
