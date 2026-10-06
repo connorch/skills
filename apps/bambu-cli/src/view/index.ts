@@ -26,6 +26,7 @@ import {
   nearestFilaments,
   NoColourError,
   paintModel,
+  srgbToLinear,
 } from "../paint/index.ts";
 import { buildGlb, type PreviewMesh } from "./glb.ts";
 import { renderReviewPage, type Review } from "./page.ts";
@@ -171,7 +172,8 @@ async function paintedPreview(
   const positions = new Float32Array(faces.length * 9),
     colors = new Float32Array(faces.length * 9);
   faces.forEach((face, f) => {
-    const rgb = palette.rgb[labels[f]!]!;
+    // The Palette is display sRGB; glTF vertex colours are linear.
+    const rgb = palette.rgb[labels[f]!]!.map(srgbToLinear);
     face.forEach((v, corner) => {
       const [x, y, z] = vertices[v]!;
       positions.set(
