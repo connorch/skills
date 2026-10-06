@@ -3,7 +3,8 @@
 //
 // One host, one credential: every request authenticates with the WOVN_TOKEN
 // bearer token. Files are private by default; `--public` (or
-// `wovn visibility set <path> public`) makes one public. Browser access to
+// `wovn visibility set <path> public`) makes one public, and `wovn share`
+// opens one to a list of emails until an optional expiry. Browser access to
 // private files goes through the host's /login flow instead - the CLI never
 // needs Cloudflare Access credentials.
 //
@@ -137,12 +138,26 @@ async function put(files: string[], opts: PutOptions): Promise<void> {
   }
 }
 
+type Visibility = "public" | "private" | "shared";
+
 interface ListEntry {
   key: string;
   size: number;
   uploaded: string;
-  visibility: "public" | "private";
+  visibility: Visibility;
 }
+
+// Who a File is shared with (the host's Share), kept after expiry.
+interface Share {
+  emails: string[];
+  expires: string | null;
+}
+
+const VISIBILITY_TAGS: Record<Visibility, string> = {
+  public: "pub",
+  private: "prv",
+  shared: "shr",
+};
 
 function formatSize(bytes: number): string {
   let value = bytes;
@@ -191,6 +206,7 @@ function collectTypes(value: string, previous: string[] = []): string[] {
 interface ListOptions {
   public?: true;
   private?: true;
+  shared?: true;
   limit: string;
   // Filter flags take an optional value; `true` means "infer from the
   // current environment" (e.g. bare --branch = the branch I'm on now).
@@ -202,13 +218,13 @@ interface ListOptions {
 }
 
 async function list(opts: ListOptions): Promise<void> {
-  if (opts.public && opts.private) fail("--public and --private are mutually exclusive");
+  const visibilities = (["public", "private", "shared"] as const).filter((name) => opts[name]);
+  if (visibilities.length > 1) fail("--public, --private, and --shared are mutually exclusive");
   const limit = Number(opts.limit);
   if (!Number.isInteger(limit) || limit < 1) fail("--limit must be a positive integer");
 
   const query = new URLSearchParams({ limit: String(limit) });
-  if (opts.public) query.set("visibility", "public");
-  if (opts.private) query.set("visibility", "private");
+  if (visibilities[0]) query.set("visibility", visibilities[0]);
   const context = gitContext();
   const inferred = {
     // The full path is the exact identity; the server matches --project
@@ -232,7 +248,7 @@ async function list(opts: ListOptions): Promise<void> {
   if (!res.ok) fail(`list failed (${res.status}): ${(await res.text()).trim()}`);
   const { files } = (await res.json()) as { files: ListEntry[] };
   for (const entry of files) {
-    const tag = entry.visibility === "public" ? "pub" : "prv";
+    const tag = VISIBILITY_TAGS[entry.visibility];
     console.log(
       `${formatWhen(entry.uploaded)}  ${formatSize(entry.size).padStart(9)}  ${tag}  ${HOST}/${entry.key}`,
     );
@@ -363,15 +379,89 @@ async function visibilityGet(target: string): Promise<void> {
 }
 
 async function visibilitySet(target: string, value: string): Promise<void> {
+  if (value === "shared") fail("use `wovn share <url-or-path> --email <addr>` to share a file");
   if (value !== "public" && value !== "private") fail("visibility must be public or private");
   const key = resolveKey(target);
+  await patchVisibility(key, { visibility: value });
+  console.log(`${HOST}/${key}`);
+}
+
+async function patchVisibility(key: string, body: object): Promise<Share | undefined> {
   const res = await fetch(`${HOST}/api/files/${key}`, {
     method: "PATCH",
     headers: { ...authHeaders(), "content-type": "application/json" },
-    body: JSON.stringify({ visibility: value }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) fail(`visibility set failed (${res.status}): ${(await res.text()).trim()}`);
+  const { share } = (await res.json()) as { share?: Share };
+  return share;
+}
+
+// `--expires` as an ISO timestamp (null = never): a duration from now
+// (12h, 7d, 2w), a date (local midnight) or timestamp, or "never".
+function parseExpires(value: string): string | null {
+  if (value === "never") return null;
+  // Date.parse reads a bare date as UTC midnight; the user means their own.
+  const date = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (date) {
+    const at = new Date(Number(date[1]), Number(date[2]) - 1, Number(date[3])).getTime();
+    if (at <= Date.now()) fail(`--expires is in the past: ${value}`);
+    return new Date(at).toISOString();
+  }
+  const duration = value.match(/^(\d+)\s*(h|d|w)$/);
+  if (duration) {
+    const unit = { h: 3_600_000, d: 86_400_000, w: 604_800_000 };
+    const ms = unit[duration[2] as keyof typeof unit];
+    return new Date(Date.now() + Number(duration[1]) * ms).toISOString();
+  }
+  const at = Date.parse(value);
+  if (Number.isNaN(at))
+    fail(`--expires must be a duration (12h, 7d, 2w), a date, or never: ${value}`);
+  if (at <= Date.now()) fail(`--expires is in the past: ${value}`);
+  return new Date(at).toISOString();
+}
+
+// "shared with 2, expires 2026-10-13 15:00" / "share expired ..." / "never".
+function describeShare(share: Share): string {
+  const count = `${share.emails.length} email${share.emails.length === 1 ? "" : "s"}`;
+  if (share.expires === null) return `shared with ${count}, never expires`;
+  const expired = Date.parse(share.expires) <= Date.now();
+  return `${expired ? "share expired" : `shared with ${count}, expires`} ${formatWhen(share.expires)}`;
+}
+
+interface ShareOptions {
+  email?: string[];
+  expires?: string;
+}
+
+// With --email: replaces the File's Share (and its expiry, when --expires is
+// given; otherwise an existing expiry is kept). Without flags: prints the
+// current Share. Revoke with `wovn visibility set <path> private`.
+async function share(target: string, opts: ShareOptions): Promise<void> {
+  const key = resolveKey(target);
+  const res = await fetch(`${HOST}/api/files/${key}`, { headers: authHeaders() });
+  if (!res.ok) fail(`share failed (${res.status}): ${(await res.text()).trim()}`);
+  const current = (await res.json()) as { visibility: Visibility; share?: Share };
+
+  if (!opts.email) {
+    if (opts.expires !== undefined) fail("--expires needs --email; the whole share is set at once");
+    if (!current.share) console.log(`${current.visibility}, not shared`);
+    else {
+      console.log(describeShare(current.share));
+      for (const email of current.share.emails) console.log(`  ${email}`);
+    }
+    return;
+  }
+
+  const emails = opts.email
+    .flatMap((value) => value.split(","))
+    .map((e) => e.trim())
+    .filter(Boolean);
+  const expires =
+    opts.expires !== undefined ? parseExpires(opts.expires) : (current.share?.expires ?? null);
+  const updated = await patchVisibility(key, { visibility: "shared", emails, expires });
   console.log(`${HOST}/${key}`);
+  if (updated) console.log(describeShare(updated));
 }
 
 async function rm(targets: string[]): Promise<void> {
@@ -429,6 +519,7 @@ program
   .description("list recent files, newest first")
   .option("--public", "only public files")
   .option("--private", "only private files")
+  .option("--shared", "only files shared with specific emails")
   .option("-n, --limit <count>", "max files to show", "20")
   .option(
     "--project [name-or-path]",
@@ -477,12 +568,28 @@ program
   .argument("[new]", "wovn URL or key path")
   .action(diff);
 
+program
+  .command("share")
+  .description("share a file with specific emails (guests sign in with an emailed code)")
+  .argument("<url-or-path>", "wovn URL or key path")
+  .option(
+    "-e, --email <address>",
+    "an email to share with; repeat or comma-separate for several (replaces the current list)",
+    (value: string, previous: string[] = []) => [...previous, value],
+  )
+  .option("--expires <when>", "a duration (12h, 7d, 2w), a date, or never (default: never)")
+  .addHelpText(
+    "after",
+    "\nWithout flags, prints the current share. Revoke with `wovn visibility set <url-or-path> private`.",
+  )
+  .action(share);
+
 const visibility = program
   .command("visibility")
-  .description("read or change whether a file is public or private");
+  .description("read or change whether a file is public, private, or shared");
 visibility
   .command("get")
-  .description("print a file's visibility (public or private)")
+  .description("print a file's visibility (public, private, or shared)")
   .argument("<url-or-path>", "wovn URL or key path")
   .action(visibilityGet);
 visibility

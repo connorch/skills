@@ -193,17 +193,23 @@ function FileRow({
             >
               {name}
             </a>
+            {/* Sharing happens from the Banner; here a click makes a public
+                or shared File private, and a private one public. */}
             <Badge
-              variant={file.visibility === "public" ? "secondary" : "outline"}
+              variant={file.visibility === "private" ? "outline" : "secondary"}
               render={
                 <button
                   type="button"
                   className="cursor-pointer"
-                  title="click to flip visibility"
+                  title={
+                    file.visibility === "shared"
+                      ? "click to stop sharing"
+                      : "click to flip visibility"
+                  }
                   onClick={() =>
                     flip.mutate({
                       key: file.key,
-                      visibility: file.visibility === "public" ? "private" : "public",
+                      visibility: file.visibility === "private" ? "public" : "private",
                     })
                   }
                 />

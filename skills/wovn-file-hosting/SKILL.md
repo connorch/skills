@@ -41,8 +41,9 @@ render inline in browsers.
 
 ## Public vs private
 
-Every file carries its own visibility; there is one host and one URL per
-file, and flipping visibility never changes the URL. A private URL opened in
+Every file carries its own visibility (public, private, or shared with
+specific emails - see below); there is one host and one URL per file, and
+flipping visibility never changes the URL. A private URL opened in
 a browser bounces through `files.wovn.org/login` (Cloudflare Access); other
 people cannot open it - never embed a private URL in a public PR or issue.
 
@@ -56,6 +57,26 @@ wovn visibility set docs/q3-roadmap.html private # unpublish (best effort:
 Reading a private file back (for example a previously uploaded plan):
 `wovn read <url-or-path>`; bare paths like `docs/plan.html` work everywhere a
 URL does. Without the CLI: `curl -H "Authorization: Bearer $WOVN_TOKEN" <url>`.
+
+## Sharing with specific people
+
+`wovn share` opens a private file to a list of emails without making it
+public. Guests open the normal URL, enter their email at files.wovn.org, and
+type the one-time code Cloudflare emails them; they get the file's bytes and
+nothing else (no listing, no history). The URL never changes, so share the
+file's own URL.
+
+```sh
+wovn share docs/q3-roadmap.html --email sam@acme.com --email lee@acme.com
+wovn share docs/q3-roadmap.html -e sam@acme.com,lee@acme.com --expires 7d  # 12h, 2w, a date, or never
+wovn share docs/q3-roadmap.html                  # print who it is shared with
+wovn visibility set docs/q3-roadmap.html private # stop sharing
+```
+
+`--email` replaces the whole list each time; without `--expires` the current
+expiry is kept (a new share never expires). Anyone who opens a shared URL
+can tell a file exists there, so share links deliberately. Updating a shared
+stable path with `--force` keeps it shared.
 
 ## Stable URLs
 
@@ -105,8 +126,8 @@ wovn rm docs/old-plan.html
 ## Listing recent files
 
 `wovn list` prints recent uploads, newest first, one line per file
-(timestamp, size, `pub`/`prv`, URL). `--public` / `--private` filter by
-visibility; `-n <count>` changes the limit (default 20). Listing is
+(timestamp, size, `pub`/`shr`/`prv`, URL). `--public` / `--shared` /
+`--private` filter by visibility; `-n <count>` changes the limit (default 20). Listing is
 authenticated - public URLs are unguessable, so the listing itself is never
 open.
 

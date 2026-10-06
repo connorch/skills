@@ -2,13 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
 
 import { fileUrl, rawUrl } from "@/lib/api";
-import { fileQuery } from "@/lib/queries";
+import { copyUrl, fileQuery } from "@/lib/queries";
 import type { FilePage } from "@/lib/types";
 import { versionStamp } from "@/lib/types";
 import { Finder } from "./finder";
 import { Crumbs, Dot, Strip } from "./strip";
 import { Time } from "./time";
-import { VisibilityBadge } from "./visibility-badge";
+import { ShareNote, VisibilityBadge } from "./visibility-badge";
 
 // The Banner (CONTEXT.md): the strip and its Finder panel above a File. One
 // component, two mounts - the React tree of an app page, and the shadow root
@@ -47,6 +47,9 @@ export function Banner({ page }: { page: FilePage }) {
       <span className="truncate font-semibold">{name}</span>
       <span className="pl-1.5">
         <VisibilityBadge file={file} />
+      </span>
+      <span className="max-sm:hidden">
+        <ShareNote file={file} />
       </span>
     </>
   );
@@ -95,6 +98,19 @@ export function Banner({ page }: { page: FilePage }) {
             )}
             <Dot />
           </span>
+        )}
+        {/* The link a Guest opens is the File's own URL (ADR 0005). */}
+        {!page.version && file.visibility === "shared" && (
+          <>
+            <button
+              type="button"
+              className="cursor-pointer text-primary hover:underline"
+              onClick={() => copyUrl(fileUrl(file.key))}
+            >
+              copy link
+            </button>
+            <Dot />
+          </>
         )}
         <a className="text-primary hover:underline" href={rawUrl(file.key, stamp)}>
           raw

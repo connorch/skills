@@ -4,24 +4,26 @@ The TanStack Start app behind `https://files.wovn.org`, running on a
 Cloudflare Worker: the file host used by the `wovn-file-hosting` skill and
 the browser surface around it. One hostname, one R2 bucket (`wovn-files`);
 every File is private unless its customMetadata says `visibility: public`
-(fail closed), and `archive/` objects - Versions of Stable Paths - are always
-private. See `docs/adr/0001` for why, `0002` for URL resolution and the
-API, `0003` for the Banner and the one wrap rule, `0004` for the Start
-layout, and `CONTEXT.md` for the domain language.
+(fail closed) or carries a Share (`shareEmails`, optional `shareExpires`)
+that opens it to named Guests, and `archive/` objects - Versions of Stable
+Paths - are always private. See `docs/adr/0001` for why, `0002` for URL
+resolution and the API, `0003` for the Banner and the one wrap rule, `0004`
+for the Start layout, `0005` for shared Files and the Guest Login, and
+`CONTEXT.md` for the domain language.
 
 ## Layout
 
 ```
 src/server.ts          the Worker entry: the file host runs first, Start only
                        sees authenticated app pages (ADR 0004)
-src/host/*.server.ts   auth, R2 data functions, /api, URL resolution, and the
-                       Banner injection for HTML Files
+src/host/*.server.ts   auth (owner and Guest), R2 data functions, /api, URL
+                       resolution, and the Banner injection for HTML Files
 src/routes/            __root.tsx (shell) and $.tsx (every app page)
-src/banner/            the Banner: strip, Finder panel, visibility select, and
-                       the two mounts (page-view.tsx, app.tsx)
+src/banner/            the Banner: strip, Finder panel, visibility select, the
+                       share form, and the two mounts (page-view.tsx, app.tsx)
 src/banner.tsx         the module that hydrates the injected Banner
 src/components/        listing, search palette, previews, shadcn ui/
-src/lib/               types, /api client, React Query definitions
+src/lib/               types, /api client, React Query definitions, Share rules
 vite.config.ts         Start + Cloudflare + Tailwind; assets under /_/
 vite.banner.config.ts  the second build: src/banner.tsx -> /_/banner.js
 wrangler.jsonc         main is src/server.ts; assets from the Vite output
@@ -35,7 +37,10 @@ Route (so `/pr-assets/` is the listing even if a File named `pr-assets`
 exists), and bare `/` is the root listing. Directory Routes are never
 public: anonymous requests to a private File, a directory, or nothing at all
 get the identical `302 /login?to=`, so probing leaks nothing. Public File
-URLs serve anonymously as before.
+URLs serve anonymously as before. A shared File (ADR 0005) is Raw for a
+Guest whose `wovn_guest` cookie names an email on its Share, `403` for a
+Guest who is not on it, and `302 /guest?to=` for anyone without the cookie -
+which does reveal that a shared File exists there.
 
 What a request gets depends on one more thing (ADR 0003): an authenticated
 Document Navigation (`Sec-Fetch-Dest: document`, no `?raw`) gets the app.
@@ -43,8 +48,8 @@ An HTML File is streamed through HTMLRewriter with the Banner injected into
 its `<body>` as declarative Shadow DOM; every other File renders as an app
 page with the Banner over a Preview of `/<key>?raw`; a Directory Route
 renders the listing. Everything else - subresource loads, downloads, fetch,
-curl, `wovn read`, and every anonymous request - gets Raw: the stored bytes
-and headers, with `Vary: Sec-Fetch-Dest, Cookie` added. An authenticated
+curl, `wovn read`, every anonymous request, and every Guest request - gets
+Raw: the stored bytes and headers, with `Vary: Sec-Fetch-Dest, Cookie` added. An authenticated
 non-document GET of a path with no Key stays a plain 404.
 
 Versions have three URL spellings for the same object: the storage Key
@@ -63,11 +68,12 @@ exact request path, giving a Stable Path for living documents (the CLI maps
 is rejected with 409 unless the request carries `x-wovn-force: 1` (the
 CLI's `--force`), so paths are never clobbered by accident. A forced
 overwrite first copies the old state to `archive/<path>/<stamp>-<random>`
-and preserves the path's Visibility unless the request restates it -
-updating a published document does not unpublish it.
+and preserves the path's Visibility and Share unless the request restates
+the Visibility - updating a published or shared document does not withdraw
+it.
 
 Reserved Keys reject uploads with a 400 naming the reserved word: top-level
-`login`, `_`, `favicon.ico`, `robots.txt`, `.well-known`, `api`, `app`,
+`login`, `guest`, `_`, `favicon.ico`, `robots.txt`, `.well-known`, `api`, `app`,
 `assets`, `static`, `auth`, `logout`, `admin`, `settings`, `upload`,
 `search`, `share`, `status`, `health`; and `archive` in any Key segment.
 
@@ -81,9 +87,12 @@ plain 401, never the login redirect):
   `?project=&branch=&worktree=&dir=&type=&limit=&visibility=` filters
   recent Files, newest first (list). Filters compose.
 - `GET /api/files/<key>` - the File's metadata (size, uploaded, visibility,
-  stable, content type, git context).
+  stable, content type, git context, and `share: {emails, expires}` when
+  the File has one, expired or not).
 - `PATCH /api/files/<key>` with `{"visibility": "public"|"private"}` -
-  flips the stamp via a metadata self-copy; same Key, same URL.
+  flips the stamp via a metadata self-copy and drops any Share; same Key,
+  same URL. `{"visibility": "shared", "emails": [...], "expires": "<iso>" |
+null}` replaces the Share (at most 20 emails, expiry in the future).
 - `DELETE /api/files/<key>` - removes the File plus its whole
   `archive/<key>/` history (an `archive/...` key deletes one Version) and
   returns the deleted keys.
@@ -95,7 +104,7 @@ no server functions.
 
 ## Auth
 
-Two interchangeable credentials, accepted on every route:
+Two interchangeable credentials identify Connor, accepted on every route:
 
 - The `WOVN_TOKEN` bearer secret (the wovn CLI and curl).
 - A Cloudflare Access JWT in a cookie, minted by `/login`: the Zero Trust app
@@ -112,7 +121,13 @@ Generated Keys are immutable); Raw private responses, app pages, and
 injected HTML are `private, no-store`.
 
 Deployed on the personal Cloudflare account (connorchev@gmail.com), pinned
-via `account_id` in `wrangler.jsonc`.
+via `account_id` in `wrangler.jsonc`. That account's wrangler login lives in
+`~/.config/wovn-files/wrangler-xdg` (the default wrangler login on this
+machine is a different account), so deploy with
+`XDG_CONFIG_HOME=~/.config/wovn-files/wrangler-xdg pnpm run deploy`. The
+Access apps are managed through the Cloudflare API (wrangler logins carry
+no Access scope) with an API token at `~/.config/wovn-files/cf-api-token.txt`
+when one is present.
 
 ## Develop, verify, deploy
 
@@ -142,9 +157,11 @@ For browser checks, open the preview with an injected
 humans: `wovn put <file...>` uploads (private by default; `--public` to
 share, `--at` for Stable Paths, `--force` to replace), tagging each upload
 with the git context it ran in; `wovn list` shows recent Files with a
-`pub`/`prv` column (`--public`/`--private` filter by Visibility, `--project`
+`pub`/`shr`/`prv` column (`--public`/`--shared`/`--private` filter by Visibility, `--project`
 / `--branch` / `--worktree` / `--dir` by context, `--type` by file type);
-`wovn read` prints a hosted File; `wovn open` opens one in the browser;
+`wovn share` shares a File with a list of emails (`--email`, `--expires`)
+or prints its Share; `wovn read` prints a hosted File; `wovn open` opens
+one in the browser;
 `wovn history` lists all Versions of a Stable Path; `wovn diff` git-diffs two
 hosted Files (one argument = previous vs current); `wovn visibility get/set`
 reads and flips Visibility; `wovn rm` deletes a File and its archived

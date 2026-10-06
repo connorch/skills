@@ -58,3 +58,13 @@ export function formatDelta(bytes: number): string {
   if (bytes === 0) return "";
   return `${bytes > 0 ? "+" : "-"}${formatSize(Math.abs(bytes))}`;
 }
+
+// "in 2h", "in 6d", then the date, for a Share's expiry; "expired" once past.
+export function formatIn(iso: string, now: number): string {
+  const minutes = (new Date(iso).getTime() - now) / 60_000;
+  if (minutes <= 0) return "expired";
+  if (minutes < 60) return `in ${Math.max(1, Math.round(minutes))}m`;
+  if (minutes < 60 * 24) return `in ${Math.round(minutes / 60)}h`;
+  const days = Math.round(minutes / (60 * 24));
+  return days < 14 ? `in ${days}d` : formatWhen(iso);
+}

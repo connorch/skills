@@ -6,7 +6,16 @@
 // (index.server.ts) are the two callers.
 import { env } from "cloudflare:workers";
 
-import type { FileEntry, FileMeta, Listing, Version, Versions, Visibility } from "@/lib/types";
+import type {
+  FileEntry,
+  FileMeta,
+  Listing,
+  Share,
+  Version,
+  Versions,
+  Visibility,
+  VisibilityPatch,
+} from "@/lib/types";
 
 const bucket = () => env.FILES;
 
@@ -15,6 +24,7 @@ const bucket = () => env.FILES;
 // make later collisions expensive, reserving costs nothing.
 export const RESERVED_TOP_LEVEL = [
   "login",
+  "guest", // the Guest Login (ADR 0005)
   "_", // the app's client assets, Banner bundle, and server-function RPC
   "favicon.ico",
   "robots.txt",
@@ -116,9 +126,35 @@ export function isPublic(key: string, meta: Record<string, string> | undefined):
   return !isArchiveKey(key) && meta?.visibility === "public";
 }
 
-function visibilityOf(key: string, meta: Record<string, string> | undefined): Visibility {
-  return isPublic(key, meta) ? "public" : "private";
+// The Share stamped on a File (ADR 0005): `shareEmails` is the comma-joined
+// list, `shareExpires` the optional ISO expiry. Present even once expired.
+export function shareOf(meta: Record<string, string> | undefined): Share | undefined {
+  if (!meta?.shareEmails) return undefined;
+  return { emails: meta.shareEmails.split(","), expires: meta.shareExpires ?? null };
 }
+
+function isShareActive(share: Share | undefined): share is Share {
+  return share !== undefined && (share.expires === null || Date.parse(share.expires) > Date.now());
+}
+
+// The emails a File is currently shared with, or null when it is not shared:
+// never public, never a Version, and the Share has not expired.
+export function sharedWith(key: string, meta: Record<string, string> | undefined): string[] | null {
+  if (isArchiveKey(key) || isPublic(key, meta)) return null;
+  const share = shareOf(meta);
+  return isShareActive(share) ? share.emails : null;
+}
+
+// The effective Visibility: public beats shared, and an expired Share is
+// private again.
+export function visibilityOf(key: string, meta: Record<string, string> | undefined): Visibility {
+  if (isPublic(key, meta)) return "public";
+  return sharedWith(key, meta) ? "shared" : "private";
+}
+
+// The metadata keys a Visibility change touches; carried across forced
+// overwrites as a unit.
+const VISIBILITY_KEYS = ["visibility", "shareEmails", "shareExpires"] as const;
 
 // Stable Paths (PUT) use the request path verbatim, sanitized per segment.
 function stableKey(pathname: string): string | null {
@@ -205,24 +241,27 @@ export async function upload(request: Request, url: URL): Promise<Response> {
       // A forced overwrite archives the Version it replaces, keeping its
       // content type and git context. `uploaded` preserves when that Version
       // was originally written (the copy's own timestamp is the archive
-      // time); `stable` and `visibility` are dropped - Versions are
+      // time); `stable` and the Visibility stamps are dropped - Versions are
       // immutable and always private.
       const existing = await bucket().get(key);
       if (existing) {
         const meta = { ...existing.customMetadata };
         delete meta.stable;
-        delete meta.visibility;
+        for (const name of VISIBILITY_KEYS) delete meta[name];
         meta.uploaded = existing.uploaded.toISOString();
         await bucket().put(archiveKeyFor(key), existing.body, {
           httpMetadata: existing.httpMetadata,
           customMetadata: meta,
         });
-        // Visibility is an attribute of the path, not of one upload: updating
-        // a published document must not silently unpublish it. The request
-        // can still restate it explicitly ("public" or "private") to flip.
+        // Visibility (and a Share) is an attribute of the path, not of one
+        // upload: updating a published or shared document must not silently
+        // withdraw it. The request can still restate it explicitly ("public"
+        // or "private") to flip.
         if (requestedVisibility !== "public" && requestedVisibility !== "private") {
-          if (existing.customMetadata?.visibility === "public")
-            customMetadata.visibility = "public";
+          for (const name of VISIBILITY_KEYS) {
+            const value = existing.customMetadata?.[name];
+            if (value) customMetadata[name] = value;
+          }
         }
       }
     }
@@ -253,9 +292,11 @@ function fileEntryOf(object: R2Object): FileEntry {
 
 export function fileMetaOf(object: R2Object): FileMeta {
   const meta = object.customMetadata ?? {};
+  const share = isArchiveKey(object.key) ? undefined : shareOf(meta);
   return {
     ...fileEntryOf(object),
     contentType: object.httpMetadata?.contentType ?? "application/octet-stream",
+    ...(share && { share }),
     ...(meta.worktree && { worktree: meta.worktree }),
     ...(meta.dir && { dir: meta.dir }),
   };
@@ -301,7 +342,8 @@ export async function listFiles(params: URLSearchParams): Promise<Listing> {
     : null;
   const matchesType = (key: string) => extensions === null || extensions.has(extensionOf(key));
 
-  // Visibility filter: "public" or "private" (anything else matches nothing).
+  // Visibility filter: "public", "shared", or "private" (anything else
+  // matches nothing).
   const visibilityParam = params.get("visibility");
 
   // R2 lists lexicographically with no reverse option, so walk the whole
@@ -354,15 +396,20 @@ export async function fileMeta(key: string): Promise<FileMeta | null> {
   return object ? fileMetaOf(object) : null;
 }
 
-// Flips the stamp via a metadata self-copy (R2 has no metadata-only update).
-// Same key, same URL, no content change - so flips never archive anything.
-// Versions are always private, so archive Keys are refused.
-export async function setVisibility(key: string, value: Visibility): Promise<FileMeta | null> {
+// Flips the stamps via a metadata self-copy (R2 has no metadata-only
+// update). Same key, same URL, no content change - so flips never archive
+// anything. Public and private drop any Share; shared replaces it. Versions
+// are always private, so archive Keys are refused by the caller.
+export async function setVisibility(key: string, patch: VisibilityPatch): Promise<FileMeta | null> {
   const object = await bucket().get(key);
   if (!object) return null;
   const meta = { ...object.customMetadata };
-  if (value === "public") meta.visibility = "public";
-  else delete meta.visibility;
+  for (const name of VISIBILITY_KEYS) delete meta[name];
+  if (patch.visibility === "public") meta.visibility = "public";
+  if (patch.visibility === "shared") {
+    meta.shareEmails = patch.emails.join(",");
+    if (patch.expires) meta.shareExpires = patch.expires;
+  }
   await bucket().put(key, object.body, {
     httpMetadata: object.httpMetadata,
     customMetadata: meta,

@@ -8,13 +8,37 @@
 //    into a host-wide cookie and redirects back. Every other route verifies
 //    the cookie itself (signature, issuer, audience, expiry), so a deleted or
 //    misconfigured Access app fails closed. See docs/adr/0001.
+// A third credential identifies a Guest, not Connor (ADR 0005): a JWT from
+// the second Access app at /guest (one-time PIN, anyone), relayed into its
+// own cookie by the same flow. Its audience differs, so it never passes
+// isAuthenticated(); guestEmail() reads it, and the resolver compares that
+// email against the File's Share.
 import { env } from "cloudflare:workers";
 
-const AUTH_COOKIE = "wovn_auth";
-// Query marker appended by the /login redirect; if a request arrives with it
-// and still has no valid cookie, the client refuses cookies - fail with 403
-// instead of redirecting forever.
-const LOGIN_MARKER = "wovn-authed";
+// One Access-gated path per credential: the app, the cookie the JWT is
+// relayed into, and the query marker the redirect back appends. A request
+// arriving with the marker and still no valid cookie means the client
+// refuses cookies - fail with 403 instead of redirecting forever.
+interface Relay {
+  path: "/login" | "/guest";
+  aud: () => string | undefined;
+  cookie: string;
+  marker: string;
+}
+
+const OWNER: Relay = {
+  path: "/login",
+  aud: () => env.ACCESS_AUD,
+  cookie: "wovn_auth",
+  marker: "wovn-authed",
+};
+
+const GUEST: Relay = {
+  path: "/guest",
+  aud: () => env.GUEST_AUD,
+  cookie: "wovn_guest",
+  marker: "wovn-guest",
+};
 
 function isTokenAuthorized(request: Request): boolean {
   const token = env.WOVN_TOKEN;
@@ -47,11 +71,19 @@ function cookieValue(request: Request, name: string): string | undefined {
 // equivalent everywhere; there are no per-route auth rules.
 export async function isAuthenticated(request: Request): Promise<boolean> {
   if (isTokenAuthorized(request)) return true;
-  for (const name of [AUTH_COOKIE, "CF_Authorization"]) {
+  for (const name of [OWNER.cookie, "CF_Authorization"]) {
     const jwt = cookieValue(request, name);
-    if (jwt && (await verifyJwt(jwt)) !== null) return true;
+    if (jwt && (await verifyJwt(jwt, OWNER.aud())) !== null) return true;
   }
   return false;
+}
+
+// The Guest's email (lowercased) when the request carries a valid Guest
+// cookie, else null. Says nothing about which Files the Guest may read.
+export async function guestEmail(request: Request): Promise<string | null> {
+  const jwt = cookieValue(request, GUEST.cookie);
+  const payload = jwt ? await verifyJwt(jwt, GUEST.aud()) : null;
+  return payload?.email?.toLowerCase() ?? null;
 }
 
 // The uniform response for anonymous requests to anything non-public: private
@@ -59,16 +91,27 @@ export async function isAuthenticated(request: Request): Promise<boolean> {
 // nothing about which Keys exist. The whole URL (path and query) comes back
 // after login, so `?raw` and `?version=` survive the bounce.
 export function loginRedirect(url: URL): Response {
-  // Arriving with the marker means we just came back from /login and the
-  // cookie still is not there: the client refuses cookies, so redirecting
-  // again would loop.
-  if (url.searchParams.has(LOGIN_MARKER)) {
+  return relayRedirect(OWNER, url);
+}
+
+// The response for a request without a Guest cookie to a shared File: the
+// Guest Login, which then bounces back here. Unlike loginRedirect this does
+// reveal that a shared File exists at the URL (ADR 0005).
+export function guestRedirect(url: URL): Response {
+  return relayRedirect(GUEST, url);
+}
+
+function relayRedirect(relay: Relay, url: URL): Response {
+  // Arriving with the marker means we just came back from the Access path
+  // and the cookie still is not there: the client refuses cookies, so
+  // redirecting again would loop.
+  if (url.searchParams.has(relay.marker)) {
     return new Response("authentication requires cookies\n", { status: 403 });
   }
   return new Response(null, {
     status: 302,
     headers: {
-      location: `/login?to=${encodeURIComponent(url.pathname + url.search)}`,
+      location: `${relay.path}?to=${encodeURIComponent(url.pathname + url.search)}`,
       "cache-control": "no-store",
     },
   });
@@ -95,10 +138,14 @@ async function accessSigningKeys(teamDomain: string) {
   return keys;
 }
 
-// Full verification of an Access JWT: issuer, audience, expiry, signature.
-// Returns the expiry (for cookie Max-Age) on success, null on any failure.
-async function verifyJwt(jwt: string): Promise<{ exp: number } | null> {
-  if (!env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD) return null;
+// Full verification of an Access JWT against one app's audience: issuer,
+// audience, expiry, signature. Returns the expiry (for cookie Max-Age) and
+// the email Access authenticated on success, null on any failure.
+async function verifyJwt(
+  jwt: string,
+  aud: string | undefined,
+): Promise<{ exp: number; email?: string } | null> {
+  if (!env.ACCESS_TEAM_DOMAIN || !aud) return null;
   const parts = jwt.split(".");
   if (parts.length !== 3) return null;
   try {
@@ -110,10 +157,11 @@ async function verifyJwt(jwt: string): Promise<{ exp: number } | null> {
       iss?: string;
       aud?: string | string[];
       exp?: number;
+      email?: string;
     };
     if (payload.iss !== `https://${env.ACCESS_TEAM_DOMAIN}`) return null;
-    const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-    if (!aud.includes(env.ACCESS_AUD)) return null;
+    const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+    if (!audiences.includes(aud)) return null;
     if (typeof payload.exp !== "number" || payload.exp * 1000 < Date.now()) return null;
 
     const jwk = (await accessSigningKeys(env.ACCESS_TEAM_DOMAIN)).find((k) => k.kid === header.kid);
@@ -131,24 +179,33 @@ async function verifyJwt(jwt: string): Promise<{ exp: number } | null> {
       b64urlDecode(parts[2]),
       new TextEncoder().encode(`${parts[0]}.${parts[1]}`),
     );
-    return valid ? { exp: payload.exp } : null;
+    return valid ? { exp: payload.exp, email: payload.email } : null;
   } catch {
     return null;
   }
 }
 
-// /login: the only Access-gated path. The Access edge has already forced the
-// interactive login and injected the JWT; relay it into a host-wide cookie
-// and bounce back to the requested URL. Without the Access app in front,
-// there is no JWT and this fails closed.
-export async function login(request: Request, url: URL): Promise<Response> {
+// /login and /guest: the two Access-gated paths. The Access edge has already
+// forced the interactive login and injected the JWT; relay it into a
+// host-wide cookie and bounce back to the requested URL. Without the Access
+// app in front, there is no JWT and this fails closed.
+export function login(request: Request, url: URL): Promise<Response> {
+  return relay(OWNER, request, url);
+}
+
+export function guest(request: Request, url: URL): Promise<Response> {
+  return relay(GUEST, request, url);
+}
+
+async function relay(relay: Relay, request: Request, url: URL): Promise<Response> {
   const jwt = request.headers.get("cf-access-jwt-assertion");
   if (!jwt) {
-    return new Response("login is not gated by a Cloudflare Access application; refusing\n", {
-      status: 503,
-    });
+    return new Response(
+      `${relay.path} is not gated by a Cloudflare Access application; refusing\n`,
+      { status: 503 },
+    );
   }
-  const payload = await verifyJwt(jwt);
+  const payload = await verifyJwt(jwt, relay.aud());
   if (!payload) return new Response("forbidden\n", { status: 403 });
 
   // `to` must be a same-origin absolute path ("/x", not "//host" or a URL).
@@ -159,8 +216,8 @@ export async function login(request: Request, url: URL): Promise<Response> {
   return new Response(null, {
     status: 302,
     headers: {
-      location: `${dest}${separator}${LOGIN_MARKER}=1`,
-      "set-cookie": `${AUTH_COOKIE}=${jwt}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`,
+      location: `${dest}${separator}${relay.marker}=1`,
+      "set-cookie": `${relay.cookie}=${jwt}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`,
       "cache-control": "no-store",
     },
   });

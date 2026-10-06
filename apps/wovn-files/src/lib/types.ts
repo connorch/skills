@@ -1,7 +1,17 @@
 // Types shared by the host (server), the /api client, and the Banner. Names
 // follow CONTEXT.md.
 
-export type Visibility = "public" | "private";
+// The effective Visibility of a File: `shared` is public to the Share's
+// emails (ADR 0005), and falls back to `private` once the Share expires.
+export type Visibility = "public" | "private" | "shared";
+
+// Who a File is shared with: Guests whose email is listed, until `expires`
+// (null = never). Kept on the File after expiry so a renewal starts from the
+// old list.
+export interface Share {
+  emails: string[];
+  expires: string | null;
+}
 
 // One File as the collection endpoints describe it.
 export interface FileEntry {
@@ -17,9 +27,16 @@ export interface FileEntry {
 // The full metadata of one File (GET /api/files/<key>).
 export interface FileMeta extends FileEntry {
   contentType: string;
+  share?: Share;
   worktree?: string;
   dir?: string;
 }
+
+// The body of PATCH /api/files/<key>: flip to public or private (dropping
+// any Share), or share with a list of emails.
+export type VisibilityPatch =
+  | { visibility: "public" | "private" }
+  | { visibility: "shared"; emails: string[]; expires: string | null };
 
 // One directory level under a prefix.
 export interface Listing {

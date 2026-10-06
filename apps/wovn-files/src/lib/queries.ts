@@ -12,7 +12,8 @@ import {
   fetchVersions,
   setVisibility,
 } from "./api";
-import type { FileMeta, Visibility } from "./types";
+import { formatWhen } from "./format";
+import type { FileMeta, VisibilityPatch } from "./types";
 
 export const listingQuery = (prefix: string) =>
   queryOptions({
@@ -46,17 +47,22 @@ export const textQuery = (url: string) =>
     staleTime: Infinity,
   });
 
-// Flips a File's Visibility and refreshes every view that shows it.
+// Flips a File's Visibility (or shares it) and refreshes every view that
+// shows it.
 export function useSetVisibility() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ key, visibility }: { key: string; visibility: Visibility }) =>
-      setVisibility(key, visibility),
+    mutationFn: ({ key, ...patch }: { key: string } & VisibilityPatch) => setVisibility(key, patch),
     onSuccess: (meta: FileMeta) => {
       queryClient.setQueryData(fileQuery(meta.key).queryKey, meta);
       void queryClient.invalidateQueries({ queryKey: ["listing"] });
       void queryClient.invalidateQueries({ queryKey: ["files"] });
-      toast.success(`${meta.key.split("/").pop()} is now ${meta.visibility}`);
+      const name = meta.key.split("/").pop();
+      if (meta.visibility === "shared" && meta.share) {
+        const count = `${meta.share.emails.length} email${meta.share.emails.length === 1 ? "" : "s"}`;
+        const until = meta.share.expires ? `, expires ${formatWhen(meta.share.expires)}` : "";
+        toast.success(`${name} is shared with ${count}${until}`);
+      } else toast.success(`${name} is now ${meta.visibility}`);
     },
     onError: (cause) => toast.error(cause instanceof Error ? cause.message : "flip failed"),
   });

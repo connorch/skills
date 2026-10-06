@@ -12,7 +12,7 @@ export interface Token {
   value: string;
 }
 
-const IS_VALUES = ["public", "private", "stable"] as const;
+const IS_VALUES = ["public", "private", "shared", "stable"] as const;
 
 // Mirrors TYPE_CATEGORIES in worker/src/index.ts; keep the two in sync.
 const TYPE_CATEGORIES: Record<string, string[]> = {

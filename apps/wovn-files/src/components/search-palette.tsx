@@ -269,7 +269,7 @@ function FileItem({ match }: { match: Match }) {
       <a className="min-w-0 flex-1 truncate" href={href} onClick={onLinkClick}>
         <HighlightedKey fileKey={file.key} hits={match.hits} />
       </a>
-      {file.visibility === "public" && <Badge variant="secondary">public</Badge>}
+      {file.visibility !== "private" && <Badge variant="secondary">{file.visibility}</Badge>}
       {file.stable && <Badge variant="outline">stable</Badge>}
       {/* Git context can be long; it yields to the Key and truncates. */}
       <CommandShortcut

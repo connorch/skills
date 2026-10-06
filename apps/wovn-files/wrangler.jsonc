@@ -20,12 +20,16 @@
     "binding": "ASSETS",
     "run_worker_first": true,
   },
-  // Cloudflare Access app path-scoped to files.wovn.org/login; the worker
-  // verifies its JWTs itself (relayed via cookie), so these identify which
-  // app to trust.
+  // Two Cloudflare Access apps on one team, each path-scoped: "wovn private
+  // files" at files.wovn.org/login identifies Connor (ACCESS_AUD), "wovn
+  // guest" at files.wovn.org/guest identifies anyone by one-time PIN
+  // (GUEST_AUD, docs/adr/0005). The worker verifies both JWTs itself
+  // (relayed via cookies), so these say which audience each cookie must
+  // carry.
   "vars": {
     "ACCESS_TEAM_DOMAIN": "connorchev.cloudflareaccess.com",
     "ACCESS_AUD": "469e2cf049d6c642d60160a7aa0ba5b4fdf1ae47638a648f8a878b98b44f6d1c",
+    "GUEST_AUD": "1a86358f75d50d57b2f67c95ea157b2aeecc941745750c547ef905ef88384d23",
   },
   "observability": { "enabled": true },
 }
