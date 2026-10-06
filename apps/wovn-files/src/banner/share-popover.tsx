@@ -30,6 +30,8 @@ export function SharePopover({
       <PopoverContent
         anchor={anchor}
         initialFocus={input}
+        // No Trigger element, so focus returns to the control that opened it.
+        finalFocus={anchor}
         className="w-[360px] max-w-[calc(100vw-1rem)] p-2.5 font-ui text-[13px] text-foreground"
       >
         {open && <ShareForm file={file} input={input} onDone={() => onOpenChange(false)} />}
