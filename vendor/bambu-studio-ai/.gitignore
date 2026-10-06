@@ -1,0 +1,45 @@
+# Secrets & config
+.secrets.json
+config.json
+.token_cache.json
+.verify_code
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Linting & type checking
+.mypy_cache/
+.ruff_cache/
+
+# IDE & OS
+.DS_Store
+*.bak
+
+# Project outputs
+output/
+bambu-output/
+*.log
+
+# Agent / skill infrastructure
+.agents/
+skills-lock.json
+
+# Certificates (v1.x location; v2 keeps them in ~/.bambu-studio-ai/)
+*.pem
+.cursor/
+
+# Claude Code agent worktrees (local only)
+.claude/worktrees/

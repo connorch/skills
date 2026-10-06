@@ -1,0 +1,82 @@
+{
+  "job": "cable-clip",
+  "title": "KLAMMA Locking Cable Clip",
+  "model": {
+    "file": "klamma-cable-clip-medium.stl",
+    "triangles": 6418,
+    "size": [41.2, 25.2, 15.0]
+  },
+  "source": {
+    "route": "Search",
+    "site": "Printables",
+    "author": "FH",
+    "url": "https://www.printables.com/model/359285-klamma-locking-cable-clip",
+    "license": "CC BY-SA"
+  },
+  "printer": { "name": "P1S · 0.4 mm", "plate": [256, 256, 256] },
+  "report": {
+    "score": 8,
+    "checks": [
+      {
+        "key": "mesh",
+        "label": "Mesh",
+        "status": "ok",
+        "value": "Watertight",
+        "detail": "6,418 triangles, 1 body, normals consistent"
+      },
+      {
+        "key": "build_volume",
+        "label": "Build volume",
+        "status": "ok",
+        "value": "Fits",
+        "detail": "Could scale up to 6.2×"
+      },
+      {
+        "key": "floating_parts",
+        "label": "Floating parts",
+        "status": "ok",
+        "value": "None",
+        "detail": "Everything connects to the base"
+      },
+      {
+        "key": "overhangs",
+        "label": "Overhangs",
+        "status": "warn",
+        "value": "7.4% past 45°",
+        "detail": "The clip lip. Use tree supports, or print it on its side."
+      },
+      {
+        "key": "wall_thickness",
+        "label": "Wall thickness",
+        "status": "ok",
+        "value": "1.6 mm min",
+        "detail": "PLA needs 0.8 mm"
+      },
+      {
+        "key": "bed_contact",
+        "label": "Bed contact",
+        "status": "ok",
+        "value": "38% flat base",
+        "detail": "No brim needed"
+      },
+      {
+        "key": "material",
+        "label": "Material",
+        "status": "ok",
+        "value": "PLA on P1S",
+        "detail": "No enclosure needed"
+      }
+    ]
+  },
+  "print": {
+    "estimate": { "minutes": 31, "grams": 7.2 },
+    "filament": { "name": "PLA Basic", "color": "Grey Blue", "hex": "#8fa3c7", "slot": "A1" },
+    "settings": [
+      ["Layer", "0.20 mm"],
+      ["Infill", "15% gyroid"],
+      ["Walls", "3"],
+      ["Supports", "Tree, lip only"],
+      ["Plate", "Textured PEI"]
+    ]
+  }
+}
