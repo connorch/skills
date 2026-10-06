@@ -32,6 +32,7 @@ import {
   isAuthenticated,
   login,
   loginRedirect,
+  withoutGuestMarker,
 } from "./auth.server";
 import { api } from "./api.server";
 import {
@@ -150,6 +151,9 @@ async function resolve(request: Request, url: URL): Promise<HostResult> {
       if (!emails.includes(email)) {
         return new Response("this File is not shared with you\n", { status: 403 });
       }
+      // Just back from the Guest Login: leave a clean URL in the address bar.
+      const clean = withoutGuestMarker(url);
+      if (clean !== null) return redirect(clean);
       return fileResponse(request, object!, false);
     }
     return loginRedirect(url);

@@ -101,6 +101,18 @@ export function guestRedirect(url: URL): Response {
   return relayRedirect(GUEST, url);
 }
 
+// The URL without the Guest marker, or null when it carries none. A Guest
+// gets Raw with no app to tidy the address bar (the Banner strips the owner
+// marker client-side), so the resolver bounces once to this clean URL; a
+// bookmarked link then starts a fresh Guest Login after the cookie expires
+// instead of hitting the cookies-refused 403.
+export function withoutGuestMarker(url: URL): string | null {
+  if (!url.searchParams.has(GUEST.marker)) return null;
+  const clean = new URL(url);
+  clean.searchParams.delete(GUEST.marker);
+  return clean.pathname + clean.search;
+}
+
 function relayRedirect(relay: Relay, url: URL): Response {
   // Arriving with the marker means we just came back from the Access path
   // and the cookie still is not there: the client refuses cookies, so

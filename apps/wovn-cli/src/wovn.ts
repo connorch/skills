@@ -435,8 +435,9 @@ interface ShareOptions {
 }
 
 // With --email: replaces the File's Share (and its expiry, when --expires is
-// given; otherwise an existing expiry is kept). Without flags: prints the
-// current Share. Revoke with `wovn visibility set <path> private`.
+// given; otherwise an existing unexpired expiry is kept, and an expired one
+// is dropped so renewing works). Without flags: prints the current Share.
+// Revoke with `wovn visibility set <path> private`.
 async function share(target: string, opts: ShareOptions): Promise<void> {
   const key = resolveKey(target);
   const res = await fetch(`${HOST}/api/files/${key}`, { headers: authHeaders() });
@@ -457,8 +458,13 @@ async function share(target: string, opts: ShareOptions): Promise<void> {
     .flatMap((value) => value.split(","))
     .map((e) => e.trim())
     .filter(Boolean);
+  const kept = current.share?.expires ?? null;
   const expires =
-    opts.expires !== undefined ? parseExpires(opts.expires) : (current.share?.expires ?? null);
+    opts.expires !== undefined
+      ? parseExpires(opts.expires)
+      : kept !== null && Date.parse(kept) > Date.now()
+        ? kept
+        : null;
   const updated = await patchVisibility(key, { visibility: "shared", emails, expires });
   console.log(`${HOST}/${key}`);
   if (updated) console.log(describeShare(updated));

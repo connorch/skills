@@ -10,7 +10,7 @@
 //     the stamp (with "emails" and "expires" for "shared", ADR 0005); DELETE
 //     removes the File and all its Versions.
 //   GET /api/versions/<key>       - the File's Versions, newest first.
-import { isEmail, MAX_SHARE_EMAILS, normalizeEmails } from "@/lib/share";
+import { isEmail, MAX_SHARE_BYTES, MAX_SHARE_EMAILS, normalizeEmails } from "@/lib/share";
 import type { VisibilityPatch } from "@/lib/types";
 import { isAuthenticated } from "./auth.server";
 import {
@@ -83,6 +83,9 @@ function parsePatch(body: unknown): VisibilityPatch | string {
   if (list.length === 0) return "a shared File needs at least one email";
   if (list.length > MAX_SHARE_EMAILS)
     return `a File can be shared with at most ${MAX_SHARE_EMAILS} emails`;
+  if (new TextEncoder().encode(list.join(",")).byteLength > MAX_SHARE_BYTES) {
+    return `the email list is too long (over ${MAX_SHARE_BYTES} bytes)`;
+  }
   const invalid = list.find((email) => !isEmail(email));
   if (invalid) return `${invalid} is not an email address`;
 
