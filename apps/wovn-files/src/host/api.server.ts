@@ -10,8 +10,7 @@
 //     the stamp (with "emails" and "expires" for "shared", ADR 0005); DELETE
 //     removes the File and all its Versions.
 //   GET /api/versions/<key>       - the File's Versions, newest first.
-import { isEmail, MAX_SHARE_BYTES, MAX_SHARE_EMAILS, normalizeEmails } from "@/lib/share";
-import type { VisibilityPatch } from "@/lib/types";
+import { parseVisibilityPatch } from "@/lib/share";
 import { isAuthenticated } from "./auth.server";
 import {
   deleteFile,
@@ -61,38 +60,10 @@ async function metaResponse(key: string): Promise<Response> {
 
 async function patch(request: Request, key: string): Promise<Response> {
   const body: unknown = await request.json().catch(() => null);
-  const parsed = parsePatch(body);
+  const parsed = parseVisibilityPatch(body);
   if (typeof parsed === "string") return new Response(`${parsed}\n`, { status: 400 });
   if (isArchiveKey(key)) return new Response("Versions are always private\n", { status: 400 });
   const meta = await setVisibility(key, parsed);
   if (!meta) return new Response("not found\n", { status: 404 });
   return Response.json(meta, { headers: NO_STORE });
-}
-
-// The PATCH body as a VisibilityPatch, or the message for a 400.
-function parsePatch(body: unknown): VisibilityPatch | string {
-  const usage =
-    'body must be {"visibility": "public" | "private"} or {"visibility": "shared", "emails": [...], "expires": "<iso>" | null}';
-  if (typeof body !== "object" || body === null) return usage;
-  const { visibility, emails, expires } = body as Record<string, unknown>;
-  if (visibility === "public" || visibility === "private") return { visibility };
-  if (visibility !== "shared") return usage;
-
-  if (!Array.isArray(emails) || !emails.every((email) => typeof email === "string")) return usage;
-  const list = normalizeEmails(emails);
-  if (list.length === 0) return "a shared File needs at least one email";
-  if (list.length > MAX_SHARE_EMAILS)
-    return `a File can be shared with at most ${MAX_SHARE_EMAILS} emails`;
-  if (new TextEncoder().encode(list.join(",")).byteLength > MAX_SHARE_BYTES) {
-    return `the email list is too long (over ${MAX_SHARE_BYTES} bytes)`;
-  }
-  const invalid = list.find((email) => !isEmail(email));
-  if (invalid) return `${invalid} is not an email address`;
-
-  if (expires === null || expires === undefined) return { visibility, emails: list, expires: null };
-  if (typeof expires !== "string" || Number.isNaN(Date.parse(expires))) {
-    return "expires must be an ISO timestamp or null";
-  }
-  if (Date.parse(expires) <= Date.now()) return "expires must be in the future";
-  return { visibility, emails: list, expires: new Date(expires).toISOString() };
 }

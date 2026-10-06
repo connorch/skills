@@ -6,6 +6,7 @@
 // (index.server.ts) are the two callers.
 import { env } from "cloudflare:workers";
 
+import { isShareExpired } from "@/lib/share";
 import type {
   FileEntry,
   FileMeta,
@@ -133,16 +134,12 @@ export function shareOf(meta: Record<string, string> | undefined): Share | undef
   return { emails: meta.shareEmails.split(","), expires: meta.shareExpires ?? null };
 }
 
-function isShareActive(share: Share | undefined): share is Share {
-  return share !== undefined && (share.expires === null || Date.parse(share.expires) > Date.now());
-}
-
 // The emails a File is currently shared with, or null when it is not shared:
 // never public, never a Version, and the Share has not expired.
 export function sharedWith(key: string, meta: Record<string, string> | undefined): string[] | null {
   if (isArchiveKey(key) || isPublic(key, meta)) return null;
   const share = shareOf(meta);
-  return isShareActive(share) ? share.emails : null;
+  return share && !isShareExpired(share) ? share.emails : null;
 }
 
 // The effective Visibility: public beats shared, and an expired Share is

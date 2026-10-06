@@ -14,7 +14,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { fileUrl, parentUrl, rawUrl, versionUrl } from "@/lib/api";
 import { formatDelta, formatSize, formatWhen } from "@/lib/format";
-import { isShareExpired } from "@/lib/share";
+import { shareSummary } from "@/lib/share";
 import {
   copyUrl,
   fileQuery,
@@ -23,7 +23,7 @@ import {
   useSetVisibility,
   versionsQuery,
 } from "@/lib/queries";
-import type { FileMeta, FilePage, Share, Version, Visibility } from "@/lib/types";
+import type { FileMeta, FilePage, Version, Visibility } from "@/lib/types";
 import { versionStamp } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { SharePopover } from "./share-popover";
@@ -268,7 +268,7 @@ function Info({
         ? `${uploads} upload${uploads === 1 ? "" : "s"} since ${formatWhen(first)}`
         : "generated key, one upload",
     ],
-    ...optional("shared", file.share && shareFact(file.share)),
+    ...optional("shared", file.share && shareSummary(file.share)),
     ...optional("project", file.project),
     ...optional("branch", file.branch),
     ...optional("worktree", file.worktree),
@@ -315,14 +315,6 @@ function Info({
 
 const optional = (label: string, value: string | undefined): [string, ReactNode][] =>
   value ? [[label, value]] : [];
-
-// "2 emails, expires Oct 13" / "2 emails, never expires" / "share expired Oct 3".
-function shareFact(share: Share): string {
-  const count = `${share.emails.length} email${share.emails.length === 1 ? "" : "s"}`;
-  if (share.expires === null) return `${count}, never expires`;
-  if (isShareExpired(share)) return `share expired ${formatWhen(share.expires)}`;
-  return `${count}, expires ${formatWhen(share.expires)}`;
-}
 
 // The current state then every Version, newest first, each with its time,
 // size, and the size change from the upload before it.

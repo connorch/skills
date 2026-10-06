@@ -12,7 +12,7 @@ import {
   fetchVersions,
   setVisibility,
 } from "./api";
-import { formatWhen } from "./format";
+import { shareSummary } from "./share";
 import type { FileMeta, VisibilityPatch } from "./types";
 
 export const listingQuery = (prefix: string) =>
@@ -59,9 +59,7 @@ export function useSetVisibility() {
       void queryClient.invalidateQueries({ queryKey: ["files"] });
       const name = meta.key.split("/").pop();
       if (meta.visibility === "shared" && meta.share) {
-        const count = `${meta.share.emails.length} email${meta.share.emails.length === 1 ? "" : "s"}`;
-        const until = meta.share.expires ? `, expires ${formatWhen(meta.share.expires)}` : "";
-        toast.success(`${name} is shared with ${count}${until}`);
+        toast.success(`${name} is shared with ${shareSummary(meta.share)}`);
       } else toast.success(`${name} is now ${meta.visibility}`);
     },
     onError: (cause) => toast.error(cause instanceof Error ? cause.message : "flip failed"),

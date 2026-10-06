@@ -136,6 +136,7 @@ From the repo root, `pnpm install` once; then in this directory:
 ```sh
 pnpm dev          # app pages (Directory Routes, Previews) with HMR
 pnpm typecheck    # wrangler types && tsc
+pnpm test         # the pure src/lib modules (Share rules), in plain Node
 pnpm build        # the Start build, then the Banner bundle
 pnpm preview      # the built Worker in workerd with a local bucket
 pnpm run deploy   # build + wrangler deploy

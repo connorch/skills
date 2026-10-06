@@ -37,8 +37,9 @@ still holds for private Files. A shared File is different by design: the
 point of sharing is that someone without a Wovn login can open the URL, so
 anyone who opens it is sent to prove an email and learns that a shared File
 sits there. The content stays protected; a Guest whose email is not on the
-Share gets a 403 and nothing else. We accept this for URLs that are handed
-out on purpose.
+Share gets a 403 naming that email, with Access's sign-out as the only way
+to try another (the Access session would otherwise hand back the same
+email). We accept this for URLs that are handed out on purpose.
 
 ## The Share is metadata, like Visibility
 

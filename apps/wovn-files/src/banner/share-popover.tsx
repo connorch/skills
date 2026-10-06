@@ -69,23 +69,24 @@ function ShareForm({
   const [openedAt] = useState(() => Date.now());
 
   // Moves the typed text (one address, or several separated by commas or
-  // spaces) into the chips; reports the first bad one and keeps it typed.
-  const commit = (): boolean => {
+  // spaces) into the chips and returns the new list; reports the first bad
+  // one, keeps it typed, and returns null.
+  const commit = (): string[] | null => {
     const typed = normalizeEmails(draft.split(/[\s,]+/));
     const bad = typed.find((email) => !isEmail(email));
     if (bad) {
       setError(`${bad} is not an email address`);
-      return false;
+      return null;
     }
     const next = normalizeEmails([...emails, ...typed]);
     if (next.length > MAX_SHARE_EMAILS) {
       setError(`at most ${MAX_SHARE_EMAILS} emails`);
-      return false;
+      return null;
     }
     setEmails(next);
     setDraft("");
     setError(null);
-    return true;
+    return next;
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -100,11 +101,9 @@ function ShareForm({
   };
 
   const submit = () => {
-    let list = emails;
-    if (draft.trim()) {
-      if (!commit()) return;
-      list = normalizeEmails([...emails, ...draft.split(/[\s,]+/)]);
-    }
+    // State updates are async, so the committed list comes back directly.
+    const list = draft.trim() ? commit() : emails;
+    if (list === null) return;
     if (list.length === 0) {
       setError("add at least one email");
       return;

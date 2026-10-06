@@ -113,6 +113,12 @@ export function withoutGuestMarker(url: URL): string | null {
   return clean.pathname + clean.search;
 }
 
+// The Set-Cookie that drops the Guest cookie, for the not-shared 403: the
+// next visit then starts a fresh Guest Login.
+export function forgetGuestCookie(): string {
+  return `${GUEST.cookie}=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0`;
+}
+
 function relayRedirect(relay: Relay, url: URL): Response {
   // Arriving with the marker means we just came back from the Access path
   // and the cookie still is not there: the client refuses cookies, so

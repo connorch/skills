@@ -26,6 +26,7 @@ import { env } from "cloudflare:workers";
 
 import type { FilePage, Page } from "@/lib/types";
 import {
+  forgetGuestCookie,
   guest,
   guestEmail,
   guestRedirect,
@@ -206,7 +207,7 @@ function notSharedWith(email: string): Response {
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
-      "set-cookie": "wovn_guest=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0",
+      "set-cookie": forgetGuestCookie(),
     },
   });
 }
