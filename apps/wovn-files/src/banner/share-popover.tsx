@@ -41,8 +41,8 @@ export function SharePopover({
 }
 
 // Expiry choices. "keep" (the current expiry, unchanged) appears only while
-// the File has an unexpired Share and is then the default; a new Share
-// defaults to 7 days.
+// the File has an unexpired Share with a deadline and is then the default; a
+// never-expiring Share defaults to "never", a new Share to 7 days.
 const DURATIONS = { "1d": 1, "7d": 7, "30d": 30 } as const;
 type Expiry = keyof typeof DURATIONS | "never" | "keep";
 
@@ -57,11 +57,13 @@ function ShareForm({
 }) {
   const share = useSetVisibility();
   const current = file.share;
-  const keepable = current !== undefined && !isShareExpired(current);
+  const keepable = current?.expires != null && !isShareExpired(current);
   const [emails, setEmails] = useState<string[]>(current?.emails ?? []);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [expiry, setExpiry] = useState<Expiry>(keepable ? "keep" : "7d");
+  const [expiry, setExpiry] = useState<Expiry>(
+    keepable ? "keep" : current && !isShareExpired(current) ? "never" : "7d",
+  );
   // The clock the form opened at, so the "until" preview is stable across
   // re-renders; the submitted expiry counts from the click itself.
   const [openedAt] = useState(() => Date.now());

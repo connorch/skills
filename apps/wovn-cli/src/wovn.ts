@@ -404,9 +404,15 @@ function parseExpires(value: string): string | null {
   // Date.parse reads a bare date as UTC midnight; the user means their own.
   const date = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (date) {
-    const at = new Date(Number(date[1]), Number(date[2]) - 1, Number(date[3])).getTime();
-    if (at <= Date.now()) fail(`--expires is in the past: ${value}`);
-    return new Date(at).toISOString();
+    const [year, month, day] = [Number(date[1]), Number(date[2]), Number(date[3])];
+    const local = new Date(year, month - 1, day);
+    // The Date constructor rolls 2026-13-01 into 2027; a typo must not share
+    // a file for longer than asked.
+    const valid =
+      local.getFullYear() === year && local.getMonth() === month - 1 && local.getDate() === day;
+    if (!valid) fail(`--expires is not a calendar date: ${value}`);
+    if (local.getTime() <= Date.now()) fail(`--expires is in the past: ${value}`);
+    return local.toISOString();
   }
   const duration = value.match(/^(\d+)\s*(h|d|w)$/);
   if (duration) {

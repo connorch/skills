@@ -148,9 +148,7 @@ async function resolve(request: Request, url: URL): Promise<HostResult> {
     if (emails) {
       const email = await guestEmail(request);
       if (email === null) return guestRedirect(url);
-      if (!emails.includes(email)) {
-        return new Response("this File is not shared with you\n", { status: 403 });
-      }
+      if (!emails.includes(email)) return notSharedWith(email);
       // Just back from the Guest Login: leave a clean URL in the address bar.
       const clean = withoutGuestMarker(url);
       if (clean !== null) return redirect(clean);
@@ -192,6 +190,32 @@ async function resolve(request: Request, url: URL): Promise<HostResult> {
   const contentType = object.httpMetadata?.contentType ?? "";
   if (/^text\/html\b/i.test(contentType) && hasBody(object)) return injectBanner(object, page);
   return { page };
+}
+
+// A Guest whose proven email is not on the Share. Their Access session
+// would hand back the same email on a retry, so the way out is Access's own
+// logout, which the edge serves on this hostname; the Guest cookie is
+// dropped here so the next visit starts a fresh Guest Login.
+function notSharedWith(email: string): Response {
+  const body =
+    `<!doctype html><meta charset="utf-8"><title>Not shared with you</title>` +
+    `<p>This file is not shared with <b>${escapeHtml(email)}</b>.</p>` +
+    `<p><a href="/cdn-cgi/access/logout">Sign in with a different email</a>, then open the link again.</p>`;
+  return new Response(body, {
+    status: 403,
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      "set-cookie": "wovn_guest=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0",
+    },
+  });
+}
+
+function escapeHtml(text: string): string {
+  return text.replace(
+    /[&<>"]/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!,
+  );
 }
 
 // head() results have no body; get() results do.

@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { useId, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useId, useState } from "react";
 
 import { fileUrl, rawUrl } from "@/lib/api";
 import { copyUrl, fileQuery } from "@/lib/queries";
@@ -19,6 +19,7 @@ export function Banner({ page }: { page: FilePage }) {
     ...fileQuery(page.file.key),
     initialData: page.file,
   }).data;
+  useRefetchAtShareExpiry(file.key, file.share?.expires ?? null);
   const [open, setOpen] = useState(page.openVersions);
   // Bumped to reopen the Finder on the page's own File.
   const [finderKey, setFinderKey] = useState(0);
@@ -119,6 +120,23 @@ export function Banner({ page }: { page: FilePage }) {
       {open && <Finder key={finderKey} id={panelId} page={page} file={file} />}
     </div>
   );
+}
+
+// A page left open past its Share's expiry refetches the File then, so the
+// badge turns private when the host does rather than showing a stale share.
+function useRefetchAtShareExpiry(key: string, expires: string | null) {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (expires === null) return;
+    const delay = Date.parse(expires) - Date.now() + 1000;
+    // setTimeout overflows past ~24.8 days; a Share that far out is covered
+    // by the next page load.
+    if (delay <= 0 || delay > 0x7fffffff) return;
+    const id = setTimeout(() => {
+      void queryClient.invalidateQueries({ queryKey: fileQuery(key).queryKey });
+    }, delay);
+    return () => clearTimeout(id);
+  }, [key, expires, queryClient]);
 }
 
 // "2 versions newer than current" style note for a Version page.
