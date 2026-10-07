@@ -217,9 +217,9 @@ configCommand
 
 program
   .command("doctor")
-  .description("check Bambu Studio, the VM tooling, settings, and secrets")
-  .action(() => {
-    const { text, ok } = report(diagnose(config));
+  .description("check Bambu Studio, the VM tooling, settings, secrets, and the printer's reach")
+  .action(async () => {
+    const { text, ok } = report(await diagnose(config));
     console.log(text);
     if (!ok) process.exit(1);
   });

@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Command } from "commander";
+import { strToU8, zipSync } from "fflate";
 import { describe, expect, it, vi, afterEach } from "vite-plus/test";
 import { Config } from "../config.ts";
 import {
@@ -302,6 +303,50 @@ describe("Search command", () => {
     expect(humanSearch(empty)).toContain("No models found");
   });
 });
+describe("MakerWorld download links", () => {
+  const zip = zipSync({
+    "clip/clip-120mm.stl": strToU8("solid mesh"),
+    "clip/readme.txt": strToU8("hi"),
+  });
+  const fetcher: Fetch = vi.fn(async (input) =>
+    String(input).endsWith(".zip?at=1&key=2")
+      ? new Response(zip)
+      : String(input).includes("expired")
+        ? new Response("<html>expired</html>")
+        : new Response("solid mesh"),
+  );
+  it("unpacks the Model files from a signed zip and credits the page", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
+    const report = await fetchModel("https://makerworld.bblmw.com/model/stls.zip?at=1&key=2", {
+      out: dir,
+      page: "https://makerworld.com/en/models/42-clip",
+      fetcher,
+    });
+    expect(report.files.map((f) => f.name)).toEqual(["clip-120mm.stl"]);
+    expect(report.skipped).toEqual(["clip/readme.txt"]);
+    expect(await readFile(join(dir, "clip-120mm.stl"), "utf8")).toBe("solid mesh");
+    expect(JSON.parse(await readFile(join(dir, "source.json"), "utf8"))).toEqual({
+      route: "Search",
+      site: "MakerWorld",
+      title: "stls",
+      url: "https://makerworld.com/en/models/42-clip",
+    });
+  });
+  it("saves a single file under its own name and refuses an expired link's page", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
+    const report = await fetchModel("https://makerworld.bblmw.com/m/clip.stl?key=3", {
+      out: dir,
+      fetcher,
+    });
+    expect(report.files.map((f) => f.name)).toEqual(["clip.stl"]);
+    await expect(
+      fetchModel("https://makerworld.bblmw.com/m/expired.stl", { out: dir, force: true, fetcher }),
+    ).rejects.toThrow("HTML");
+    await expect(
+      fetchModel("https://makerworld.com/en/models/42-clip", { out: dir, fetcher }),
+    ).rejects.toThrow("Download button");
+  });
+});
 describe("Printables fetching", () => {
   it("downloads supported files, skips others, and protects existing files", async () => {
     const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
@@ -423,7 +468,7 @@ describe("Printables fetching", () => {
     }
   });
   it("rejects MakerWorld and untrusted URLs", () => {
-    expect(() => printablesId("https://makerworld.com/en/models/1")).toThrow("needs a login");
+    expect(() => printablesId("https://makerworld.com/en/models/1")).toThrow("need a login");
     expect(() => printablesId("https://printables.com.evil.example/model/1")).toThrow("Expected");
     expect(printablesId("42")).toBe("42");
   });

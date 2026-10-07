@@ -1,17 +1,15 @@
 import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
-import { unzipSync, zipSync, strFromU8, strToU8 } from "fflate";
-import { z } from "zod";
 import {
-  identity,
-  matrixMultiply,
-  merge,
-  transform,
-  triangle,
-  faceGeometry,
-  bounds,
-  weld,
-} from "./geometry.ts";
+  NodeIO,
+  type Document,
+  type GLTF,
+  type JSONDocument,
+  type Mesh as GltfMesh,
+  type Node as GltfNode,
+} from "@gltf-transform/core";
+import { unzipSync, zipSync, strFromU8, strToU8 } from "fflate";
+import { identity, merge, transform, triangle, faceGeometry, bounds, weld } from "./geometry.ts";
 import type { Mesh } from "./geometry.ts";
 
 import { loadPLY } from "./ply.ts";
@@ -244,187 +242,44 @@ export function load3MF(bytes: Uint8Array): Mesh {
   mesh.unit = root.attrs.unit ?? "millimeter";
   return mesh;
 }
-const gltfSchema = z.object({
-  buffers: z.array(z.object({ uri: z.string().optional(), byteLength: z.number() })).default([]),
-  bufferViews: z
-    .array(
-      z.object({
-        buffer: z.number(),
-        byteOffset: z.number().default(0),
-        byteLength: z.number(),
-        byteStride: z.number().optional(),
-      }),
-    )
-    .default([]),
-  accessors: z
-    .array(
-      z.object({
-        bufferView: z.number().optional(),
-        byteOffset: z.number().default(0),
-        componentType: z.number(),
-        count: z.number(),
-        type: z.string(),
-        normalized: z.boolean().default(false),
-        sparse: z
-          .object({
-            count: z.number().int().nonnegative(),
-            indices: z.object({
-              bufferView: z.number().int().nonnegative(),
-              byteOffset: z.number().int().nonnegative().default(0),
-              componentType: z.number(),
-            }),
-            values: z.object({
-              bufferView: z.number().int().nonnegative(),
-              byteOffset: z.number().int().nonnegative().default(0),
-            }),
-          })
-          .optional(),
-      }),
-    )
-    .default([]),
-  meshes: z
-    .array(
-      z.object({
-        primitives: z.array(
-          z.object({
-            attributes: z.object({ POSITION: z.number().optional() }),
-            indices: z.number().optional(),
-            mode: z.number().default(4),
-          }),
-        ),
-      }),
-    )
-    .default([]),
-  nodes: z
-    .array(
-      z.object({
-        mesh: z.number().optional(),
-        children: z.array(z.number()).default([]),
-        matrix: z.array(z.number()).length(16).optional(),
-        translation: z.array(z.number()).length(3).optional(),
-        rotation: z.array(z.number()).length(4).optional(),
-        scale: z.array(z.number()).length(3).optional(),
-      }),
-    )
-    .default([]),
-  scenes: z.array(z.object({ nodes: z.array(z.number()).default([]) })).default([]),
-  scene: z.number().optional(),
-  extensionsRequired: z.array(z.string()).default([]),
-});
-// Geometry stored by these extensions is not in the accessors this loader reads.
+// Geometry stored by these extensions is not in the accessors a reader sees.
 const COMPRESSION = new Set(["KHR_draco_mesh_compression", "EXT_meshopt_compression"]);
-export function loadGLTF(json: unknown, buffers: Uint8Array[], format = "gltf"): Mesh {
-  const doc = gltfSchema.parse(json);
-  const compressed = doc.extensionsRequired.find((e) => COMPRESSION.has(e));
+// The one way a glTF or GLB is opened, for the analysis loader here and the
+// paint loader alike: a gltf-transform Document, with companion files
+// (buffers, images) read through the caller and kept to the Model's folder.
+export async function readGltf(
+  path: string,
+  read: (path: string) => Uint8Array | Promise<Uint8Array>,
+): Promise<Document> {
+  const io = new NodeIO(),
+    bytes = await read(path);
+  let jsonDoc: JSONDocument;
+  if (extname(path).toLowerCase() === ".glb")
+    jsonDoc = await io.binaryToJSON(new Uint8Array(bytes));
+  else {
+    const json = JSON.parse(strFromU8(bytes)) as GLTF.IGLTF,
+      resources: Record<string, Uint8Array<ArrayBuffer>> = {};
+    for (const item of [...(json.buffers ?? []), ...(json.images ?? [])])
+      if (item.uri && !item.uri.startsWith("data:")) {
+        if (/^[a-z]+:/i.test(item.uri))
+          throw new MeshLoadError("remote glTF buffers are unsupported");
+        resources[item.uri] = new Uint8Array(
+          await read(companionPath(path, decodeURIComponent(item.uri))),
+        );
+      }
+    jsonDoc = { json, resources };
+  }
+  const compressed = jsonDoc.json.extensionsRequired?.find((e) => COMPRESSION.has(e));
   if (compressed)
     throw new MeshLoadError(
       `${compressed} glTF is not supported; export the Model uncompressed (or as STL or 3MF)`,
     );
-  function values(
-    bufferView: number,
-    offset: number,
-    type: number,
-    count: number,
-    components: number,
-  ): number[] {
-    const b = doc.bufferViews[bufferView],
-      bytes = b && buffers[b.buffer];
-    if (!b || !bytes) throw new MeshLoadError("missing glTF buffer");
-    const size =
-      type === 5126 || type === 5125
-        ? 4
-        : type === 5123 || type === 5122
-          ? 2
-          : type === 5121 || type === 5120
-            ? 1
-            : 0;
-    if (!size) throw new MeshLoadError("unsupported glTF component type");
-    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
-      result: number[] = [];
-    for (let i = 0; i < count; i++)
-      for (let c = 0; c < components; c++) {
-        const p = b.byteOffset + offset + i * (b.byteStride ?? components * size) + c * size;
-        if (p + size > b.byteOffset + b.byteLength)
-          throw new MeshLoadError("glTF accessor exceeds buffer view");
-        result.push(
-          type === 5126
-            ? view.getFloat32(p, true)
-            : type === 5125
-              ? view.getUint32(p, true)
-              : type === 5123
-                ? view.getUint16(p, true)
-                : type === 5122
-                  ? view.getInt16(p, true)
-                  : type === 5121
-                    ? view.getUint8(p)
-                    : view.getInt8(p),
-        );
-      }
-    return result;
-  }
-  // Primitives split by material share accessors; each is decoded once.
-  const decoded = new Map<string, number[]>();
-  function accessor(index: number, components: number): number[] {
-    const key = `${index}:${components}`,
-      cached = decoded.get(key);
-    if (cached) return cached;
-    const values = decodeAccessor(index, components);
-    decoded.set(key, values);
-    return values;
-  }
-  function decodeAccessor(index: number, components: number): number[] {
-    const a = doc.accessors[index];
-    if (!a) throw new MeshLoadError("missing glTF accessor");
-    // A sparse accessor without a buffer view is allocated from its count alone.
-    if (a.count > MAX_ACCESSOR_COUNT)
-      throw new MeshLoadError(
-        `glTF accessor has ${a.count} elements; the limit is ${MAX_ACCESSOR_COUNT}`,
-      );
-    if (a.type !== (components === 3 ? "VEC3" : "SCALAR"))
-      throw new MeshLoadError("unexpected glTF accessor type");
-    const result =
-      a.bufferView === undefined
-        ? Array<number>(a.count * components).fill(0)
-        : values(a.bufferView, a.byteOffset, a.componentType, a.count, components);
-    if (a.sparse) {
-      const sparse = a.sparse,
-        indices = values(
-          sparse.indices.bufferView,
-          sparse.indices.byteOffset,
-          sparse.indices.componentType,
-          sparse.count,
-          1,
-        ),
-        overrides = values(
-          sparse.values.bufferView,
-          sparse.values.byteOffset,
-          a.componentType,
-          sparse.count,
-          components,
-        );
-      for (let i = 0; i < sparse.count; i++) {
-        const target = indices[i]!;
-        if (!Number.isInteger(target) || target < 0 || target >= a.count)
-          throw new MeshLoadError("invalid sparse glTF index");
-        for (let c = 0; c < components; c++)
-          result[target * components + c] = overrides[i * components + c]!;
-      }
-    }
-    if (a.normalized && a.componentType !== 5126) {
-      const max =
-        a.componentType === 5120
-          ? 127
-          : a.componentType === 5121
-            ? 255
-            : a.componentType === 5122
-              ? 32767
-              : a.componentType === 5123
-                ? 65535
-                : 4294967295;
-      return result.map((v) => Math.max(-1, v / max));
-    }
-    return result;
-  }
+  return io.readJSON(jsonDoc);
+}
+// The surface geometry of what the Document's default scene shows (or every
+// node, or every mesh, when it has none), in world coordinates.
+export function loadGLTF(document: Document, format = "gltf"): Mesh {
+  const root = document.getRoot();
   // Points and lines (guides, annotations) are not surfaces; they are left out
   // rather than failing the Model. A mesh with no surface primitive is empty.
   const empty: Mesh = {
@@ -432,36 +287,40 @@ export function loadGLTF(json: unknown, buffers: Uint8Array[], format = "gltf"):
     indices: new Uint32Array(),
     source: { format },
   };
-  // Decoded on first use from the scene walk, so an unused mesh costs nothing.
-  const decodedMeshes = new Map<number, Mesh>();
-  const meshAt = (index: number): Mesh => {
-    const cached = decodedMeshes.get(index);
-    if (cached) return cached;
-    const m = doc.meshes[index];
-    if (!m) throw new MeshLoadError("missing glTF mesh");
-    const mesh = decodeMesh(m);
-    decodedMeshes.set(index, mesh);
+  // Decoded on first use, so an instanced mesh is decoded once and an unused one never.
+  const decoded = new Map<GltfMesh, Mesh>();
+  const meshAt = (m: GltfMesh): Mesh => {
+    let mesh = decoded.get(m);
+    if (!mesh) decoded.set(m, (mesh = decodeMesh(m)));
     return mesh;
   };
-  const decodeMesh = (m: (typeof doc.meshes)[number]): Mesh => {
-    const surfaces = m.primitives.filter(
-      (p) => p.attributes.POSITION !== undefined && [4, 5, 6].includes(p.mode),
-    );
+  const decodeMesh = (m: GltfMesh): Mesh => {
+    const surfaces = m
+      .listPrimitives()
+      .filter((p) => p.getAttribute("POSITION") && [4, 5, 6].includes(p.getMode()));
     if (!surfaces.length) return empty;
     return merge(
       surfaces.map((p) => {
-        const positions = accessor(p.attributes.POSITION!, 3),
-          raw =
-            p.indices === undefined
-              ? Array.from({ length: positions.length / 3 }, (_, i) => i)
-              : accessor(p.indices, 1),
-          indices: number[] = [];
-        if (p.mode === 4) for (const i of raw) indices.push(i);
-        else if (p.mode === 5 || p.mode === 6)
+        const attribute = p.getAttribute("POSITION")!,
+          count = attribute.getCount();
+        if (count > MAX_ACCESSOR_COUNT)
+          throw new MeshLoadError(
+            `glTF accessor has ${count} elements; the limit is ${MAX_ACCESSOR_COUNT}`,
+          );
+        // getElement decodes normalized integer positions (KHR_mesh_quantization).
+        const positions: number[] = [],
+          element: number[] = [];
+        for (let i = 0; i < count; i++) positions.push(...attribute.getElement(i, element));
+        const index = p.getIndices(),
+          raw = index ? Array.from(index.getArray()!) : Array.from({ length: count }, (_, i) => i),
+          indices: number[] = [],
+          mode = p.getMode();
+        if (mode === 4) for (const i of raw) indices.push(i);
+        else
           for (let i = 2; i < raw.length; i++)
             indices.push(
-              p.mode === 6 ? raw[0]! : raw[i - 2 + (i % 2)]!,
-              p.mode === 6 ? raw[i - 1]! : raw[i - 1 - (i % 2)]!,
+              mode === 6 ? raw[0]! : raw[i - 2 + (i % 2)]!,
+              mode === 6 ? raw[i - 1]! : raw[i - 1 - (i % 2)]!,
               raw[i]!,
             );
         return model(positions, indices, format);
@@ -469,46 +328,18 @@ export function loadGLTF(json: unknown, buffers: Uint8Array[], format = "gltf"):
       format,
     );
   };
-  const instances: Mesh[] = [];
-  function visit(index: number, parent: readonly number[], ancestors: Set<number>) {
-    const n = doc.nodes[index];
-    if (!n || ancestors.has(index)) throw new MeshLoadError("invalid glTF node graph");
-    let local = n.matrix;
-    if (!local) {
-      const [x, y, z, w] = n.rotation ?? [0, 0, 0, 1],
-        s = n.scale ?? [1, 1, 1],
-        t = n.translation ?? [0, 0, 0];
-      local = [
-        (1 - 2 * (y! * y! + z! * z!)) * s[0]!,
-        2 * (x! * y! + z! * w!) * s[0]!,
-        2 * (x! * z! - y! * w!) * s[0]!,
-        0,
-        2 * (x! * y! - z! * w!) * s[1]!,
-        (1 - 2 * (x! * x! + z! * z!)) * s[1]!,
-        2 * (y! * z! + x! * w!) * s[1]!,
-        0,
-        2 * (x! * z! + y! * w!) * s[2]!,
-        2 * (y! * z! - x! * w!) * s[2]!,
-        (1 - 2 * (x! * x! + y! * y!)) * s[2]!,
-        0,
-        t[0]!,
-        t[1]!,
-        t[2]!,
-        1,
-      ];
-    }
-    const world = matrixMultiply(parent, local);
-    if (n.mesh !== undefined) instances.push(transform(meshAt(n.mesh), world));
-    for (const child of n.children) visit(child, world, new Set([...ancestors, index]));
-  }
-  const roots =
-    doc.scenes[doc.scene ?? 0]?.nodes ??
-    doc.nodes.map((_, i) => i).filter((i) => !doc.nodes.some((n) => n.children.includes(i)));
-  for (const root of roots) visit(root, identity, new Set());
-  return merge(doc.nodes.length ? instances : doc.meshes.map((_, i) => meshAt(i)), format);
+  const scene = root.getDefaultScene() ?? root.listScenes()[0],
+    nodes: GltfNode[] = [];
+  if (scene) scene.traverse((node) => nodes.push(node));
+  else nodes.push(...root.listNodes());
+  const instances = nodes.flatMap((node) => {
+    const m = node.getMesh();
+    return m ? [transform(meshAt(m), node.getWorldMatrix())] : [];
+  });
+  return merge(nodes.length ? instances : root.listMeshes().map(meshAt), format);
 }
 // Loaders read only local files or embedded buffers; no network requests.
-export function load(path: string, io: MeshIO = fileIO): Mesh {
+export async function load(path: string, io: MeshIO = fileIO): Promise<Mesh> {
   try {
     const bytes = io.read(path),
       format = extname(path).slice(1).toLowerCase();
@@ -517,45 +348,9 @@ export function load(path: string, io: MeshIO = fileIO): Mesh {
     else if (format === "obj") mesh = loadOBJ(strFromU8(bytes));
     else if (format === "3mf") mesh = load3MF(bytes);
     else if (format === "ply") mesh = loadPLY(bytes);
-    else if (format === "glb" || format === "gltf") {
-      let json: unknown, bin: Uint8Array | undefined;
-      if (format === "glb") {
-        const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-        if (
-          view.getUint32(0, true) !== 0x46546c67 ||
-          view.getUint32(4, true) !== 2 ||
-          view.getUint32(8, true) !== bytes.length
-        )
-          throw new MeshLoadError("invalid GLB header");
-        for (let p = 12; p < bytes.length;) {
-          const length = view.getUint32(p, true),
-            type = view.getUint32(p + 4, true);
-          if (p + 8 + length > bytes.length) throw new MeshLoadError("truncated GLB");
-          const chunk = bytes.subarray(p + 8, p + 8 + length);
-          if (type === 0x4e4f534a) json = JSON.parse(strFromU8(chunk));
-          if (type === 0x004e4942) bin = chunk;
-          p += 8 + length;
-        }
-      } else json = JSON.parse(strFromU8(bytes));
-      const doc = gltfSchema.parse(json),
-        buffers = doc.buffers.map((b) => {
-          if (!b.uri) {
-            if (!bin) throw new MeshLoadError("missing GLB BIN chunk");
-            return bin;
-          }
-          if (b.uri.startsWith("data:")) {
-            // glTF requires base64 data URIs; anything else is refused, not misread.
-            const comma = b.uri.indexOf(",");
-            if (!b.uri.slice(0, comma).endsWith(";base64"))
-              throw new MeshLoadError("glTF data URIs must be base64");
-            return new Uint8Array(Buffer.from(b.uri.slice(comma + 1), "base64"));
-          }
-          if (/^[a-z]+:/i.test(b.uri))
-            throw new MeshLoadError("remote glTF buffers are unsupported");
-          return io.read(companionPath(path, decodeURIComponent(b.uri)));
-        });
-      mesh = loadGLTF(json, buffers, format);
-    } else throw new MeshLoadError(`unsupported format: ${format}`);
+    else if (format === "glb" || format === "gltf")
+      mesh = loadGLTF(await readGltf(path, (p) => io.read(p)), format);
+    else throw new MeshLoadError(`unsupported format: ${format}`);
     if (!mesh.indices.length) throw new MeshLoadError(`${basename(path)} contains no triangles`);
     return mesh;
   } catch (error) {

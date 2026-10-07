@@ -30,7 +30,10 @@ Commands print a `bambu: ...` line to stderr and exit 1 (failed) or 2 (usage) on
 2. **Check the plate before every print.** Take a fresh `bambu snapshot` and look at it. A
    `FINISH` state usually means the last print is still on the plate. The thin grey square is
    printed on the plate itself; ignore it. If anything is on it, or the image is unclear, do not
-   print: send Connor the snapshot and wait. After he says he cleared it, take a new one.
+   print: send Connor the snapshot and wait. After he says he cleared it, take a new one. Dark
+   filament on the textured plate is hard to see in the camera, and the bed and chamber light
+   cannot be moved from here (cloud mode); when a plate or first-layer snapshot is unreadable,
+   say so and ask Connor to look rather than calling it clear.
 3. **Never start a print while the printer is busy** (`RUNNING`, `PAUSE`, `PREPARE`).
 4. **Analyze every Model**, downloaded, generated, made, or supplied. Add `--orient` for
    downloaded Models only (they arrive in arbitrary orientations); generated Models already
@@ -75,11 +78,23 @@ purpose (decorative or functional). Ask for what's missing in one message, then 
 ```sh
 bambu search "phone stand" --limit 6 --page          # MakerWorld + Printables, Candidates page on wovn
 bambu fetch <printables url or id> --out <job folder>   # Printables downloads anonymously
+bambu fetch "<makerworld.bblmw.com link>" --out <job folder> --page <model page url>
 ```
 
 `--page` publishes a numbered Candidates page; show Connor the URL and let him pick a number.
-Printables picks download with `fetch`. MakerWorld needs a login, so give Connor the link and
-wait for the file to appear in the Print Job folder. Mind the licence if he plans to sell prints.
+Printables picks download with `fetch`. MakerWorld pages need a login, but the Download button
+hands the browser a short-lived signed link on `makerworld.bblmw.com` that `fetch` can download.
+With the browser tools on the model page (Connor is signed in there; ask him to sign in if
+not), capture the link instead of following it:
+
+```js
+HTMLAnchorElement.prototype.click = function () { window.__dl = this.href; };
+window.open = (url) => { window.__dl = url; return null; };
+```
+
+Then click Download (all files, or one file), read `window.__dl`, and run `bambu fetch` on it
+within a few minutes with `--page` set to the model page for the credit. A zip unpacks to its
+Model files. Mind the licence if he plans to sell prints.
 
 **Generate** (needs a provider key: `bambu config secret meshy_api_key`, or tripo, rodin)
 
@@ -172,9 +187,10 @@ Report the estimate (`≈ 1 h 12 min incl. start sequence · 23.4 g PLA`) and sh
 
 The printer's firmware rejects unsigned LAN control commands (HMS `0500-0500-0001-0007`) and
 Developer Mode would turn off cloud printing and Bambu Handy, so prints start from **Bambu
-Connect** in the guest VM from the $mac-vm skill, driven through computer use. Connect sends the sliced file
-over Connor's Bambu cloud account; he is already signed in. Bambu Studio itself crashes in the
-guest, and Connect's LAN Discover can't see the printer through Tart's NAT.
+Connect** in the guest VM from the $mac-vm skill, driven with its `shot`, `click`, `type`, and
+`key` commands. Connect sends the sliced file over Connor's Bambu cloud account; he is already
+signed in. Bambu Studio itself crashes in the guest, and Connect's LAN Discover can't see the
+printer through Tart's NAT.
 
 Copy this checklist and track your progress:
 
@@ -194,9 +210,9 @@ Copy this checklist and track your progress:
    `tart exec -i agent-vm sh -c 'cat > ~/Downloads/<name>.gcode.3mf' < <name>.3mf`.
 3. Open it in Connect with its import link, which also launches the app:
    `tart exec agent-vm open "bambu-connect://import-file?path=%2FUsers%2Fadmin%2FDownloads%2F<name>.gcode.3mf&name=<name>&version=1.0.0"`
-   (`path` and `name` percent-encoded). With the computer tool on the **Agent VM** node (take
-   a screenshot before the first click), click Import Gcode 3MF, check the preview's plate,
-   time, and grams, then Print.
+   (`path` and `name` percent-encoded). Take a `mac-vm shot` and look at it before the first
+   click, then `mac-vm click <x> <y>` Import Gcode 3MF, check the preview's plate, time, and
+   grams in a new shot, then Print.
 4. In Send to print: check the printer is Connor's Garage P1S and the Plate matches, click the
    filament box and pick the Slot Connor chose (it defaults to another one), Timelapse off,
    Bed leveling on, then Send.
@@ -217,8 +233,9 @@ bambu watch --wait-start 30 --interval 300       # in the background; relay each
 bambu watch --once                               # on a schedule; keeps state between runs
 ```
 
-Watching is read-only: it announces start, progress, finish, errors, and out-of-range
-temperatures. Pause and cancel happen on the printer screen or in Bambu Handy.
+Watching is read-only: it announces start, 25/50/75 % and half-hourly progress, finish,
+errors, and out-of-range temperatures. Pause and cancel happen on the printer screen or in
+Bambu Handy.
 
 ### Checklist before you say you're done
 
@@ -250,7 +267,9 @@ To delete a file from the SD card (no command for it), use FTPS with the access 
 ## Setup
 
 Settings live in `~/.config/bambu/config.json`, secrets in the Keychain. `bambu doctor` checks
-Bambu Studio, the VM tooling, settings, and secrets, and says what to run.
+Bambu Studio, the VM tooling, settings, secrets, and whether the printer answers, and says what
+to run. A printer that is unreachable while the router answers means the app running `bambu`
+(the terminal, or an agent host) lacks macOS Local Network permission; doctor says so.
 
 ```sh
 bambu config show
@@ -272,3 +291,4 @@ If printer auth fails, the access code was regenerated on the printer: ask Conno
 | Regenerating because analysis reports 60+ bodies | Look at the Review Page first; it's usually harmless topology |
 | Telling Connor the print started because he said "looks good" | Check `bambu status` before saying it's running |
 | Editing a sliced 3MF to change the Slot | Pick the Slot in Connect's print dialog |
+| Calling a dark, unreadable snapshot "clear" | Send it to Connor and ask |

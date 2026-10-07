@@ -41,6 +41,8 @@ function summary(s: PrinterStatus) {
       .join(" · ") || s.state
   );
 }
+// Quarter marks a long print reports as it passes them.
+const MILESTONES = [25, 50, 75] as const;
 function minutesSince(then: number | null, now: number) {
   return then === null ? Infinity : (now - then) / 60;
 }
@@ -59,6 +61,8 @@ export function evaluate(
       job: s.file,
       last_change_at: now,
       last_progress_at: now,
+      // Marks already behind a print joined midway are not news.
+      announced: MILESTONES.filter((m) => (s.progress_pct ?? 0) >= m).map((m) => `progress:${m}`),
     });
     events.push({
       kind: "started",
@@ -159,6 +163,12 @@ export function evaluate(
         message: `No new layer and no change in time left for 20+ minutes (layer ${s.layer ?? "None"}/${s.total_layers ?? "None"}).`,
       },
     ]);
+  for (const m of MILESTONES)
+    if (s.progress_pct !== null && s.progress_pct >= m)
+      candidates.push([
+        `progress:${m}`,
+        { kind: "progress", severity: "info", title: `${m}% printed`, message: summary(s) },
+      ]);
   for (const [key, event] of candidates)
     if (!state.announced.includes(key)) {
       state.announced.push(key);

@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { extname, basename } from "node:path";
-import { NodeIO, type GLTF, type Node } from "@gltf-transform/core";
+import type { Node } from "@gltf-transform/core";
 import { UPRIGHT_NODES } from "../generate/download.ts";
-import { companionPath } from "../mesh/load.ts";
+import { companionPath, readGltf } from "../mesh/load.ts";
 import jpeg from "jpeg-js";
 import { PNG } from "pngjs";
 import { linearToSrgb, srgbToLinear, roundEven, type Vec3, type Vec4 } from "./lab.ts";
@@ -30,6 +30,9 @@ export interface ColouredModel {
   warnings: string[];
   // True when glTF Y-up coordinates were turned Z-up for the printer.
   turned: boolean;
+  // Millimetres per unit of the file's own numbers: glTF is in metres, so its
+  // vertices come back x1000; OBJ numbers are kept as they are.
+  unitScale: number;
 }
 export class ModelLoadError extends Error {}
 export class NoColourError extends Error {}
@@ -95,25 +98,12 @@ export async function loadColouredModel(
     parts: [],
     warnings: [],
     turned: false,
+    unitScale: suffix === ".obj" ? 1 : 1000,
   };
   try {
     if (suffix === ".obj") await loadObj(path, read, model);
     else {
-      const io = new NodeIO();
-      const bytes = await read(path);
-      const document =
-        suffix === ".glb"
-          ? await io.readBinary(bytes)
-          : await (async () => {
-              const json = JSON.parse(Buffer.from(bytes).toString()) as GLTF.IGLTF;
-              const resources: Record<string, Uint8Array<ArrayBuffer>> = {};
-              for (const item of [...(json.buffers ?? []), ...(json.images ?? [])])
-                if (item.uri && !item.uri.startsWith("data:"))
-                  resources[item.uri] = new Uint8Array(
-                    await read(companionPath(path, decodeURIComponent(item.uri))),
-                  );
-              return io.readJSON({ json, resources });
-            })();
+      const document = await readGltf(path, read);
       // Only what the default scene shows; a GLB can carry other scenes or
       // staging nodes that are not part of the Model.
       // One decode per image however many primitives share it.

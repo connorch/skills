@@ -14,10 +14,14 @@ what the host is doing. It is **off by default**: boot it for a task, shut it
 down after.
 
 ```sh
-mac-vm status                 # stopped | running at <ip>, guest agent, tunnels
+mac-vm status                 # stopped | running at <ip>, guest agent, VNC, tunnels
 mac-vm up                     # boot headless, wait for the guest; safe to re-run
 mac-vm up --forward 18789     # also reverse-tunnel host 127.0.0.1:18789 into the guest
 mac-vm down                   # close tunnels, shut down (forced after 60s)
+mac-vm shot [out.png]         # the guest screen as a PNG (default /tmp/mac-vm.png)
+mac-vm click <x> <y>          # at the PNG's pixel coordinates; --double, --right
+mac-vm type "<text>"          # type into whatever has focus
+mac-vm key cmd+shift+a        # enter, tab, escape, backspace, arrows, f1-f12, cmd/alt/ctrl/shift
 ```
 
 The VM is `agent-vm` unless `--vm` or `MAC_VM` says otherwise.
@@ -43,16 +47,23 @@ tart exec agent-vm sh -c 'ls ~/Downloads'
 tart exec -i agent-vm sh -c 'cat > ~/Downloads/file.3mf' < file.3mf   # copy a file in
 ```
 
-`tart exec` runs as the guest's `admin` user (passwordless `sudo -n` works). To
-drive an app's UI, use your computer-use tool against the guest's desktop, not
-the host's.
+`tart exec` runs as the guest's `admin` user (passwordless `sudo -n` works).
 
-### With OpenClaw
+### Driving the screen
 
-The guest runs the OpenClaw Mac app as a node named **Agent VM**. It reaches a
-loopback-only Gateway through `mac-vm up --forward <gateway port>` and
-reconnects on its own after boot (a LaunchAgent opens the app at login).
-Target that node with the computer tool. To set it up in a new guest, copy
+`shot`, `click`, `type`, and `key` go through Tart's VNC server, so they work
+from any agent with a shell and need nothing inside the guest. Take a `shot`
+and look at it before the first click, and again after anything that changes
+the screen; click coordinates are pixels of that PNG (the guest is Retina, so
+a 1024x768 desktop is a 2048x1536 image). Each command opens its own
+connection and paces itself; run them one at a time, not in parallel.
+
+### With OpenClaw (optional)
+
+An OpenClaw agent can also use its own computer tool: the guest runs the
+OpenClaw Mac app as a node named **Agent VM**, reaching a loopback-only Gateway
+through `mac-vm up --forward <gateway port>`, and reconnects on its own after
+boot (a LaunchAgent opens the app at login). To set it up in a new guest, copy
 `/Applications/OpenClaw.app` in, get the user's go-ahead to put the Gateway
 token in the guest, then pipe it (never echo it) into
 `openclaw-mac primary set --direct-url ws://127.0.0.1:<port> --token-stdin`
@@ -82,8 +93,12 @@ Grant Accessibility and Screen Recording to whatever drives the UI in the guest.
 - `reverse tunnel ... exited` or `... never became reachable in the guest`: the
   port is already bound in the guest, or `mac-vm init` never authorized the key.
   Re-run `mac-vm init` (it skips the clone).
-- Screenshots come back black or fail: the guest must be logged in (auto-login
-  on) and the capturing app needs Screen Recording in the guest.
+- `mac-vm shot` is black: the guest is still booting; `up` waits for the login.
+- `vnc: not available (booted outside mac-vm?)`: the VM was started with
+  `tart run` by hand, so mac-vm has no VNC address. `mac-vm down`, then `up`.
+- `VNC: the server closed the connection` and `status` says stopped: Tart's
+  VNC server crashed, which it does when a new client connects while the last
+  one is being torn down. mac-vm paces its own commands; do not run two at once.
 - `open -a "Some App"` cannot find an app copied in: open it by path,
   `open "/Applications/Some App.app"`.
 - The guest renders OpenGL in software, so GL-heavy apps (Bambu Studio's 3D

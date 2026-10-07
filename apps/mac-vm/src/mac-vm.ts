@@ -4,8 +4,10 @@
 //
 // The VM is off by default: `up` boots it headless, `down` shuts it off. Run
 // commands and copy files with `tart exec` (the Cirrus images ship its guest
-// agent). SSH is only used for `--forward`, which reverse-tunnels host
-// loopback ports into the guest so apps there can reach host-only services.
+// agent). The guest's screen and input go through Tart's VNC server
+// (`shot`, `click`, `type`, `key`), so no agent runs inside the guest. SSH is
+// only used for `--forward`, which reverse-tunnels host loopback ports into
+// the guest so apps there can reach host-only services.
 
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
@@ -13,6 +15,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { Command, Option } from "commander";
+import { charKeysym, KEYSYMS, needsShift, Rfb } from "./rfb.ts";
 
 const STATE_DIR = join(homedir(), ".local", "state", "mac-vm");
 // Every guest built by `init` from the Cirrus images logs in as this user.
@@ -104,11 +107,16 @@ async function withVm<T>(vm: string, work: (started: boolean) => Promise<T>): Pr
   }
 }
 
+// Tart prints the VNC address, password included, into the log; a fresh log
+// per boot keeps only the live one, readable by this user alone.
+function logFile(vm: string) {
+  return join(STATE_DIR, `${vm}.log`);
+}
 async function boot(vm: string, start: boolean) {
   if (start) {
     mkdirSync(STATE_DIR, { recursive: true });
-    const log = openSync(join(STATE_DIR, `${vm}.log`), "a");
-    spawn("tart", ["run", "--no-graphics", vm], {
+    const log = openSync(logFile(vm), "w", 0o600);
+    spawn("tart", ["run", "--no-graphics", "--vnc-experimental", vm], {
       detached: true,
       stdio: ["ignore", log, log],
     }).unref();
@@ -195,12 +203,108 @@ function status(vm: string, json: boolean) {
     running,
     ip: address,
     guestAgent: running && tart(["exec", vm, "true"]).status === 0,
+    vnc: running ? (vncUrl(vm)?.port ?? null) : null,
     tunnels: address ? tunnels(address) : [],
   };
   if (json) return console.log(JSON.stringify(report, null, 2));
   console.log(`${vm}: ${running ? `running at ${report.ip ?? "?"}` : "stopped"}`);
   if (running) console.log(`guest agent: ${report.guestAgent ? "ready" : "not ready"}`);
+  if (running)
+    console.log(
+      `vnc: ${report.vnc ? `port ${report.vnc}` : "not available (booted outside mac-vm?)"}`,
+    );
   for (const t of report.tunnels) console.log(`tunnel ${t.port}: up`);
+}
+
+// The VNC address of the running VM, from the boot log.
+function vncUrl(vm: string): URL | undefined {
+  try {
+    const match = readFileSync(logFile(vm), "utf8")
+      .match(/vnc:\/\/[^\s]+/g)
+      ?.at(-1);
+    return match ? new URL(match) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// Open the screen of a running VM for one command, and close it after.
+async function withScreen<T>(vm: string, work: (screen: Rfb) => Promise<T>): Promise<T> {
+  if (!isRunning(vm)) fail(`${vm} is not running; run \`mac-vm up\` first`);
+  const url = vncUrl(vm);
+  if (!url)
+    fail(
+      `${vm} has no VNC address; it was booted outside mac-vm, so run \`mac-vm down\` then \`mac-vm up\``,
+    );
+  const screen = await Rfb.open(url);
+  try {
+    return await work(screen);
+  } finally {
+    await screen.close();
+  }
+}
+
+async function shot(vm: string, file: string) {
+  await withScreen(vm, async (screen) => {
+    writeFileSync(file, await screen.screenshot());
+    console.log(`${file} (${screen.width}x${screen.height})`);
+  });
+}
+
+// The screen only shows its size after the first update, so a click takes a
+// frame first; that also lets the pointer land after the desktop has settled.
+async function click(
+  vm: string,
+  x: number,
+  y: number,
+  { double, right }: { double: boolean; right: boolean },
+) {
+  await withScreen(vm, async (screen) => {
+    await screen.screenshot();
+    if (x >= screen.width || y >= screen.height)
+      fail(`(${x}, ${y}) is outside the ${screen.width}x${screen.height} screen`);
+    const button = right ? 4 : 1;
+    screen.move(x, y, 0);
+    for (let n = double ? 2 : 1; n > 0; n--) {
+      screen.move(x, y, button);
+      await sleep(60);
+      screen.move(x, y, 0);
+      await sleep(60);
+    }
+    console.log(`${double ? "double-" : right ? "right-" : ""}clicked (${x}, ${y})`);
+  });
+}
+
+async function type(vm: string, text: string) {
+  await withScreen(vm, async (screen) => {
+    for (const char of text) {
+      const keysym = charKeysym(char),
+        shift = needsShift(char);
+      if (shift) screen.key(KEYSYMS.shift!, true);
+      screen.key(keysym, true);
+      screen.key(keysym, false);
+      if (shift) screen.key(KEYSYMS.shift!, false);
+      await sleep(15);
+    }
+    console.log(`typed ${text.length} characters`);
+  });
+}
+
+// `cmd+shift+a`: modifiers held in order, the last key pressed, all released.
+async function key(vm: string, combo: string) {
+  const names = combo.toLowerCase().split("+").filter(Boolean);
+  const keysyms = names.map((name) => {
+    const known = KEYSYMS[name] ?? ([...name].length === 1 ? charKeysym(name) : undefined);
+    if (known === undefined) fail(`unknown key "${name}" in ${combo}`);
+    return known;
+  });
+  if (!keysyms.length) fail("no key given");
+  await withScreen(vm, async (screen) => {
+    for (const keysym of keysyms) screen.key(keysym, true);
+    await sleep(30);
+    for (const keysym of keysyms.toReversed()) screen.key(keysym, false);
+    console.log(`pressed ${combo}`);
+  });
 }
 
 // One-time setup: clone the image, size it, and authorize this host's SSH key
@@ -311,9 +415,47 @@ program
   )
   .action((o: { vm: string; timeout: number }) => down(o.vm, o.timeout));
 
+const pixel = (name: string) => (v: string) => {
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 0) fail(`invalid ${name}: ${v}`);
+  return n;
+};
+program
+  .command("shot")
+  .description("save the guest screen as a PNG; coordinates for click are its pixels")
+  .argument("[file]", "output PNG", "/tmp/mac-vm.png")
+  .addOption(vmOption)
+  .action((file: string, o: { vm: string }) => shot(o.vm, file));
+
+program
+  .command("click")
+  .description("click at a point on the guest screen")
+  .argument("<x>", "pixels from the left", pixel("x"))
+  .argument("<y>", "pixels from the top", pixel("y"))
+  .addOption(vmOption)
+  .option("--double", "double-click")
+  .option("--right", "right-click")
+  .action((x: number, y: number, o: { vm: string; double?: boolean; right?: boolean }) =>
+    click(o.vm, x, y, { double: o.double ?? false, right: o.right ?? false }),
+  );
+
+program
+  .command("type")
+  .description("type text into the guest")
+  .argument("<text>")
+  .addOption(vmOption)
+  .action((text: string, o: { vm: string }) => type(o.vm, text));
+
+program
+  .command("key")
+  .description("press a key or combination, e.g. enter, cmd+a, cmd+shift+4")
+  .argument("<combo>")
+  .addOption(vmOption)
+  .action((combo: string, o: { vm: string }) => key(o.vm, combo));
+
 program
   .command("status")
-  .description("running state, IP, guest agent, tunnels")
+  .description("running state, IP, guest agent, VNC, tunnels")
   .addOption(vmOption)
   .option("--json", "machine-readable output")
   .action((o: { vm: string; json?: boolean }) => status(o.vm, o.json ?? false));

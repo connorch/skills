@@ -86,8 +86,13 @@ export interface Step {
   [key: string]: unknown;
 }
 // Preparation writes each changed Model beside the previous step's file.
-export function prepare(file: string, args: AnalyzeOptions, notes: string[], io: MeshIO = fileIO) {
-  let mesh = load(file, io),
+export async function prepare(
+  file: string,
+  args: AnalyzeOptions,
+  notes: string[],
+  io: MeshIO = fileIO,
+) {
+  let mesh = await load(file, io),
     current = file;
   const written: string[] = [],
     steps: Record<string, Step> = {};
@@ -179,7 +184,7 @@ const removedReasons = {
   simplify:
     "switched off a simplification step that never worked. To simplify, use Bambu Studio: right-click the Model, Simplify Model.",
 };
-export function analyzeFile(
+export async function analyzeFile(
   file: string,
   raw: unknown = {},
   configuredPrinter?: string,
@@ -209,7 +214,7 @@ export function analyzeFile(
   if (!io.exists(file)) throw new UsageError(`file not found: ${file}`);
   const resolvedPrinter = resolvePrinter(args.printer, configuredPrinter, notes),
     material = resolveMaterial(args.material, notes),
-    prepared = prepare(file, args, notes, io);
+    prepared = await prepare(file, args, notes, io);
   return {
     schema: 1,
     file,
@@ -224,7 +229,7 @@ export function analyzeFile(
     notes,
   };
 }
-export type PrintabilityReport = ReturnType<typeof analyzeFile>;
+export type PrintabilityReport = Awaited<ReturnType<typeof analyzeFile>>;
 export function formatReport(doc: PrintabilityReport): string {
   const g = doc.geometry,
     detail = [
@@ -284,10 +289,10 @@ export function register(program: Command, config: Config, io: MeshIO = fileIO):
     .addOption(new Option("--output-dir <dir>").hideHelp())
     .addOption(new Option("--no-clean").hideHelp())
     .addOption(new Option("--no-simplify").hideHelp())
-    .action((file: string, raw: unknown) => {
+    .action(async (file: string, raw: unknown) => {
       const json = jsonFlag(raw);
       try {
-        const doc = analyzeFile(file, raw, config.settings().model, io);
+        const doc = await analyzeFile(file, raw, config.settings().model, io);
         output(json, doc, () => formatReport(doc));
         if (json) console.error(next(`Use this file: ${doc.output_file}`));
       } catch (error) {

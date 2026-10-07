@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vite-plus/test";
 import { strToU8, zipSync } from "fflate";
 import { bounds, signedVolume } from "./geometry.ts";
-import { derivedPath, load, loadGLTF, loadOBJ, loadSTL, save } from "./load.ts";
+import { derivedPath, load, loadOBJ, loadSTL, save } from "./load.ts";
 import { box } from "./test-shapes.ts";
 import { memoryIO } from "./test-io.ts";
 describe("Model file formats", () => {
-  it.each(["stl", "obj", "glb", "3mf"])("round-trips geometry as %s", (format) => {
+  it.each(["stl", "obj", "glb", "3mf"])("round-trips geometry as %s", async (format) => {
     const { io } = memoryIO(),
       path = `/cube.${format}`;
     save(path, box(10, 20, 30), io);
-    const model = load(path, io);
+    const model = await load(path, io);
     expect(bounds(model).extents).toEqual([10, 20, 30]);
     expect(signedVolume(model)).toBeCloseTo(6000);
     expect(model.source.format).toBe(format);
@@ -25,7 +25,7 @@ describe("Model file formats", () => {
     expect(mesh.indices.length).toBe(6);
     expect(bounds(mesh).extents).toEqual([10, 10, 0]);
   });
-  it("merges nested 3MF components and build instances with transforms", () => {
+  it("merges nested 3MF components and build instances with transforms", async () => {
     const { io, files } = memoryIO();
     files.set(
       "/instances.3mf",
@@ -35,12 +35,12 @@ describe("Model file formats", () => {
         ),
       }),
     );
-    const mesh = load("/instances.3mf", io);
+    const mesh = await load("/instances.3mf", io);
     expect(mesh.unit).toBe("inch");
     expect(mesh.indices.length).toBe(6);
     expect(bounds(mesh).extents).toEqual([7, 5, 0]);
   });
-  it("follows production-extension p:path references to object files", () => {
+  it("follows production-extension p:path references to object files", async () => {
     const { io, files } = memoryIO();
     files.set(
       "/project.3mf",
@@ -53,20 +53,25 @@ describe("Model file formats", () => {
         ),
       }),
     );
-    const mesh = load("/project.3mf", io);
+    const mesh = await load("/project.3mf", io);
     expect(mesh.indices.length).toBe(3);
     expect(bounds(mesh).min).toEqual([128, 128, 0]);
     expect(bounds(mesh).extents).toEqual([2, 3, 0]);
   });
-  it("rejects compressed glTF instead of reading empty geometry", () => {
-    expect(() =>
-      loadGLTF(
-        { asset: { version: "2.0" }, extensionsRequired: ["KHR_draco_mesh_compression"] },
-        [],
+  it("rejects compressed glTF instead of reading empty geometry", async () => {
+    const { io, files } = memoryIO();
+    files.set(
+      "/packed.gltf",
+      strToU8(
+        JSON.stringify({
+          asset: { version: "2.0" },
+          extensionsRequired: ["KHR_draco_mesh_compression"],
+        }),
       ),
-    ).toThrow(/KHR_draco_mesh_compression/);
+    );
+    await expect(load("/packed.gltf", io)).rejects.toThrow(/KHR_draco_mesh_compression/);
   });
-  it("rejects cyclic components and corrupt or empty Models", () => {
+  it("rejects cyclic components and corrupt or empty Models", async () => {
     const { io, files } = memoryIO();
     files.set(
       "/cycle.3mf",
@@ -76,12 +81,12 @@ describe("Model file formats", () => {
         ),
       }),
     );
-    expect(() => load("/cycle.3mf", io)).toThrow("cyclic");
+    await expect(load("/cycle.3mf", io)).rejects.toThrow("cyclic");
     files.set("/bad.stl", strToU8("not a mesh"));
-    expect(() => load("/bad.stl", io)).toThrow();
+    await expect(load("/bad.stl", io)).rejects.toThrow();
     expect(() => loadOBJ("v 0 0 0")).toThrow();
   });
-  it("applies glTF node hierarchy, quaternion, scale and interleaved accessors", () => {
+  it("applies glTF node hierarchy, quaternion, scale and interleaved accessors", async () => {
     const { io, files } = memoryIO(),
       bytes = new Uint8Array(48),
       view = new DataView(bytes.buffer);
@@ -105,18 +110,18 @@ describe("Model file formats", () => {
     };
     files.set("/model.gltf", strToU8(JSON.stringify(doc)));
     files.set("/mesh.bin", bytes);
-    const model = load("/model.gltf", io);
+    const model = await load("/model.gltf", io);
     expect(model.indices.length).toBe(6);
     expect(bounds(model).min).toEqual([8, 5, 0]);
     expect(bounds(model).max).toEqual([10, 7, 0]);
     doc.buffers[0]!.uri =
       "data:application/octet-stream;base64," + Buffer.from(bytes).toString("base64");
     files.set("/model.gltf", strToU8(JSON.stringify(doc)));
-    expect(bounds(load("/model.gltf", io)).extents).toEqual([2, 2, 0]);
+    expect(bounds(await load("/model.gltf", io)).extents).toEqual([2, 2, 0]);
     // Points and lines beside the surface are ignored, not an error.
     doc.meshes[0]!.primitives.push({ attributes: { POSITION: 0 }, mode: 1 } as never);
     files.set("/model.gltf", strToU8(JSON.stringify(doc)));
-    expect(load("/model.gltf", io).indices.length).toBe(6);
+    expect((await load("/model.gltf", io)).indices.length).toBe(6);
   });
   it("chains derived names and falls back to STL for other extensions", () => {
     expect(derivedPath("/a/cup_scaled.glb", "_oriented")).toBe("/a/cup_scaled_oriented.glb");
@@ -124,13 +129,20 @@ describe("Model file formats", () => {
   });
 });
 describe("sparse glTF accessors", () => {
-  it("patches sparse POSITION values without a base buffer view", () => {
+  it("patches sparse POSITION values without a base buffer view", async () => {
     const bytes = new Uint8Array(28),
       view = new DataView(bytes.buffer);
     bytes.set([1, 2]);
     [1, 0, 0, 0, 1, 0].forEach((v, i) => view.setFloat32(4 + i * 4, v, true));
+    const { io, files } = memoryIO();
     const doc = {
-      buffers: [{ byteLength: 28 }],
+      asset: { version: "2.0" },
+      buffers: [
+        {
+          byteLength: 28,
+          uri: "data:application/octet-stream;base64," + Buffer.from(bytes).toString("base64"),
+        },
+      ],
       bufferViews: [
         { buffer: 0, byteOffset: 0, byteLength: 2 },
         { buffer: 0, byteOffset: 4, byteLength: 24 },
@@ -149,6 +161,7 @@ describe("sparse glTF accessors", () => {
       ],
       meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }],
     };
-    expect(bounds(loadGLTF(doc, [bytes])).extents).toEqual([1, 1, 0]);
+    files.set("/sparse.gltf", strToU8(JSON.stringify(doc)));
+    expect(bounds(await load("/sparse.gltf", io)).extents).toEqual([1, 1, 0]);
   });
 });

@@ -1,8 +1,10 @@
 // `bambu doctor`: is this Machine set up to find, check, slice and print?
-// Every check is local and offline; nothing here talks to the printer.
+// Every check is local except one TCP probe of the printer's MQTT port, which
+// tells a printer that is off from a process macOS has cut off from the LAN.
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { connect } from "node:net";
 import { dirname } from "node:path";
 import { type Config, ConfigError, mask, PROVIDERS } from "./config.ts";
 import { findCli, findProfilesDir } from "./slice/discovery.ts";
@@ -17,6 +19,76 @@ export interface Finding {
 }
 
 const MARK: Record<Level, string> = { ok: "✓", warn: "!", missing: "✗", info: "·" };
+
+// What one TCP connection attempt learned: "refused" still means the host is
+// there, "unreachable" is the kernel refusing to route to it, "silent" is a
+// timeout or anything else.
+export type Reach = "open" | "refused" | "unreachable" | "silent";
+export interface Network {
+  reach(host: string, port: number): Promise<Reach>;
+  gateway(): string | undefined;
+}
+const PRINTER_PORT = 8883;
+export const localNetwork: Network = {
+  reach: (host, port) =>
+    new Promise((done) => {
+      const socket = connect({ host, port });
+      const finish = (result: Reach) => {
+        socket.destroy();
+        done(result);
+      };
+      socket.setTimeout(3000, () => finish("silent"));
+      socket.on("connect", () => finish("open"));
+      socket.on("error", (error: NodeJS.ErrnoException) =>
+        finish(
+          error.code === "ECONNREFUSED"
+            ? "refused"
+            : ["EHOSTUNREACH", "EHOSTDOWN", "ENETUNREACH", "ENETDOWN"].includes(error.code ?? "")
+              ? "unreachable"
+              : "silent",
+        ),
+      );
+    }),
+  gateway() {
+    try {
+      return execFileSync("route", ["-n", "get", "default"], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).match(/gateway: (\S+)/)?.[1];
+    } catch {
+      return undefined;
+    }
+  },
+};
+
+// A printer the kernel will not route to while the router answers is the
+// macOS Local Network permission: it is granted per app, and a terminal or
+// agent host without it gets EHOSTUNREACH for every LAN peer.
+async function printerReach(ip: string, net: Network): Promise<Finding> {
+  const reach = await net.reach(ip, PRINTER_PORT);
+  if (reach === "open") return { level: "ok", text: `Printer answers at ${ip}:${PRINTER_PORT}` };
+  if (reach === "refused")
+    return {
+      level: "warn",
+      text: `${ip} answers but nothing listens on port ${PRINTER_PORT}; is that the printer's address?`,
+    };
+  if (reach === "silent")
+    return {
+      level: "warn",
+      text: `No answer from ${ip}; the printer may be off, or the address may be wrong`,
+    };
+  const gateway = net.gateway(),
+    router = gateway ? await net.reach(gateway, 80) : "unreachable";
+  return router === "open" || router === "refused"
+    ? {
+        level: "missing",
+        text: `${ip} is unreachable while the router at ${gateway} answers: the app running bambu lacks macOS Local Network permission. Enable it under System Settings > Privacy & Security > Local Network for the terminal or agent host, then restart that app.`,
+      }
+    : {
+        level: "warn",
+        text: `${ip} is unreachable and so is the router; check this Mac's network connection`,
+      };
+}
 
 function onPath(command: string): string | undefined {
   try {
@@ -39,7 +111,7 @@ function studioVersion(cli: string): string | undefined {
   }
 }
 
-export function diagnose(config: Config): Finding[] {
+export async function diagnose(config: Config, net: Network = localNetwork): Promise<Finding[]> {
   const findings: Finding[] = [];
   const add = (level: Level, text: string) => findings.push({ level, text });
 
@@ -80,6 +152,7 @@ export function diagnose(config: Config): Finding[] {
   const { model, printer_ip: ip, serial } = settings;
   if (ip && serial) add("ok", `Printer ${model ?? "(model not set)"} at ${ip}, serial ${serial}`);
   else add("missing", "Printer not set; run `bambu config set printer_ip <ip> serial <serial>`");
+  if (ip) findings.push(await printerReach(ip, net));
   if (!model) add("warn", "Printer model not set; run `bambu config set model P1S`");
   else
     try {
