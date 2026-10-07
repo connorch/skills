@@ -226,9 +226,12 @@ async function relay(relay: Relay, request: Request, url: URL): Promise<Response
   const payload = await verifyJwt(jwt, relay.aud());
   if (!payload) return new Response("forbidden\n", { status: 403 });
 
-  // `to` must be a same-origin absolute path ("/x", not "//host" or a URL).
+  // `to` must be a same-origin absolute path: "/x", not "//host", a URL, or
+  // "/\\host", which browsers read as "//host". Resolving it against our
+  // origin and comparing catches every spelling, so the public Guest Login
+  // cannot be used as an open redirect.
   const to = url.searchParams.get("to") ?? "/";
-  const dest = /^\/(?!\/)/.test(to) ? to : "/";
+  const dest = /^\//.test(to) && new URL(to, url.origin).origin === url.origin ? to : "/";
   const maxAge = Math.max(0, Math.floor(payload.exp - Date.now() / 1000));
   const separator = dest.includes("?") ? "&" : "?";
   return new Response(null, {
