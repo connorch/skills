@@ -3,7 +3,7 @@
 // wovn_auth cookie (browser) or an injected Authorization header
 // (agent-browser) authenticates them. Used identically by app pages and by
 // the Banner injected into HTML Files.
-import type { FileEntry, FileMeta, Listing, Versions, Visibility } from "./types";
+import type { FileEntry, FileMeta, Listing, Versions, VisibilityPatch } from "./types";
 
 // A 401/403 means the session expired: re-enter the /login flow for the page
 // we are on instead of surfacing an error state.
@@ -39,11 +39,12 @@ export function fetchVersions(key: string): Promise<Versions> {
   return request<Versions>(`/api/versions/${key}`);
 }
 
-export function setVisibility(key: string, visibility: Visibility): Promise<FileMeta> {
+// Flips to public or private, or shares with a list of emails (ADR 0005).
+export function setVisibility(key: string, patch: VisibilityPatch): Promise<FileMeta> {
   return request<FileMeta>(`/api/files/${key}`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ visibility }),
+    body: JSON.stringify(patch),
   });
 }
 

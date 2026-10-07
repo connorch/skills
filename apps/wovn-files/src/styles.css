@@ -48,6 +48,7 @@
   --color-background: var(--background);
   --color-public: var(--public);
   --color-private: var(--private);
+  --color-shared: var(--shared);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -84,6 +85,7 @@
   --chart-5: oklch(0.269 0 0);
   --public: oklch(0.6 0.15 150);
   --private: oklch(0.72 0.15 70);
+  --shared: oklch(0.6 0.17 255);
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
@@ -123,6 +125,7 @@
     --chart-5: oklch(0.269 0 0);
     --public: oklch(0.85 0.1 150);
     --private: oklch(0.87 0.1 75);
+    --shared: oklch(0.8 0.1 255);
     --sidebar: oklch(0.205 0 0);
     --sidebar-foreground: oklch(0.985 0 0);
     --sidebar-primary: oklch(0.488 0.243 264.376);

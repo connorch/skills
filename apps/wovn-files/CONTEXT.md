@@ -23,7 +23,21 @@ A Key the client chose explicitly (PUT), safe to re-publish in place; forced
 overwrites archive the previous Version.
 
 **Visibility**:
-A per-File stamp, `public` or `private`; absent means private (fail closed).
+What a File is to readers other than Connor: `public` (anyone), `shared`
+(the Guests on its Share), or `private` (nobody). Stored as stamps; no stamp
+means private (fail closed).
+
+**Share**:
+The emails a shared File is open to, and an optional expiry. Kept on the
+File after it expires, so renewing starts from the old list.
+
+**Guest**:
+A reader who proved an email at the Guest Login. A Guest only ever gets Raw.
+_Avoid_: viewer, recipient, external user
+
+**Guest Login**:
+The `/guest` path, gated by the second Access app (one-time PIN, anyone),
+which relays the proven email into the `wovn_guest` cookie.
 
 **Version**:
 A previous state of a Stable Path, stored under `archive/` when an overwrite
@@ -69,10 +83,16 @@ _Avoid_: viewer, embed
 ## Relationships
 
 - A **File** has exactly one **Key** and one effective **Visibility**
+- A **File** has at most one **Share**; it is `shared` only while the Share
+  has not expired and the File is not `public`
+- A **Guest** reads a **File** only when their email is on its **Share**, and
+  then only **Raw**; a **Guest** never sees a **Banner** or a **Directory
+  Route**
 - A **Stable Path** accumulates **Versions**; a **Generated Key** never does
 - A **Directory Route** exists implicitly for every prefix that contains
   **Files**; it is never public regardless of the Files' **Visibility**
-- **Versions** are always private regardless of their File's **Visibility**
+- **Versions** are always private regardless of their File's **Visibility**,
+  **Share** included
 - A **File Page** exists only for a **Document Navigation** that is
   authenticated; every other request to a **File** gets **Raw**
 - An HTML **File** is its own **File Page** body (the **Banner** is injected
@@ -87,6 +107,12 @@ _Avoid_: viewer, embed
 > **Domain expert:** "No - an exact **Key** match always serves the **File**.
 > The **Directory Route** for that prefix is still reachable at
 > `/pr-assets/`."
+
+> **Dev:** "I shared `docs/plan.html` with two people. Can they see the
+> Versions?"
+> **Domain expert:** "No - a **Share** opens the **File**, not its history.
+> **Versions** are always private, and a **Guest** gets **Raw** of the current
+> File only."
 
 > **Dev:** "If I open a public PNG while logged in, do I get the **Banner**?"
 > **Domain expert:** "Yes - that is a **Document Navigation**, so you get the

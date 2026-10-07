@@ -7,8 +7,10 @@
 //     visibility/limit compose as filters (list), newest first when not
 //     browsing.
 //   GET|PATCH|DELETE /api/files/<key> - metadata; {"visibility": ...} flips
-//     the stamp; DELETE removes the File and all its Versions.
+//     the stamp (with "emails" and "expires" for "shared", ADR 0005); DELETE
+//     removes the File and all its Versions.
 //   GET /api/versions/<key>       - the File's Versions, newest first.
+import { parseVisibilityPatch } from "@/lib/share";
 import { isAuthenticated } from "./auth.server";
 import {
   deleteFile,
@@ -57,17 +59,11 @@ async function metaResponse(key: string): Promise<Response> {
 }
 
 async function patch(request: Request, key: string): Promise<Response> {
-  const body = (await request.json().catch(() => null)) as {
-    visibility?: unknown;
-  } | null;
-  const value = body?.visibility;
-  if (value !== "public" && value !== "private") {
-    return new Response('body must be {"visibility": "public"} or {"visibility": "private"}\n', {
-      status: 400,
-    });
-  }
+  const body: unknown = await request.json().catch(() => null);
+  const parsed = parseVisibilityPatch(body);
+  if (typeof parsed === "string") return new Response(`${parsed}\n`, { status: 400 });
   if (isArchiveKey(key)) return new Response("Versions are always private\n", { status: 400 });
-  const meta = await setVisibility(key, value);
+  const meta = await setVisibility(key, parsed);
   if (!meta) return new Response("not found\n", { status: 404 });
   return Response.json(meta, { headers: NO_STORE });
 }

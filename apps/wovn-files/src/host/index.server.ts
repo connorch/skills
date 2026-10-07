@@ -7,13 +7,15 @@
 //
 // URL resolution (docs/adr/0002 and 0003): an exact Key match serves the
 // File; any other GET path is a Directory Route. A public File is Raw for
-// anyone; everything else - private File, Directory Route, or nothing at
-// all - 302s anonymous requests to /login identically, so probing leaks
-// nothing. An authenticated Document Navigation (Sec-Fetch-Dest: document,
-// no ?raw) is the one request that gets the app: an HTML File with the
-// Banner injected, or a File Page / Directory Route page rendered by Start.
-// Every other authenticated request gets Raw, or a plain 404 for a path with
-// no Key, so scripted reads keep error detection.
+// anyone; a shared File (ADR 0005) is Raw for a Guest whose email is on its
+// Share and sends anyone else to the Guest Login at /guest; everything else
+// - private File, Directory Route, or nothing at all - 302s anonymous
+// requests to /login identically, so probing leaks nothing. An authenticated
+// Document Navigation (Sec-Fetch-Dest: document, no ?raw) is the one request
+// that gets the app: an HTML File with the Banner injected, or a File Page /
+// Directory Route page rendered by Start. Every other authenticated request
+// gets Raw, or a plain 404 for a path with no Key, so scripted reads keep
+// error detection.
 //
 // Versions have three URL spellings that name the same object: the storage
 // Key archive/<key>/<stamp>, the alias /<key>/archive/<stamp>, and
@@ -23,7 +25,16 @@
 import { env } from "cloudflare:workers";
 
 import type { FilePage, Page } from "@/lib/types";
-import { isAuthenticated, login, loginRedirect } from "./auth.server";
+import {
+  forgetGuestCookie,
+  guest,
+  guestEmail,
+  guestRedirect,
+  isAuthenticated,
+  login,
+  loginRedirect,
+  withoutGuestMarker,
+} from "./auth.server";
 import { api } from "./api.server";
 import {
   fileMetaOf,
@@ -31,6 +42,7 @@ import {
   isPublic,
   listDirectory,
   listVersions,
+  sharedWith,
   upload,
   versionOf,
 } from "./files.server";
@@ -45,6 +57,7 @@ export async function host(request: Request): Promise<HostResult> {
   const url = new URL(request.url);
 
   if (url.pathname === "/login") return login(request, url);
+  if (url.pathname === "/guest") return guest(request, url);
   // Every PUT/POST is an upload attempt - no system route accepts them - so
   // routing them first lets upload() reject Reserved Keys with the 400 that
   // names the reserved word instead of a generic 405.
@@ -127,7 +140,25 @@ async function resolve(request: Request, url: URL): Promise<HostResult> {
   if (publicObject && !wrap) return fileResponse(request, object, true);
 
   if (!(await isAuthenticated(request))) {
-    return publicObject ? fileResponse(request, object, true) : loginRedirect(url);
+    if (publicObject) return fileResponse(request, object, true);
+    // A shared File (ADR 0005): a Guest on its Share gets Raw and nothing
+    // else - no Banner, no app - whatever the request destination. A Guest
+    // who is not on it learns that much and no more; anyone without a Guest
+    // cookie is sent to prove an email first.
+    const emails = object ? sharedWith(lookupKey, object.customMetadata) : null;
+    if (emails) {
+      const email = await guestEmail(request);
+      if (email === null) return guestRedirect(url);
+      // Just back from the Guest Login: leave a clean URL in the address bar
+      // before anything renders, so a reload after the not-shared page (or
+      // after the cookie lapses) starts a fresh Guest Login instead of
+      // reading the marker as cookie refusal.
+      const clean = withoutGuestMarker(url);
+      if (clean !== null) return redirect(clean);
+      if (!emails.includes(email)) return notSharedWith(email);
+      return fileResponse(request, object!, false);
+    }
+    return loginRedirect(url);
   }
   if (!wrap) return object ? fileResponse(request, object, publicObject) : NOT_FOUND();
 
@@ -163,6 +194,32 @@ async function resolve(request: Request, url: URL): Promise<HostResult> {
   const contentType = object.httpMetadata?.contentType ?? "";
   if (/^text\/html\b/i.test(contentType) && hasBody(object)) return injectBanner(object, page);
   return { page };
+}
+
+// A Guest whose proven email is not on the Share. Their Access session
+// would hand back the same email on a retry, so the way out is Access's own
+// logout, which the edge serves on this hostname; the Guest cookie is
+// dropped here so the next visit starts a fresh Guest Login.
+function notSharedWith(email: string): Response {
+  const body =
+    `<!doctype html><meta charset="utf-8"><title>Not shared with you</title>` +
+    `<p>This file is not shared with <b>${escapeHtml(email)}</b>.</p>` +
+    `<p><a href="/cdn-cgi/access/logout">Sign in with a different email</a>, then open the link again.</p>`;
+  return new Response(body, {
+    status: 403,
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      "set-cookie": forgetGuestCookie(),
+    },
+  });
+}
+
+function escapeHtml(text: string): string {
+  return text.replace(
+    /[&<>"]/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!,
+  );
 }
 
 // head() results have no body; get() results do.

@@ -1,14 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
-import { useId, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useId, useState } from "react";
 
 import { fileUrl, rawUrl } from "@/lib/api";
-import { fileQuery } from "@/lib/queries";
+import { copyUrl, fileQuery } from "@/lib/queries";
 import type { FilePage } from "@/lib/types";
 import { versionStamp } from "@/lib/types";
 import { Finder } from "./finder";
 import { Crumbs, Dot, Strip } from "./strip";
 import { Time } from "./time";
-import { VisibilityBadge } from "./visibility-badge";
+import { ShareNote, VisibilityBadge } from "./visibility-badge";
 
 // The Banner (CONTEXT.md): the strip and its Finder panel above a File. One
 // component, two mounts - the React tree of an app page, and the shadow root
@@ -19,6 +19,7 @@ export function Banner({ page }: { page: FilePage }) {
     ...fileQuery(page.file.key),
     initialData: page.file,
   }).data;
+  useRefetchAtShareExpiry(file.key, file.share?.expires ?? null);
   const [open, setOpen] = useState(page.openVersions);
   // Bumped to reopen the Finder on the page's own File.
   const [finderKey, setFinderKey] = useState(0);
@@ -47,6 +48,9 @@ export function Banner({ page }: { page: FilePage }) {
       <span className="truncate font-semibold">{name}</span>
       <span className="pl-1.5">
         <VisibilityBadge file={file} />
+      </span>
+      <span className="max-sm:hidden">
+        <ShareNote file={file} />
       </span>
     </>
   );
@@ -96,6 +100,19 @@ export function Banner({ page }: { page: FilePage }) {
             <Dot />
           </span>
         )}
+        {/* The link a Guest opens is the File's own URL (ADR 0005). */}
+        {!page.version && file.visibility === "shared" && (
+          <>
+            <button
+              type="button"
+              className="cursor-pointer text-primary hover:underline"
+              onClick={() => copyUrl(fileUrl(file.key))}
+            >
+              copy link
+            </button>
+            <Dot />
+          </>
+        )}
         <a className="text-primary hover:underline" href={rawUrl(file.key, stamp)}>
           raw
         </a>
@@ -103,6 +120,23 @@ export function Banner({ page }: { page: FilePage }) {
       {open && <Finder key={finderKey} id={panelId} page={page} file={file} />}
     </div>
   );
+}
+
+// A page left open past its Share's expiry refetches the File then, so the
+// badge turns private when the host does rather than showing a stale share.
+function useRefetchAtShareExpiry(key: string, expires: string | null) {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (expires === null) return;
+    const delay = Date.parse(expires) - Date.now() + 1000;
+    // setTimeout overflows past ~24.8 days; a Share that far out is covered
+    // by the next page load.
+    if (delay <= 0 || delay > 0x7fffffff) return;
+    const id = setTimeout(() => {
+      void queryClient.invalidateQueries({ queryKey: fileQuery(key).queryKey });
+    }, delay);
+    return () => clearTimeout(id);
+  }, [key, expires, queryClient]);
 }
 
 // "2 versions newer than current" style note for a Version page.

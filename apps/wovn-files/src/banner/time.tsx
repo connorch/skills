@@ -1,10 +1,12 @@
 import { useSyncExternalStore } from "react";
 
-import { formatAgo, formatDayTime, formatLong, formatStamp } from "@/lib/format";
+import { formatAgo, formatDayTime, formatIn, formatLong, formatStamp } from "@/lib/format";
 
 const SHOW = {
   // "3h ago", with the exact time on hover.
   ago: (iso: string, now: number) => formatAgo(iso, now),
+  // "in 6d", for a Share's expiry.
+  in: (iso: string, now: number) => formatIn(iso, now),
   // "Sep 28, 22:34"
   day: (iso: string) => formatDayTime(iso),
   // "2026-09-28 22:34"
@@ -33,7 +35,7 @@ export function Time({
     <time
       className={className}
       dateTime={iso}
-      title={show === "ago" && now !== null ? formatLong(iso) : undefined}
+      title={(show === "ago" || show === "in") && now !== null ? formatLong(iso) : undefined}
       data-fresh={fresh ? "" : undefined}
     >
       {now === null ? iso.slice(0, 10) : SHOW[show](iso, now)}

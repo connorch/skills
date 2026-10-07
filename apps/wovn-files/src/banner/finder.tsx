@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useState, type MouseEvent, type ReactNode } from "react";
+import { useCallback, useRef, useState, type MouseEvent, type ReactNode } from "react";
 
 import {
   AlertDialog,
@@ -14,6 +14,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { fileUrl, parentUrl, rawUrl, versionUrl } from "@/lib/api";
 import { formatDelta, formatSize, formatWhen } from "@/lib/format";
+import { shareSummary } from "@/lib/share";
 import {
   copyUrl,
   fileQuery,
@@ -25,6 +26,7 @@ import {
 import type { FileMeta, FilePage, Version, Visibility } from "@/lib/types";
 import { versionStamp } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { SharePopover } from "./share-popover";
 import { Time } from "./time";
 import { VisibilityDot, VisibilityLabel } from "./visibility-badge";
 
@@ -266,6 +268,8 @@ function Info({
         ? `${uploads} upload${uploads === 1 ? "" : "s"} since ${formatWhen(first)}`
         : "generated key, one upload",
     ],
+    // A Version is always private; the Share belongs to the current File.
+    ...(version ? [] : optional("shared", file.share && shareSummary(file.share))),
     ...optional("project", file.project),
     ...optional("branch", file.branch),
     ...optional("worktree", file.worktree),
@@ -372,14 +376,19 @@ function Uploads({
   );
 }
 
+// public / shared / private. Public and private flip at once; shared opens
+// the share form anchored to its button (and edits the Share while shared).
 function VisibilityToggle({ file }: { file: FileMeta }) {
   const flip = useSetVisibility();
-  const options: Visibility[] = ["public", "private"];
+  const [sharing, setSharing] = useState(false);
+  const shareButton = useRef<HTMLButtonElement>(null);
+  const options: Visibility[] = ["public", "shared", "private"];
   return (
     <div className="flex gap-0.5 px-0.5 py-0.5" role="radiogroup" aria-label="visibility">
       {options.map((value) => (
         <button
           key={value}
+          ref={value === "shared" ? shareButton : undefined}
           type="button"
           role="radio"
           aria-checked={file.visibility === value}
@@ -391,13 +400,18 @@ function VisibilityToggle({ file }: { file: FileMeta }) {
               : "border-transparent text-muted-foreground hover:bg-accent hover:text-foreground",
           )}
           onClick={() => {
-            if (value !== file.visibility) flip.mutate({ key: file.key, visibility: value });
+            if (value === "shared") setSharing(true);
+            else if (value !== file.visibility) flip.mutate({ key: file.key, visibility: value });
           }}
         >
           <VisibilityDot value={value} />
           {value}
+          {value === "shared" && file.visibility === "shared" && (
+            <span className="text-muted-foreground/70">· edit</span>
+          )}
         </button>
       ))}
+      <SharePopover file={file} anchor={shareButton} open={sharing} onOpenChange={setSharing} />
     </div>
   );
 }
