@@ -268,7 +268,8 @@ function Info({
         ? `${uploads} upload${uploads === 1 ? "" : "s"} since ${formatWhen(first)}`
         : "generated key, one upload",
     ],
-    ...optional("shared", file.share && shareSummary(file.share)),
+    // A Version is always private; the Share belongs to the current File.
+    ...(version ? [] : optional("shared", file.share && shareSummary(file.share))),
     ...optional("project", file.project),
     ...optional("branch", file.branch),
     ...optional("worktree", file.worktree),
