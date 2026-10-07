@@ -1,8 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Command } from "commander";
+import { strToU8, zipSync } from "fflate";
 import { describe, expect, it, vi, afterEach } from "vite-plus/test";
 import { Config } from "../config.ts";
 import {
@@ -302,6 +303,148 @@ describe("Search command", () => {
     expect(humanSearch(empty)).toContain("No models found");
   });
 });
+describe("MakerWorld download links", () => {
+  const zip = zipSync({
+    "clip/clip-120mm.stl": strToU8("solid mesh"),
+    "clip/readme.txt": strToU8("hi"),
+  });
+  const texturedZip = zipSync({
+    "model.obj": strToU8("mtllib materials/model.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"),
+    "materials/model.mtl": strToU8("newmtl m\nmap_Kd ../textures/c.png\n"),
+    "textures/c.png": strToU8("png"),
+  });
+  const caseZip = zipSync({
+    "Model.stl": strToU8("solid a"),
+    "model.stl": strToU8("solid b"),
+  });
+  // The same name in two Unicode forms, which APFS treats as one file.
+  const formsZip = zipSync({
+    "caf\u00e9.stl": strToU8("solid a"),
+    "cafe\u0301.stl": strToU8("solid b"),
+  });
+  const nestedZip = zipSync({
+    "model.obj": strToU8("v 0 0 0\n"),
+    "textures/new/c.png": strToU8("png"),
+  });
+  const ancestryZip = zipSync({
+    "part.obj": strToU8("v 0 0 0\n"),
+    "part.obj/textures/c.png": strToU8("png"),
+  });
+  const escapingZip = zipSync({
+    "model.obj": strToU8("v 0 0 0\n"),
+    "../victim.png": strToU8("png"),
+  });
+  const fetcher: Fetch = vi.fn(async (input) =>
+    String(input).endsWith(".zip?at=1&key=2")
+      ? new Response(zip)
+      : String(input).endsWith("textured.zip")
+        ? new Response(texturedZip)
+        : String(input).endsWith("escaping.zip")
+          ? new Response(escapingZip)
+          : String(input).endsWith("case.zip")
+            ? new Response(caseZip)
+            : String(input).endsWith("forms.zip")
+              ? new Response(formsZip)
+              : String(input).endsWith("nested.zip")
+                ? new Response(nestedZip)
+                : String(input).endsWith("ancestry.zip")
+                  ? new Response(ancestryZip)
+                  : String(input).includes("expired")
+                    ? new Response("<html>expired</html>")
+                    : new Response("solid mesh"),
+  );
+  it("unpacks the Model files from a signed zip and credits the page", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
+    const report = await fetchModel("https://makerworld.bblmw.com/model/stls.zip?at=1&key=2", {
+      out: dir,
+      page: "https://makerworld.com/en/models/42-clip",
+      fetcher,
+    });
+    expect(report.files.map((f) => f.name)).toEqual(["clip-120mm.stl"]);
+    expect(report.skipped).toEqual(["clip/readme.txt"]);
+    expect(await readFile(join(dir, "clip-120mm.stl"), "utf8")).toBe("solid mesh");
+    expect(JSON.parse(await readFile(join(dir, "source.json"), "utf8"))).toEqual({
+      route: "Search",
+      site: "MakerWorld",
+      title: "stls",
+      url: "https://makerworld.com/en/models/42-clip",
+    });
+  });
+  it("keeps an OBJ's companion folders so its MTL and texture references resolve", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
+    const report = await fetchModel("https://makerworld.bblmw.com/m/textured.zip", {
+      out: dir,
+      fetcher,
+    });
+    expect(report.files.map((f) => f.name).sort()).toEqual([
+      "materials/model.mtl",
+      "model.obj",
+      "textures/c.png",
+    ]);
+    expect(existsSync(join(dir, "materials", "model.mtl"))).toBe(true);
+  });
+  it("refuses a zip whose member path climbs out of the job folder", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
+    await expect(
+      fetchModel("https://makerworld.bblmw.com/m/escaping.zip", { out: dir, fetcher }),
+    ).rejects.toThrow("unsafe filename");
+    expect(existsSync(join(dir, "..", "victim.png"))).toBe(false);
+    expect(existsSync(join(dir, "model.obj"))).toBe(false);
+  });
+  it("refuses to write through a folder linked out of the job folder", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bambu-search-")),
+      elsewhere = await mkdtemp(join(tmpdir(), "bambu-elsewhere-"));
+    await symlink(elsewhere, join(dir, "textures"));
+    await expect(
+      fetchModel("https://makerworld.bblmw.com/m/textured.zip", { out: dir, fetcher }),
+    ).rejects.toThrow("leave the job folder");
+    expect(await readdir(elsewhere)).toEqual([]);
+    // Nor made a folder through the link before refusing.
+    await expect(
+      fetchModel("https://makerworld.bblmw.com/m/nested.zip", { out: dir, fetcher }),
+    ).rejects.toThrow("leave the job folder");
+    expect(await readdir(elsewhere)).toEqual([]);
+  });
+  it("refuses a member that is also another member's folder", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
+    await expect(
+      fetchModel("https://makerworld.bblmw.com/m/ancestry.zip", { out: dir, fetcher }),
+    ).rejects.toThrow("both a file and a folder");
+    expect(await readdir(dir)).toEqual([]);
+  });
+  it("leaves a .tmp another fetch is writing alone", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
+    await writeFile(join(dir, "clip.stl.tmp"), "theirs");
+    await expect(
+      fetchModel("https://makerworld.bblmw.com/m/clip.stl?key=3", { out: dir, fetcher }),
+    ).rejects.toThrow("another fetch");
+    expect(await readFile(join(dir, "clip.stl.tmp"), "utf8")).toBe("theirs");
+  });
+  it("refuses members whose names differ only in case", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
+    await expect(
+      fetchModel("https://makerworld.bblmw.com/m/case.zip", { out: dir, fetcher }),
+    ).rejects.toThrow("twice");
+    expect(existsSync(join(dir, "model.stl"))).toBe(false);
+    await expect(
+      fetchModel("https://makerworld.bblmw.com/m/forms.zip", { out: dir, fetcher }),
+    ).rejects.toThrow("twice");
+  });
+  it("saves a single file under its own name and refuses an expired link's page", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
+    const report = await fetchModel("https://makerworld.bblmw.com/m/clip.stl?key=3", {
+      out: dir,
+      fetcher,
+    });
+    expect(report.files.map((f) => f.name)).toEqual(["clip.stl"]);
+    await expect(
+      fetchModel("https://makerworld.bblmw.com/m/expired.stl", { out: dir, force: true, fetcher }),
+    ).rejects.toThrow("HTML");
+    await expect(
+      fetchModel("https://makerworld.com/en/models/42-clip", { out: dir, fetcher }),
+    ).rejects.toThrow("Download button");
+  });
+});
 describe("Printables fetching", () => {
   it("downloads supported files, skips others, and protects existing files", async () => {
     const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
@@ -423,7 +566,7 @@ describe("Printables fetching", () => {
     }
   });
   it("rejects MakerWorld and untrusted URLs", () => {
-    expect(() => printablesId("https://makerworld.com/en/models/1")).toThrow("needs a login");
+    expect(() => printablesId("https://makerworld.com/en/models/1")).toThrow("need a login");
     expect(() => printablesId("https://printables.com.evil.example/model/1")).toThrow("Expected");
     expect(printablesId("42")).toBe("42");
   });

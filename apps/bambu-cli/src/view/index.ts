@@ -3,7 +3,7 @@
 // GLB, fills the viewer template, writes review.html beside the Model, and
 // publishes it privately on wovn.
 
-import { existsSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, resolve } from "node:path";
 import { Command } from "commander";
 import { z } from "zod";
@@ -26,8 +26,11 @@ import {
   nearestFilaments,
   NoColourError,
   paintModel,
+  parseHex,
+  readProject,
   srgbToLinear,
 } from "../paint/index.ts";
+
 import { buildGlb, type PreviewMesh } from "./glb.ts";
 import { renderReviewPage, type Review } from "./page.ts";
 import { publish, slug } from "./publish.ts";
@@ -136,14 +139,14 @@ function centred(mesh: PreviewMesh): PreviewMesh {
 // A textured or vertex-coloured Model (GLB, glTF, OBJ) is previewed as it
 // would print: each triangle in its Palette colour, with the Palette listed.
 // Anything else, or a Model without colour, previews in the filament colour.
-// `scale` maps the paint loader's coordinates onto the analysed mesh: glTF
-// comes back x1000 (metres to mm) while OBJ keeps the file's numbers, and the
+// `factor` is the analysis's scale on the file's own numbers; the paint
+// loader's coordinates are divided by its unit scale first, since the
 // analysis follows the unit decision rather than glTF's metre convention.
 // The coordinates are also turned back to the file's own axes when the loader
 // made them Z-up: analysis and the page both show a raw glTF as it is.
 async function paintedPreview(
   file: string,
-  scale: number,
+  factor: number,
   maxColors: number,
   notes: string[],
 ): Promise<{ mesh: PreviewMesh; palette: NonNullable<Review["palette"]> } | undefined> {
@@ -168,7 +171,8 @@ async function paintedPreview(
     if (!(error instanceof ColorsLostError)) throw error;
     painted = paintModel(coloured, { colors: error.kept });
   }
-  const { vertices, faces, labels, palette, areaShare } = painted;
+  const { vertices, faces, labels, palette, areaShare } = painted,
+    scale = factor / coloured.unitScale;
   const positions = new Float32Array(faces.length * 9),
     colors = new Float32Array(faces.length * 9);
   faces.forEach((face, f) => {
@@ -193,6 +197,66 @@ async function paintedPreview(
       areaPct: (areaShare[i] ?? 0) * 100,
     })),
   };
+}
+
+// A painted 3MF from `bambu paint` previews each triangle in its filament's
+// colour from the project settings, with the filaments used as the Palette.
+// Any other 3MF, or one the project reader cannot follow, previews plainly.
+function paintedProjectPreview(
+  file: string,
+  factor: number,
+): { mesh: PreviewMesh; palette: NonNullable<Review["palette"]> } | undefined {
+  let project: ReturnType<typeof readProject>;
+  try {
+    project = readProject(readFileSync(file));
+  } catch {
+    return undefined;
+  }
+  const hexes = z
+      .array(z.string().regex(/^#[0-9a-f]{6}$/i))
+      .safeParse(project.settings.filament_colour),
+    names = z.array(z.string()).safeParse(project.settings.filament_settings_id);
+  if (!hexes.success || !hexes.data.length || !project.filaments.some((f) => f > 0))
+    return undefined;
+  const { vertices, faces, filaments } = project;
+  const positions = new Float32Array(faces.length * 9),
+    colors = new Float32Array(faces.length * 9),
+    area = new Map<number, number>();
+  faces.forEach((face, f) => {
+    // Unpainted triangles print in the first filament, as the object's extruder.
+    const filament = Math.min(Math.max(filaments[f]!, 1), hexes.data.length),
+      rgb = parseHex(hexes.data[filament - 1]!).map(srgbToLinear);
+    const [a, b, c] = face.map((v) => vertices[v]!.map((n) => n * factor)) as [Vec3, Vec3, Vec3];
+    area.set(filament, (area.get(filament) ?? 0) + triangleArea(a, b, c));
+    [a, b, c].forEach((p, corner) => {
+      positions.set(p, f * 9 + corner * 3);
+      colors.set(rgb, f * 9 + corner * 3);
+    });
+  });
+  const total = [...area.values()].reduce((s, v) => s + v, 0) || 1;
+  return {
+    mesh: { positions, colors },
+    palette: [...area.keys()]
+      .sort((a, b) => a - b)
+      .map((filament) => ({
+        hex: hexes.data[filament - 1]!,
+        name: names.success ? (names.data[filament - 1] ?? "").replace(/ @.*$/, "") : "",
+        slot: "",
+        areaPct: ((area.get(filament) ?? 0) / total) * 100,
+      })),
+  };
+}
+type Vec3 = [number, number, number];
+function triangleArea(a: Vec3, b: Vec3, c: Vec3): number {
+  const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
+    v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+  return (
+    Math.hypot(
+      u[1]! * v[2]! - u[2]! * v[1]!,
+      u[2]! * v[0]! - u[0]! * v[2]!,
+      u[0]! * v[1]! - u[1]! * v[0]!,
+    ) / 2
+  );
 }
 
 const viewOptions = z.object({
@@ -246,7 +310,7 @@ async function view(model: string, options: ViewOptions, config: Config): Promis
   // The same unit decision analyze makes, so the report describes the
   // Model at its printed size; --height overrides it the way analyze and
   // paint do, so a generated GLB is reviewed at the size it will print.
-  const loaded = load(file),
+  const loaded = await load(file),
     extents = bounds(loaded).extents;
   const units = decideUnits(Math.max(...extents), { declared: loaded.unit });
   let factor = units.scale;
@@ -269,12 +333,10 @@ async function view(model: string, options: ViewOptions, config: Config): Promis
     plate: [px, py, pz],
   });
   const noted = notes.length;
-  const painted = await paintedPreview(
-    file,
-    extname(file).toLowerCase() === ".obj" ? factor : factor / 1000,
-    options.maxColors,
-    notes,
-  );
+  const painted =
+    extname(file).toLowerCase() === ".3mf"
+      ? paintedProjectPreview(file, factor)
+      : await paintedPreview(file, factor, options.maxColors, notes);
   for (const note of notes.slice(noted)) console.error(note);
   if (painted) review.palette = painted.palette;
   const glb = await buildGlb(

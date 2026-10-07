@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vite-plus/test";
 import { strToU8, zipSync } from "fflate";
 import { bounds, signedVolume } from "./geometry.ts";
-import { derivedPath, load, loadGLTF, loadOBJ, loadSTL, save } from "./load.ts";
+import { derivedPath, load, loadOBJ, loadSTL, readGltf, save } from "./load.ts";
 import { box } from "./test-shapes.ts";
 import { memoryIO } from "./test-io.ts";
 describe("Model file formats", () => {
-  it.each(["stl", "obj", "glb", "3mf"])("round-trips geometry as %s", (format) => {
+  it.each(["stl", "obj", "glb", "3mf"])("round-trips geometry as %s", async (format) => {
     const { io } = memoryIO(),
       path = `/cube.${format}`;
     save(path, box(10, 20, 30), io);
-    const model = load(path, io);
+    const model = await load(path, io);
     expect(bounds(model).extents).toEqual([10, 20, 30]);
     expect(signedVolume(model)).toBeCloseTo(6000);
     expect(model.source.format).toBe(format);
@@ -25,7 +25,7 @@ describe("Model file formats", () => {
     expect(mesh.indices.length).toBe(6);
     expect(bounds(mesh).extents).toEqual([10, 10, 0]);
   });
-  it("merges nested 3MF components and build instances with transforms", () => {
+  it("merges nested 3MF components and build instances with transforms", async () => {
     const { io, files } = memoryIO();
     files.set(
       "/instances.3mf",
@@ -35,12 +35,12 @@ describe("Model file formats", () => {
         ),
       }),
     );
-    const mesh = load("/instances.3mf", io);
+    const mesh = await load("/instances.3mf", io);
     expect(mesh.unit).toBe("inch");
     expect(mesh.indices.length).toBe(6);
     expect(bounds(mesh).extents).toEqual([7, 5, 0]);
   });
-  it("follows production-extension p:path references to object files", () => {
+  it("follows production-extension p:path references to object files", async () => {
     const { io, files } = memoryIO();
     files.set(
       "/project.3mf",
@@ -53,20 +53,25 @@ describe("Model file formats", () => {
         ),
       }),
     );
-    const mesh = load("/project.3mf", io);
+    const mesh = await load("/project.3mf", io);
     expect(mesh.indices.length).toBe(3);
     expect(bounds(mesh).min).toEqual([128, 128, 0]);
     expect(bounds(mesh).extents).toEqual([2, 3, 0]);
   });
-  it("rejects compressed glTF instead of reading empty geometry", () => {
-    expect(() =>
-      loadGLTF(
-        { asset: { version: "2.0" }, extensionsRequired: ["KHR_draco_mesh_compression"] },
-        [],
+  it("rejects compressed glTF instead of reading empty geometry", async () => {
+    const { io, files } = memoryIO();
+    files.set(
+      "/packed.gltf",
+      strToU8(
+        JSON.stringify({
+          asset: { version: "2.0" },
+          extensionsRequired: ["KHR_draco_mesh_compression"],
+        }),
       ),
-    ).toThrow(/KHR_draco_mesh_compression/);
+    );
+    await expect(load("/packed.gltf", io)).rejects.toThrow(/KHR_draco_mesh_compression/);
   });
-  it("rejects cyclic components and corrupt or empty Models", () => {
+  it("rejects cyclic components and corrupt or empty Models", async () => {
     const { io, files } = memoryIO();
     files.set(
       "/cycle.3mf",
@@ -76,12 +81,12 @@ describe("Model file formats", () => {
         ),
       }),
     );
-    expect(() => load("/cycle.3mf", io)).toThrow("cyclic");
+    await expect(load("/cycle.3mf", io)).rejects.toThrow("cyclic");
     files.set("/bad.stl", strToU8("not a mesh"));
-    expect(() => load("/bad.stl", io)).toThrow();
+    await expect(load("/bad.stl", io)).rejects.toThrow();
     expect(() => loadOBJ("v 0 0 0")).toThrow();
   });
-  it("applies glTF node hierarchy, quaternion, scale and interleaved accessors", () => {
+  it("applies glTF node hierarchy, quaternion, scale and interleaved accessors", async () => {
     const { io, files } = memoryIO(),
       bytes = new Uint8Array(48),
       view = new DataView(bytes.buffer);
@@ -105,32 +110,99 @@ describe("Model file formats", () => {
     };
     files.set("/model.gltf", strToU8(JSON.stringify(doc)));
     files.set("/mesh.bin", bytes);
-    const model = load("/model.gltf", io);
+    const model = await load("/model.gltf", io);
     expect(model.indices.length).toBe(6);
     expect(bounds(model).min).toEqual([8, 5, 0]);
     expect(bounds(model).max).toEqual([10, 7, 0]);
     doc.buffers[0]!.uri =
       "data:application/octet-stream;base64," + Buffer.from(bytes).toString("base64");
     files.set("/model.gltf", strToU8(JSON.stringify(doc)));
-    expect(bounds(load("/model.gltf", io)).extents).toEqual([2, 2, 0]);
+    expect(bounds(await load("/model.gltf", io)).extents).toEqual([2, 2, 0]);
     // Points and lines beside the surface are ignored, not an error.
     doc.meshes[0]!.primitives.push({ attributes: { POSITION: 0 }, mode: 1 } as never);
     files.set("/model.gltf", strToU8(JSON.stringify(doc)));
-    expect(load("/model.gltf", io).indices.length).toBe(6);
+    expect((await load("/model.gltf", io)).indices.length).toBe(6);
   });
   it("chains derived names and falls back to STL for other extensions", () => {
     expect(derivedPath("/a/cup_scaled.glb", "_oriented")).toBe("/a/cup_scaled_oriented.glb");
     expect(derivedPath("/a/part.ply", "_scaled")).toBe("/a/part_scaled.stl");
   });
 });
+describe("glTF declarations", () => {
+  it("reads quantized positions, refuses oversized accessors up front, and honours an empty scene", async () => {
+    const { io, files } = memoryIO(),
+      bytes = new Uint8Array(24),
+      view = new DataView(bytes.buffer);
+    // Three SHORT vertices, normalized: (0,0,0), (1,0,0), (0,1,0) in [-1, 1].
+    [0, 0, 0, 0, 32767, 0, 0, 0, 0, 32767, 0, 0].forEach((v, i) => view.setInt16(i * 2, v, true));
+    const uri = "data:application/octet-stream;base64," + Buffer.from(bytes).toString("base64");
+    const doc = {
+      asset: { version: "2.0" },
+      extensionsRequired: ["KHR_mesh_quantization"],
+      extensionsUsed: ["KHR_mesh_quantization"],
+      buffers: [{ byteLength: 24, uri }],
+      bufferViews: [{ buffer: 0, byteLength: 24, byteStride: 8 }],
+      accessors: [{ bufferView: 0, componentType: 5122, normalized: true, type: "VEC3", count: 3 }],
+      meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }],
+      nodes: [{ mesh: 0 }],
+      scenes: [{ nodes: [0] }],
+    };
+    files.set("/q.gltf", strToU8(JSON.stringify(doc)));
+    expect(bounds(await load("/q.gltf", io)).extents.map((n) => Math.round(n))).toEqual([1, 1, 0]);
+    files.set(
+      "/big.gltf",
+      strToU8(
+        JSON.stringify({
+          ...doc,
+          // Each alone is 120 MB; together they would be 1.2 GB of zero-filled arrays.
+          accessors: Array.from({ length: 10 }, () => ({ ...doc.accessors[0], count: 20_000_000 })),
+        }),
+      ),
+    );
+    await expect(load("/big.gltf", io)).rejects.toThrow("the limit is");
+    files.set(
+      "/negative.gltf",
+      strToU8(
+        JSON.stringify({
+          ...doc,
+          accessors: [
+            { ...doc.accessors[0], count: 20_000_000 },
+            { ...doc.accessors[0], count: -20_000_000 },
+          ],
+        }),
+      ),
+    );
+    await expect(load("/negative.gltf", io)).rejects.toThrow("invalid count");
+    // Few bytes declared, but far too many elements to decode into arrays.
+    files.set(
+      "/bytes.gltf",
+      strToU8(
+        JSON.stringify({
+          ...doc,
+          accessors: [{ bufferView: 0, componentType: 5121, type: "SCALAR", count: 250_000_000 }],
+        }),
+      ),
+    );
+    await expect(load("/bytes.gltf", io)).rejects.toThrow("elements; the limit is");
+    files.set("/empty.gltf", strToU8(JSON.stringify({ ...doc, scenes: [{ nodes: [] }] })));
+    await expect(load("/empty.gltf", io)).rejects.toThrow("no triangles");
+  });
+});
 describe("sparse glTF accessors", () => {
-  it("patches sparse POSITION values without a base buffer view", () => {
+  it("patches sparse POSITION values without a base buffer view", async () => {
     const bytes = new Uint8Array(28),
       view = new DataView(bytes.buffer);
     bytes.set([1, 2]);
     [1, 0, 0, 0, 1, 0].forEach((v, i) => view.setFloat32(4 + i * 4, v, true));
+    const { io, files } = memoryIO();
     const doc = {
-      buffers: [{ byteLength: 28 }],
+      asset: { version: "2.0" },
+      buffers: [
+        {
+          byteLength: 28,
+          uri: "data:application/octet-stream;base64," + Buffer.from(bytes).toString("base64"),
+        },
+      ],
       bufferViews: [
         { buffer: 0, byteOffset: 0, byteLength: 2 },
         { buffer: 0, byteOffset: 4, byteLength: 24 },
@@ -149,6 +221,41 @@ describe("sparse glTF accessors", () => {
       ],
       meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }],
     };
-    expect(bounds(loadGLTF(doc, [bytes])).extents).toEqual([1, 1, 0]);
+    files.set("/sparse.gltf", strToU8(JSON.stringify(doc)));
+    expect(bounds(await load("/sparse.gltf", io)).extents).toEqual([1, 1, 0]);
   });
+});
+it("reads geometry without the images a glTF names, which only colour reads want", async () => {
+  const { io, files } = memoryIO(),
+    positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+  const doc = {
+    asset: { version: "2.0" },
+    buffers: [
+      {
+        byteLength: 36,
+        uri: `data:application/octet-stream;base64,${Buffer.from(positions.buffer).toString("base64")}`,
+      },
+    ],
+    bufferViews: [{ buffer: 0, byteLength: 36 }],
+    accessors: [
+      {
+        bufferView: 0,
+        componentType: 5126,
+        count: 3,
+        type: "VEC3",
+        min: [0, 0, 0],
+        max: [1, 1, 0],
+      },
+    ],
+    images: [{ uri: "missing.png" }],
+    textures: [{ source: 0 }],
+    materials: [{ pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 }, material: 0 }] }],
+    nodes: [{ mesh: 0 }],
+    scenes: [{ nodes: [0] }],
+    scene: 0,
+  };
+  files.set("/textured.gltf", strToU8(JSON.stringify(doc)));
+  expect((await load("/textured.gltf", io)).indices.length).toBe(3);
+  await expect(readGltf("/textured.gltf", (p) => io.read(p), { images: true })).rejects.toThrow();
 });

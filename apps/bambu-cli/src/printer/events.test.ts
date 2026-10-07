@@ -15,6 +15,25 @@ const status = (fields: Record<string, unknown> = {}) =>
     ...fields,
   });
 const kinds = (events: ReturnType<typeof evaluate>) => events.map((e) => e.kind);
+describe("progress milestones", () => {
+  it("announces each quarter once, skipping those already behind a print joined midway", () => {
+    const state = freshState();
+    expect(kinds(evaluate(status({ mc_percent: 10 }), state, 0, limits))).toEqual(["started"]);
+    expect(evaluate(status({ mc_percent: 30 }), state, 60, limits).map((e) => e.title)).toEqual([
+      "25% printed",
+    ]);
+    expect(evaluate(status({ mc_percent: 31 }), state, 120, limits)).toEqual([]);
+    expect(evaluate(status({ mc_percent: 80 }), state, 180, limits).map((e) => e.title)).toEqual([
+      "50% printed",
+      "75% printed",
+    ]);
+    const late = freshState();
+    expect(kinds(evaluate(status({ mc_percent: 60 }), late, 0, limits))).toEqual(["started"]);
+    expect(evaluate(status({ mc_percent: 80 }), late, 60, limits).map((e) => e.title)).toEqual([
+      "75% printed",
+    ]);
+  });
+});
 describe("upstream monitor events", () => {
   it("ignores idle and unknown, starts once and finishes with reset", () => {
     const state = freshState();

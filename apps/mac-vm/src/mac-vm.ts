@@ -4,15 +4,33 @@
 //
 // The VM is off by default: `up` boots it headless, `down` shuts it off. Run
 // commands and copy files with `tart exec` (the Cirrus images ship its guest
-// agent). SSH is only used for `--forward`, which reverse-tunnels host
-// loopback ports into the guest so apps there can reach host-only services.
+// agent). The guest's screen and input go through Tart's VNC server
+// (`shot`, `click`, `type`, `key`), so no agent runs inside the guest. Those
+// commands talk to a screen daemon (started on demand, one per VM) that holds
+// the single VNC connection for the VM's lifetime: Tart's server asserts when
+// a client connects after the screen changed since the last one left, so the
+// connection is never dropped while the VM runs. SSH is only used for
+// `--forward`, which reverse-tunnels host loopback ports into the guest so
+// apps there can reach host-only services.
 
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { connect, createServer } from "node:net";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { Command, Option } from "commander";
+import { charKeysym, KEYSYMS, needsShift, Rfb } from "./rfb.ts";
 
 const STATE_DIR = join(homedir(), ".local", "state", "mac-vm");
 // Every guest built by `init` from the Cirrus images logs in as this user.
@@ -104,11 +122,25 @@ async function withVm<T>(vm: string, work: (started: boolean) => Promise<T>): Pr
   }
 }
 
+// Tart prints the VNC address, password included, into the boot log, which
+// is recreated per boot and readable by this user alone. The address of the
+// live boot is copied to its own file, which `down` removes, so a VM started
+// by hand with `tart run` is not mistaken for one with a VNC server.
+function logFile(vm: string) {
+  return join(STATE_DIR, `${vm}.log`);
+}
+function vncFile(vm: string) {
+  return join(STATE_DIR, `${vm}.vnc`);
+}
 async function boot(vm: string, start: boolean) {
   if (start) {
-    mkdirSync(STATE_DIR, { recursive: true });
-    const log = openSync(join(STATE_DIR, `${vm}.log`), "a");
-    spawn("tart", ["run", "--no-graphics", vm], {
+    // The state holds the VNC password and the daemon socket: this user only.
+    mkdirSync(STATE_DIR, { recursive: true, mode: 0o700 });
+    chmodSync(STATE_DIR, 0o700);
+    rmSync(logFile(vm), { force: true });
+    rmSync(vncFile(vm), { force: true });
+    const log = openSync(logFile(vm), "w", 0o600);
+    spawn("tart", ["run", "--no-graphics", "--vnc-experimental", vm], {
       detached: true,
       stdio: ["ignore", log, log],
     }).unref();
@@ -118,6 +150,11 @@ async function boot(vm: string, start: boolean) {
     tart(["exec", vm, "sh", "-c", '[ "$(stat -f %Su /dev/console)" != root ]']).status === 0;
   if (!(await waitFor(BOOT_TIMEOUT_S, loggedIn)))
     fail(`timed out after ${BOOT_TIMEOUT_S}s waiting for the guest desktop login`);
+  if (start) {
+    const url = readFileSync(logFile(vm), "utf8").match(/vnc:\/\/\S+/)?.[0];
+    if (!url) fail(`tart printed no VNC address (see ${logFile(vm)})`);
+    writeFileSync(vncFile(vm), url, { mode: 0o600 });
+  }
 }
 
 function up(vm: string, forwards: number[]) {
@@ -167,6 +204,8 @@ async function forward(vm: string, forwards: number[]) {
 // the guest agent is unreachable or the shutdown hangs.
 async function down(vm: string, timeout: number) {
   if (isRunning(vm)) {
+    // A daemon stuck on the VM must not hold up the shutdown; it dies with the VM.
+    await Promise.race([ask(vm, { cmd: "quit" }).catch(() => {}), sleep(3000)]);
     const address = tart(["ip", vm]).stdout.trim();
     for (const t of address ? tunnels(address) : []) {
       try {
@@ -184,6 +223,7 @@ async function down(vm: string, timeout: number) {
       if (result.status !== 0) fail(`tart stop failed: ${result.stderr.trim()}`);
     }
   }
+  rmSync(vncFile(vm), { force: true });
   console.log(`${vm} down`);
 }
 
@@ -195,12 +235,256 @@ function status(vm: string, json: boolean) {
     running,
     ip: address,
     guestAgent: running && tart(["exec", vm, "true"]).status === 0,
+    vnc: running ? (vncUrl(vm)?.port ?? null) : null,
     tunnels: address ? tunnels(address) : [],
   };
   if (json) return console.log(JSON.stringify(report, null, 2));
   console.log(`${vm}: ${running ? `running at ${report.ip ?? "?"}` : "stopped"}`);
   if (running) console.log(`guest agent: ${report.guestAgent ? "ready" : "not ready"}`);
+  if (running)
+    console.log(
+      `vnc: ${report.vnc ? `port ${report.vnc}` : "not available (booted outside mac-vm?)"}`,
+    );
   for (const t of report.tunnels) console.log(`tunnel ${t.port}: up`);
+}
+
+// The VNC address of the VM that up booted, which down removes. A VM booted
+// by hand has none.
+function vncUrl(vm: string): URL | undefined {
+  try {
+    return new URL(readFileSync(vncFile(vm), "utf8").trim());
+  } catch {
+    return undefined;
+  }
+}
+
+// One request to the screen daemon, which is started if it is not listening.
+type ScreenRequest =
+  | { cmd: "shot" }
+  | { cmd: "click"; x: number; y: number; double: boolean; right: boolean }
+  | { cmd: "type"; text: string }
+  | { cmd: "key"; keysyms: number[] }
+  | { cmd: "quit" };
+type ScreenReply =
+  | { ok: true; width: number; height: number; png?: string }
+  | { ok: false; error: string };
+// Opening the VNC connection is bounded at 10 s; the rest is process start.
+const DAEMON_START_MS = 15_000;
+function socketFile(vm: string) {
+  return join(STATE_DIR, `${vm}.sock`);
+}
+function ask(vm: string, request: ScreenRequest): Promise<ScreenReply> {
+  return new Promise((resolve, reject) => {
+    const socket = connect(socketFile(vm));
+    let data = "";
+    socket.on("error", reject);
+    socket.on("data", (chunk) => {
+      data += chunk;
+      if (data.endsWith("\n")) {
+        socket.destroy();
+        resolve(JSON.parse(data) as ScreenReply);
+      }
+    });
+    socket.on("close", () => reject(new Error("the screen daemon closed the connection")));
+    socket.write(`${JSON.stringify(request)}\n`);
+  });
+}
+async function screen(vm: string, request: Exclude<ScreenRequest, { cmd: "quit" }>) {
+  if (!isRunning(vm)) fail(`${vm} is not running; run \`mac-vm up\` first`);
+  if (!vncUrl(vm))
+    fail(
+      `${vm} has no VNC address; it was booted outside mac-vm, so run \`mac-vm down\` then \`mac-vm up\``,
+    );
+  let reply: ScreenReply | undefined;
+  try {
+    reply = await ask(vm, request);
+  } catch {
+    // Not listening: start the daemon, or wait for whoever is starting it. The
+    // lock is taken atomically so two commands arriving together cannot each
+    // open a VNC connection, which Tart's server does not survive, and is held
+    // only until the daemon listens; the daemon then owns the connection.
+    const lock = `${socketFile(vm)}.lock`,
+      screenLog = join(STATE_DIR, `${vm}.screen.log`);
+    // A lock left by a starter that died is ignored once it is older than any start could take.
+    try {
+      if (Date.now() - statSync(lock).mtimeMs > 2 * DAEMON_START_MS) rmSync(lock, { force: true });
+    } catch {
+      // No lock.
+    }
+    let starter = false;
+    try {
+      try {
+        closeSync(openSync(lock, "wx"));
+        starter = true;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      }
+      if (starter) {
+        rmSync(socketFile(vm), { force: true });
+        const log = openSync(screenLog, "a", 0o600);
+        spawn(process.execPath, [process.argv[1]!, "screen-daemon", "--vm", vm], {
+          detached: true,
+          stdio: ["ignore", log, log],
+        }).unref();
+      }
+      // The socket appears once the daemon has its VNC connection and listens.
+      const deadline = Date.now() + DAEMON_START_MS;
+      while (!existsSync(socketFile(vm))) {
+        if (Date.now() > deadline) fail(`the screen daemon did not start (see ${screenLog})`);
+        await sleep(200);
+      }
+    } finally {
+      if (starter) rmSync(lock, { force: true });
+    }
+    reply = await ask(vm, request);
+  }
+  if (!reply.ok) fail(reply.error);
+  return reply;
+}
+
+// A request the VM's screen does not answer in time means the connection is
+// no longer usable: the daemon reports the stall and exits, so the next
+// command starts a fresh one. Typing is paced per character, so it gets longer.
+const REQUEST_TIMEOUT_MS = 30_000;
+class ScreenStall extends Error {}
+function within<T>(ms: number, work: Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new ScreenStall(`the VM screen did not answer within ${ms / 1000} s`)),
+      ms,
+    );
+    work.then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
+
+// Holds the VM's one VNC connection and answers requests over a unix socket,
+// one at a time, until the VM goes away, `down` sends quit, or a request stalls.
+async function screenDaemon(vm: string) {
+  const url = vncUrl(vm);
+  if (!url) fail(`${vm} has no VNC address`);
+  const rfb = await Rfb.open(url);
+  const file = socketFile(vm);
+  const stop = () => {
+    rfb.close();
+    server.close();
+    rmSync(file, { force: true });
+    process.exit(0);
+  };
+  rfb.onClose(stop);
+  let queue = Promise.resolve();
+  const server = createServer((connection) => {
+    let data = "";
+    connection.on("data", (chunk) => {
+      data += chunk;
+      if (!data.endsWith("\n")) return;
+      const request = JSON.parse(data) as ScreenRequest;
+      data = "";
+      queue = queue.then(async () => {
+        let reply: ScreenReply,
+          finished = request.cmd === "quit";
+        const budget = REQUEST_TIMEOUT_MS + (request.cmd === "type" ? request.text.length * 15 : 0);
+        try {
+          reply = { ok: true, ...(await within(budget, perform(rfb, request))) };
+        } catch (error) {
+          reply = { ok: false, error: (error as Error).message };
+          finished ||= error instanceof ScreenStall;
+        }
+        // The reply is flushed before the process goes.
+        connection.end(`${JSON.stringify(reply)}\n`, () => {
+          if (finished) stop();
+        });
+      });
+    });
+    connection.on("error", () => {});
+  });
+  rmSync(file, { force: true });
+  // Anyone who can connect drives the always-unlocked guest: the socket is this user's only.
+  process.umask(0o077);
+  server.listen(file);
+  process.on("SIGTERM", stop);
+}
+
+async function perform(
+  rfb: Rfb,
+  request: ScreenRequest,
+): Promise<{ png?: string; width: number; height: number }> {
+  switch (request.cmd) {
+    case "shot": {
+      const png = (await rfb.screenshot()).toString("base64");
+      return { png, width: rfb.width, height: rfb.height };
+    }
+    case "click": {
+      // The screen only shows its size after the first update, so a click takes
+      // a frame first; that also lets the pointer land after the desktop settled.
+      await rfb.screenshot();
+      if (request.x >= rfb.width || request.y >= rfb.height)
+        throw new Error(
+          `(${request.x}, ${request.y}) is outside the ${rfb.width}x${rfb.height} screen`,
+        );
+      const button = request.right ? 4 : 1;
+      rfb.move(request.x, request.y, 0);
+      for (let n = request.double ? 2 : 1; n > 0; n--) {
+        rfb.move(request.x, request.y, button);
+        await sleep(60);
+        rfb.move(request.x, request.y, 0);
+        await sleep(60);
+      }
+      break;
+    }
+    case "type":
+      for (const char of request.text) {
+        const keysym = charKeysym(char),
+          shift = needsShift(char);
+        if (shift) rfb.key(KEYSYMS.shift!, true);
+        rfb.key(keysym, true);
+        rfb.key(keysym, false);
+        if (shift) rfb.key(KEYSYMS.shift!, false);
+        await sleep(15);
+      }
+      break;
+    case "key":
+      for (const keysym of request.keysyms) rfb.key(keysym, true);
+      await sleep(30);
+      for (const keysym of request.keysyms.toReversed()) rfb.key(keysym, false);
+      break;
+    case "quit":
+      break;
+  }
+  return { width: rfb.width, height: rfb.height };
+}
+
+async function shot(vm: string, file: string) {
+  const reply = await screen(vm, { cmd: "shot" });
+  writeFileSync(file, Buffer.from(reply.png!, "base64"));
+  console.log(`${file} (${reply.width}x${reply.height})`);
+}
+
+async function click(
+  vm: string,
+  x: number,
+  y: number,
+  { double, right }: { double: boolean; right: boolean },
+) {
+  await screen(vm, { cmd: "click", x, y, double, right });
+  console.log(`${double ? "double-" : right ? "right-" : ""}clicked (${x}, ${y})`);
+}
+
+async function type(vm: string, text: string) {
+  await screen(vm, { cmd: "type", text });
+  console.log(`typed ${text.length} characters`);
+}
+
+// `cmd+shift+a`: modifiers held in order, the last key pressed, all released.
+async function key(vm: string, combo: string) {
+  const names = combo.toLowerCase().split("+").filter(Boolean);
+  const keysyms = names.map((name) => {
+    const known = KEYSYMS[name] ?? ([...name].length === 1 ? charKeysym(name) : undefined);
+    if (known === undefined) fail(`unknown key "${name}" in ${combo}`);
+    return known;
+  });
+  if (!keysyms.length) fail("no key given");
+  await screen(vm, { cmd: "key", keysyms });
+  console.log(`pressed ${combo}`);
 }
 
 // One-time setup: clone the image, size it, and authorize this host's SSH key
@@ -255,12 +539,15 @@ function authorizeKey(vm: string) {
   if (install.status !== 0) fail(`authorizing SSH key failed: ${install.stderr.trim()}`);
 }
 
-// VM names become log file names, so keep them to one plain path segment.
+// VM names become state file names, so keep them to one plain path segment
+// short enough for the daemon socket, whose path macOS caps near 104 bytes.
 const vmOption = new Option("--vm <name>", "VM name")
   .env("MAC_VM")
   .default("agent-vm")
   .argParser((name: string) => {
     if (!/^[\w][\w.-]*$/.test(name)) fail(`invalid VM name: ${name}`);
+    if (Buffer.byteLength(socketFile(name)) > 100)
+      fail(`VM name too long: the socket path ${socketFile(name)} is over 100 bytes`);
     return name;
   });
 const program = new Command("mac-vm").description(
@@ -311,9 +598,52 @@ program
   )
   .action((o: { vm: string; timeout: number }) => down(o.vm, o.timeout));
 
+const pixel = (name: string) => (v: string) => {
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 0) fail(`invalid ${name}: ${v}`);
+  return n;
+};
+program
+  .command("shot")
+  .description("save the guest screen as a PNG; coordinates for click are its pixels")
+  .argument("[file]", "output PNG", "/tmp/mac-vm.png")
+  .addOption(vmOption)
+  .action((file: string, o: { vm: string }) => shot(o.vm, file));
+
+program
+  .command("click")
+  .description("click at a point on the guest screen")
+  .argument("<x>", "pixels from the left", pixel("x"))
+  .argument("<y>", "pixels from the top", pixel("y"))
+  .addOption(vmOption)
+  .option("--double", "double-click")
+  .option("--right", "right-click")
+  .action((x: number, y: number, o: { vm: string; double?: boolean; right?: boolean }) =>
+    click(o.vm, x, y, { double: o.double ?? false, right: o.right ?? false }),
+  );
+
+program
+  .command("type")
+  .description("type text into the guest")
+  .argument("<text>")
+  .addOption(vmOption)
+  .action((text: string, o: { vm: string }) => type(o.vm, text));
+
+program
+  .command("key")
+  .description("press a key or combination, e.g. enter, cmd+a, cmd+shift+4")
+  .argument("<combo>")
+  .addOption(vmOption)
+  .action((combo: string, o: { vm: string }) => key(o.vm, combo));
+
+program
+  .command("screen-daemon", { hidden: true })
+  .addOption(vmOption)
+  .action((o: { vm: string }) => screenDaemon(o.vm));
+
 program
   .command("status")
-  .description("running state, IP, guest agent, tunnels")
+  .description("running state, IP, guest agent, VNC, tunnels")
   .addOption(vmOption)
   .option("--json", "machine-readable output")
   .action((o: { vm: string; json?: boolean }) => status(o.vm, o.json ?? false));

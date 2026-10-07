@@ -35,7 +35,7 @@ export function humanSearch(report: Awaited<ReturnType<typeof search>>): string 
     return report.failed_sites.length === report.sites.length
       ? ""
       : `No models found for "${report.query}" on ${names}. Try fewer or different words, or English terms.`;
-  return `${report.results.length} models for "${report.query}" on ${names}, by ${report.sort}:\n\n${report.results.map((c, i) => formatResult(i + 1, c)).join("\n")}\n\n${next("Show Connor the Candidates page (or these options) and let him pick a number; `bambu fetch` downloads Printables picks, MakerWorld picks he downloads himself.")}`;
+  return `${report.results.length} models for "${report.query}" on ${names}, by ${report.sort}:\n\n${report.results.map((c, i) => formatResult(i + 1, c)).join("\n")}\n\n${next("Show Connor the Candidates page (or these options) and let him pick a number; `bambu fetch` downloads Printables picks and MakerWorld download links.")}`;
 }
 // Register Search and anonymous Printables fetching; no credentials are needed.
 export function register(
@@ -120,15 +120,19 @@ export function register(
     });
   program
     .command("fetch")
-    .description("download a Printables Model into a Print Job folder")
-    .argument("<url-or-id>")
+    .description(
+      "download a Printables Model, or a MakerWorld download link, into a Print Job folder",
+    )
+    .argument("<url-or-id>", "Printables model URL or id, or a signed makerworld.bblmw.com link")
     .option("--out <dir>")
+    .option("--page <url>", "the MakerWorld model page a link came from, for the credit")
     .option("--force", "overwrite existing files")
     .option("--json")
     .action(async (input: string, raw: unknown) => {
       const options = z
         .object({
           out: z.string().optional(),
+          page: z.string().optional(),
           force: z.boolean().optional(),
           json: z.boolean().optional(),
         })

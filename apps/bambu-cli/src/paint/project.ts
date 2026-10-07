@@ -1,4 +1,5 @@
-import { zipSync, unzipSync, strToU8, strFromU8 } from "fflate";
+import { zipSync, strToU8, strFromU8 } from "fflate";
+import { unzipWithin } from "../zip.ts";
 import { z } from "zod";
 import profiles from "./data/profiles.json" with { type: "json" };
 import template from "./data/project_settings.json" with { type: "json" };
@@ -140,9 +141,23 @@ export function buildProject(
   };
   return zipSync(Object.fromEntries(Object.entries(files).map(([k, v]) => [k, strToU8(v)])));
 }
+// The entries a painted project is read from, inflated to no more than a
+// Bambu project could need.
+const PROJECT_ENTRIES = [
+  "3D/Objects/object_1.model",
+  "3D/3dmodel.model",
+  "Metadata/project_settings.config",
+];
+const MAX_PROJECT_BYTES = 1024 * 1024 * 1024;
 export function readProject(data: Uint8Array) {
-  const files = unzipSync(data),
-    mesh = strFromU8(files["3D/Objects/object_1.model"]!),
+  const files = unzipWithin(data, {
+    keep: (name) => PROJECT_ENTRIES.includes(name),
+    limit: MAX_PROJECT_BYTES,
+    over: () => new RangeError(`the project files expand past ${MAX_PROJECT_BYTES / 2 ** 30} GB`),
+  });
+  for (const entry of PROJECT_ENTRIES)
+    if (!files[entry]) throw new RangeError(`not a painted Bambu project: no ${entry}`);
+  const mesh = strFromU8(files["3D/Objects/object_1.model"]!),
     root = strFromU8(files["3D/3dmodel.model"]!);
   const vertices = [...mesh.matchAll(/<vertex x="([^"]+)" y="([^"]+)" z="([^"]+)"/g)].map(
     (m) => [Number(m[1]), Number(m[2]), Number(m[3])] as Vec3,
