@@ -160,6 +160,19 @@ describe("glTF declarations", () => {
       ),
     );
     await expect(load("/big.gltf", io)).rejects.toThrow("the limit is");
+    files.set(
+      "/negative.gltf",
+      strToU8(
+        JSON.stringify({
+          ...doc,
+          accessors: [
+            { ...doc.accessors[0], count: 20_000_000 },
+            { ...doc.accessors[0], count: -20_000_000 },
+          ],
+        }),
+      ),
+    );
+    await expect(load("/negative.gltf", io)).rejects.toThrow("invalid count");
     files.set("/empty.gltf", strToU8(JSON.stringify({ ...doc, scenes: [{ nodes: [] }] })));
     await expect(load("/empty.gltf", io)).rejects.toThrow("no triangles");
   });

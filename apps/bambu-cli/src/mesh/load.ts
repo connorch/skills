@@ -294,7 +294,10 @@ export async function readGltf(
     throw new MeshLoadError(
       `${compressed} glTF is not supported; export the Model uncompressed (or as STL or 3MF)`,
     );
-  const declared = (jsonDoc.json.accessors ?? []).reduce(
+  const accessors = jsonDoc.json.accessors ?? [];
+  if (!accessors.every((a) => Number.isInteger(a.count) && a.count >= 0))
+    throw new MeshLoadError("glTF accessor has an invalid count");
+  const declared = accessors.reduce(
     (sum, a) =>
       sum + a.count * (COMPONENTS[a.type] ?? 16) * (COMPONENT_BYTES[a.componentType] ?? 4),
     0,

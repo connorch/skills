@@ -317,6 +317,14 @@ describe("MakerWorld download links", () => {
     "Model.stl": strToU8("solid a"),
     "model.stl": strToU8("solid b"),
   });
+  const nestedZip = zipSync({
+    "model.obj": strToU8("v 0 0 0\n"),
+    "textures/new/c.png": strToU8("png"),
+  });
+  const ancestryZip = zipSync({
+    "part.obj": strToU8("v 0 0 0\n"),
+    "part.obj/textures/c.png": strToU8("png"),
+  });
   const escapingZip = zipSync({
     "model.obj": strToU8("v 0 0 0\n"),
     "../victim.png": strToU8("png"),
@@ -330,9 +338,13 @@ describe("MakerWorld download links", () => {
           ? new Response(escapingZip)
           : String(input).endsWith("case.zip")
             ? new Response(caseZip)
-            : String(input).includes("expired")
-              ? new Response("<html>expired</html>")
-              : new Response("solid mesh"),
+            : String(input).endsWith("nested.zip")
+              ? new Response(nestedZip)
+              : String(input).endsWith("ancestry.zip")
+                ? new Response(ancestryZip)
+                : String(input).includes("expired")
+                  ? new Response("<html>expired</html>")
+                  : new Response("solid mesh"),
   );
   it("unpacks the Model files from a signed zip and credits the page", async () => {
     const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
@@ -380,6 +392,18 @@ describe("MakerWorld download links", () => {
       fetchModel("https://makerworld.bblmw.com/m/textured.zip", { out: dir, fetcher }),
     ).rejects.toThrow("leave the job folder");
     expect(await readdir(elsewhere)).toEqual([]);
+    // Nor made a folder through the link before refusing.
+    await expect(
+      fetchModel("https://makerworld.bblmw.com/m/nested.zip", { out: dir, fetcher }),
+    ).rejects.toThrow("leave the job folder");
+    expect(await readdir(elsewhere)).toEqual([]);
+  });
+  it("refuses a member that is also another member's folder", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
+    await expect(
+      fetchModel("https://makerworld.bblmw.com/m/ancestry.zip", { out: dir, fetcher }),
+    ).rejects.toThrow("both a file and a folder");
+    expect(await readdir(dir)).toEqual([]);
   });
   it("refuses members whose names differ only in case", async () => {
     const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));

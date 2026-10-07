@@ -80,9 +80,11 @@ async function printerReach(ip: string, net: Network): Promise<Finding> {
       level: "warn",
       text: `No answer from ${ip}; the printer may be off, or the address may be wrong`,
     };
+  // The router is probed on a port it may well not serve: anything but the
+  // kernel refusing to route to it means the LAN is there.
   const gateway = net.gateway(),
     router = gateway ? await net.reach(gateway, 80) : "unreachable";
-  return router === "open" || router === "refused"
+  return router !== "unreachable"
     ? {
         level: "warn",
         text: `${ip} is unreachable while the router at ${gateway} answers: either nothing is at that address (the printer is off, or its address changed), or the app running bambu lacks macOS Local Network permission. If the printer is on, enable that under System Settings > Privacy & Security > Local Network for the terminal or agent host, then restart it.`,

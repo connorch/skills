@@ -256,6 +256,16 @@ async function fetchMakerworld(
       folded.add(relative.toLowerCase());
       members.set(relative, data);
     }
+    // A member that is also a folder of another could not be written beside it.
+    const folders = new Set<string>();
+    for (const member of members.keys()) {
+      const parts = member.toLowerCase().split("/");
+      for (let depth = 1; depth < parts.length; depth++)
+        folders.add(parts.slice(0, depth).join("/"));
+    }
+    for (const member of members.keys())
+      if (folders.has(member.toLowerCase()))
+        throw new SiteError(`${name} holds ${member} as both a file and a folder`);
     if (![...members.keys()].some((n) => MODEL_EXTENSIONS.has(extname(n).toLowerCase())))
       throw new SiteError(
         `no STL, 3MF, OBJ, GLB, or PLY file in ${name}${skipped.length ? ` (skipped ${skipped.join(", ")})` : ""}`,
@@ -273,14 +283,15 @@ async function fetchMakerworld(
           const path = resolve(out, member),
             memberTmp = `${path}.tmp`;
           staged.push({ name: member, path, tmp: memberTmp, bytes: data.length });
-          await fs.mkdir(dirname(path), { recursive: true });
-          // By real path: a folder already here could be a link out of the job folder.
-          const inside = relative(
-            await fs.realpath(resolve(out)),
-            await fs.realpath(dirname(path)),
-          );
+          // Checked by real path before anything is created: a folder already
+          // here could be a link out of the job folder, and nothing may be
+          // made through it. The nearest existing ancestor is where a write lands.
+          let existing = dirname(path);
+          while (!existsSync(existing)) existing = dirname(existing);
+          const inside = relative(await fs.realpath(resolve(out)), await fs.realpath(existing));
           if (inside.startsWith("..") || isAbsolute(inside))
             throw new SiteError(`${member} would leave the job folder`);
+          await fs.mkdir(dirname(path), { recursive: true });
           await fs.writeFile(memberTmp, data);
           const format = extname(member).slice(1).toLowerCase();
           const problem = MODEL_EXTENSIONS.has(`.${format}`)

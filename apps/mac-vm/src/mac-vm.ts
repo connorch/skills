@@ -268,6 +268,8 @@ type ScreenRequest =
 type ScreenReply =
   | { ok: true; width: number; height: number; png?: string }
   | { ok: false; error: string };
+// Opening the VNC connection is bounded at 10 s; the rest is process start.
+const DAEMON_START_MS = 15_000;
 function socketFile(vm: string) {
   return join(STATE_DIR, `${vm}.sock`);
 }
@@ -299,12 +301,13 @@ async function screen(vm: string, request: Exclude<ScreenRequest, { cmd: "quit" 
   } catch {
     // Not listening: start the daemon, or wait for whoever is starting it. The
     // lock is taken atomically so two commands arriving together cannot each
-    // open a VNC connection, which Tart's server does not survive.
+    // open a VNC connection, which Tart's server does not survive, and is held
+    // only until the daemon listens; the daemon then owns the connection.
     const lock = `${socketFile(vm)}.lock`,
       screenLog = join(STATE_DIR, `${vm}.screen.log`);
     // A lock left by a starter that died is ignored once it is older than any start could take.
     try {
-      if (Date.now() - statSync(lock).mtimeMs > 15_000) rmSync(lock, { force: true });
+      if (Date.now() - statSync(lock).mtimeMs > 2 * DAEMON_START_MS) rmSync(lock, { force: true });
     } catch {
       // No lock.
     }
@@ -324,19 +327,16 @@ async function screen(vm: string, request: Exclude<ScreenRequest, { cmd: "quit" 
           stdio: ["ignore", log, log],
         }).unref();
       }
-      const deadline = Date.now() + 10_000;
-      while (!reply) {
+      // The socket appears once the daemon has its VNC connection and listens.
+      const deadline = Date.now() + DAEMON_START_MS;
+      while (!existsSync(socketFile(vm))) {
+        if (Date.now() > deadline) fail(`the screen daemon did not start (see ${screenLog})`);
         await sleep(200);
-        try {
-          reply = await ask(vm, request);
-        } catch (error) {
-          if (Date.now() > deadline)
-            fail(`the screen daemon did not start (see ${screenLog}): ${(error as Error).message}`);
-        }
       }
     } finally {
       if (starter) rmSync(lock, { force: true });
     }
+    reply = await ask(vm, request);
   }
   if (!reply.ok) fail(reply.error);
   return reply;

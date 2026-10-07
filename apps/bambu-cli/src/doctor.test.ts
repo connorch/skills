@@ -24,6 +24,10 @@ describe("doctor printer reach", () => {
     expect(finding.level).toBe("warn");
     expect(finding.text).toContain("Local Network");
     expect(finding.text).toContain("off");
+    // A router that serves nothing on the probed port is still a router.
+    expect((await printerFinding(network("unreachable", "silent"))).text).toContain(
+      "Local Network",
+    );
   });
   it("blames the network when the router is unreachable too", async () => {
     const finding = await printerFinding(network("unreachable", "unreachable"));
