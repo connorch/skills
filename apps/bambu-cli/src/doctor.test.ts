@@ -21,8 +21,9 @@ describe("doctor printer reach", () => {
   });
   it("names the Local Network permission when only the printer is unroutable", async () => {
     const finding = await printerFinding(network("unreachable", "refused"));
-    expect(finding.level).toBe("missing");
+    expect(finding.level).toBe("warn");
     expect(finding.text).toContain("Local Network");
+    expect(finding.text).toContain("off");
   });
   it("blames the network when the router is unreachable too", async () => {
     const finding = await printerFinding(network("unreachable", "unreachable"));

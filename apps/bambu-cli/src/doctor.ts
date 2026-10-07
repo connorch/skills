@@ -62,9 +62,11 @@ export const localNetwork: Network = {
   },
 };
 
-// A printer the kernel will not route to while the router answers is the
-// macOS Local Network permission: it is granted per app, and a terminal or
-// agent host without it gets EHOSTUNREACH for every LAN peer.
+// A printer the kernel will not route to while the router answers is either
+// nothing at that address (ARP got no answer: the printer is off or moved) or
+// the macOS Local Network permission, granted per app, without which a
+// terminal or agent host gets EHOSTUNREACH for every LAN peer. Only the
+// user can tell which, so both are named.
 async function printerReach(ip: string, net: Network): Promise<Finding> {
   const reach = await net.reach(ip, PRINTER_PORT);
   if (reach === "open") return { level: "ok", text: `Printer answers at ${ip}:${PRINTER_PORT}` };
@@ -82,8 +84,8 @@ async function printerReach(ip: string, net: Network): Promise<Finding> {
     router = gateway ? await net.reach(gateway, 80) : "unreachable";
   return router === "open" || router === "refused"
     ? {
-        level: "missing",
-        text: `${ip} is unreachable while the router at ${gateway} answers: the app running bambu lacks macOS Local Network permission. Enable it under System Settings > Privacy & Security > Local Network for the terminal or agent host, then restart that app.`,
+        level: "warn",
+        text: `${ip} is unreachable while the router at ${gateway} answers: either nothing is at that address (the printer is off, or its address changed), or the app running bambu lacks macOS Local Network permission. If the printer is on, enable that under System Settings > Privacy & Security > Local Network for the terminal or agent host, then restart it.`,
       }
     : {
         level: "warn",

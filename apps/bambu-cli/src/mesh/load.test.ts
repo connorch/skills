@@ -151,7 +151,13 @@ describe("glTF declarations", () => {
     expect(bounds(await load("/q.gltf", io)).extents.map((n) => Math.round(n))).toEqual([1, 1, 0]);
     files.set(
       "/big.gltf",
-      strToU8(JSON.stringify({ ...doc, accessors: [{ ...doc.accessors[0], count: 30_000_000 }] })),
+      strToU8(
+        JSON.stringify({
+          ...doc,
+          // Each alone is 120 MB; together they would be 1.2 GB of zero-filled arrays.
+          accessors: Array.from({ length: 10 }, () => ({ ...doc.accessors[0], count: 20_000_000 })),
+        }),
+      ),
     );
     await expect(load("/big.gltf", io)).rejects.toThrow("the limit is");
     files.set("/empty.gltf", strToU8(JSON.stringify({ ...doc, scenes: [{ nodes: [] }] })));

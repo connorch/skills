@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
-import { mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { basename, dirname, extname, resolve } from "node:path";
+import { mkdir, open, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
+import { basename, dirname, extname, isAbsolute, relative, resolve } from "node:path";
 import { unzipWithin } from "../zip.ts";
 import { UsageError } from "../cli.ts";
 import { SOURCE_FILE, type Source } from "../job.ts";
@@ -90,7 +90,7 @@ function commonFolder(members: string[]): string {
 }
 type Files = Pick<
   typeof import("node:fs/promises"),
-  "mkdir" | "writeFile" | "rm" | "open" | "rename" | "readFile"
+  "mkdir" | "writeFile" | "rm" | "open" | "rename" | "readFile" | "realpath"
 >;
 interface Staged {
   name: string;
@@ -107,7 +107,7 @@ export async function fetchModel(
     force = false,
     page,
     fetcher = globalThis.fetch,
-    fs = { mkdir, writeFile, rm, open, rename, readFile },
+    fs = { mkdir, writeFile, rm, open, rename, readFile, realpath },
   }: {
     out?: string;
     force?: boolean;
@@ -274,6 +274,13 @@ async function fetchMakerworld(
             memberTmp = `${path}.tmp`;
           staged.push({ name: member, path, tmp: memberTmp, bytes: data.length });
           await fs.mkdir(dirname(path), { recursive: true });
+          // By real path: a folder already here could be a link out of the job folder.
+          const inside = relative(
+            await fs.realpath(resolve(out)),
+            await fs.realpath(dirname(path)),
+          );
+          if (inside.startsWith("..") || isAbsolute(inside))
+            throw new SiteError(`${member} would leave the job folder`);
           await fs.writeFile(memberTmp, data);
           const format = extname(member).slice(1).toLowerCase();
           const problem = MODEL_EXTENSIONS.has(`.${format}`)

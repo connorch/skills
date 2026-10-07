@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Command } from "commander";
@@ -371,6 +371,15 @@ describe("MakerWorld download links", () => {
     ).rejects.toThrow("unsafe filename");
     expect(existsSync(join(dir, "..", "victim.png"))).toBe(false);
     expect(existsSync(join(dir, "model.obj"))).toBe(false);
+  });
+  it("refuses to write through a folder linked out of the job folder", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bambu-search-")),
+      elsewhere = await mkdtemp(join(tmpdir(), "bambu-elsewhere-"));
+    await symlink(elsewhere, join(dir, "textures"));
+    await expect(
+      fetchModel("https://makerworld.bblmw.com/m/textured.zip", { out: dir, fetcher }),
+    ).rejects.toThrow("leave the job folder");
+    expect(await readdir(elsewhere)).toEqual([]);
   });
   it("refuses members whose names differ only in case", async () => {
     const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));

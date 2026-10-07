@@ -268,8 +268,9 @@ To delete a file from the SD card (no command for it), use FTPS with the access 
 
 Settings live in `~/.config/bambu/config.json`, secrets in the Keychain. `bambu doctor` checks
 Bambu Studio, the VM tooling, settings, secrets, and whether the printer answers, and says what
-to run. A printer that is unreachable while the router answers means the app running `bambu`
-(the terminal, or an agent host) lacks macOS Local Network permission; doctor says so.
+to run. A printer that is unreachable while the router answers is either off at that address or the
+app running `bambu` (the terminal, or an agent host) lacks macOS Local Network permission;
+doctor names both.
 
 ```sh
 bambu config show

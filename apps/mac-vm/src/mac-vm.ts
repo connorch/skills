@@ -15,6 +15,7 @@
 
 import { spawn, spawnSync } from "node:child_process";
 import {
+  chmodSync,
   closeSync,
   existsSync,
   mkdirSync,
@@ -133,7 +134,9 @@ function vncFile(vm: string) {
 }
 async function boot(vm: string, start: boolean) {
   if (start) {
-    mkdirSync(STATE_DIR, { recursive: true });
+    // The state holds the VNC password and the daemon socket: this user only.
+    mkdirSync(STATE_DIR, { recursive: true, mode: 0o700 });
+    chmodSync(STATE_DIR, 0o700);
     rmSync(logFile(vm), { force: true });
     rmSync(vncFile(vm), { force: true });
     const log = openSync(logFile(vm), "w", 0o600);
@@ -395,6 +398,8 @@ async function screenDaemon(vm: string) {
     connection.on("error", () => {});
   });
   rmSync(file, { force: true });
+  // Anyone who can connect drives the always-unlocked guest: the socket is this user's only.
+  process.umask(0o077);
   server.listen(file);
   process.on("SIGTERM", stop);
 }
@@ -534,12 +539,15 @@ function authorizeKey(vm: string) {
   if (install.status !== 0) fail(`authorizing SSH key failed: ${install.stderr.trim()}`);
 }
 
-// VM names become log file names, so keep them to one plain path segment.
+// VM names become state file names, so keep them to one plain path segment
+// short enough for the daemon socket, whose path macOS caps near 104 bytes.
 const vmOption = new Option("--vm <name>", "VM name")
   .env("MAC_VM")
   .default("agent-vm")
   .argParser((name: string) => {
     if (!/^[\w][\w.-]*$/.test(name)) fail(`invalid VM name: ${name}`);
+    if (Buffer.byteLength(socketFile(name)) > 100)
+      fail(`VM name too long: the socket path ${socketFile(name)} is over 100 bytes`);
     return name;
   });
 const program = new Command("mac-vm").description(

@@ -41,7 +41,27 @@ export function companionPath(model: string, reference: string, from = model): s
     throw new MeshLoadError(`${basename(model)} refers to ${reference}, outside its folder`);
   return target;
 }
-export const MAX_ACCESSOR_COUNT = 20_000_000;
+// What every declared accessor would take in memory, checked on the
+// declaration before the reader allocates it all (a sparse accessor is
+// zero-filled with no bytes behind it, so the file's size bounds nothing).
+export const MAX_ACCESSOR_BYTES = 1024 * 1024 * 1024;
+const COMPONENTS: Record<string, number> = {
+  SCALAR: 1,
+  VEC2: 2,
+  VEC3: 3,
+  VEC4: 4,
+  MAT2: 4,
+  MAT3: 9,
+  MAT4: 16,
+};
+const COMPONENT_BYTES: Record<number, number> = {
+  5120: 1,
+  5121: 1,
+  5122: 2,
+  5123: 2,
+  5125: 4,
+  5126: 4,
+};
 const MAX_TRIANGLES = 20_000_000;
 const MAX_MODEL_FILE_BYTES = 1024 * 1024 * 1024;
 export class MeshSaveError extends Error {}
@@ -274,11 +294,14 @@ export async function readGltf(
     throw new MeshLoadError(
       `${compressed} glTF is not supported; export the Model uncompressed (or as STL or 3MF)`,
     );
-  // Checked on the declaration, before the reader allocates anything from it.
-  const largest = Math.max(0, ...(jsonDoc.json.accessors ?? []).map((a) => a.count));
-  if (largest > MAX_ACCESSOR_COUNT)
+  const declared = (jsonDoc.json.accessors ?? []).reduce(
+    (sum, a) =>
+      sum + a.count * (COMPONENTS[a.type] ?? 16) * (COMPONENT_BYTES[a.componentType] ?? 4),
+    0,
+  );
+  if (declared > MAX_ACCESSOR_BYTES)
     throw new MeshLoadError(
-      `glTF accessor has ${largest} elements; the limit is ${MAX_ACCESSOR_COUNT}`,
+      `glTF accessors declare ${Math.round(declared / 2 ** 20)} MB of data; the limit is ${MAX_ACCESSOR_BYTES / 2 ** 30} GB`,
     );
   return io.readJSON(jsonDoc);
 }
