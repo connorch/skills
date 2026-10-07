@@ -149,10 +149,13 @@ async function resolve(request: Request, url: URL): Promise<HostResult> {
     if (emails) {
       const email = await guestEmail(request);
       if (email === null) return guestRedirect(url);
-      if (!emails.includes(email)) return notSharedWith(email);
-      // Just back from the Guest Login: leave a clean URL in the address bar.
+      // Just back from the Guest Login: leave a clean URL in the address bar
+      // before anything renders, so a reload after the not-shared page (or
+      // after the cookie lapses) starts a fresh Guest Login instead of
+      // reading the marker as cookie refusal.
       const clean = withoutGuestMarker(url);
       if (clean !== null) return redirect(clean);
+      if (!emails.includes(email)) return notSharedWith(email);
       return fileResponse(request, object!, false);
     }
     return loginRedirect(url);
