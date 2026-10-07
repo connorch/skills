@@ -317,6 +317,11 @@ describe("MakerWorld download links", () => {
     "Model.stl": strToU8("solid a"),
     "model.stl": strToU8("solid b"),
   });
+  // The same name in two Unicode forms, which APFS treats as one file.
+  const formsZip = zipSync({
+    "caf\u00e9.stl": strToU8("solid a"),
+    "cafe\u0301.stl": strToU8("solid b"),
+  });
   const nestedZip = zipSync({
     "model.obj": strToU8("v 0 0 0\n"),
     "textures/new/c.png": strToU8("png"),
@@ -338,13 +343,15 @@ describe("MakerWorld download links", () => {
           ? new Response(escapingZip)
           : String(input).endsWith("case.zip")
             ? new Response(caseZip)
-            : String(input).endsWith("nested.zip")
-              ? new Response(nestedZip)
-              : String(input).endsWith("ancestry.zip")
-                ? new Response(ancestryZip)
-                : String(input).includes("expired")
-                  ? new Response("<html>expired</html>")
-                  : new Response("solid mesh"),
+            : String(input).endsWith("forms.zip")
+              ? new Response(formsZip)
+              : String(input).endsWith("nested.zip")
+                ? new Response(nestedZip)
+                : String(input).endsWith("ancestry.zip")
+                  ? new Response(ancestryZip)
+                  : String(input).includes("expired")
+                    ? new Response("<html>expired</html>")
+                    : new Response("solid mesh"),
   );
   it("unpacks the Model files from a signed zip and credits the page", async () => {
     const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
@@ -405,12 +412,23 @@ describe("MakerWorld download links", () => {
     ).rejects.toThrow("both a file and a folder");
     expect(await readdir(dir)).toEqual([]);
   });
+  it("leaves a .tmp another fetch is writing alone", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
+    await writeFile(join(dir, "clip.stl.tmp"), "theirs");
+    await expect(
+      fetchModel("https://makerworld.bblmw.com/m/clip.stl?key=3", { out: dir, fetcher }),
+    ).rejects.toThrow("another fetch");
+    expect(await readFile(join(dir, "clip.stl.tmp"), "utf8")).toBe("theirs");
+  });
   it("refuses members whose names differ only in case", async () => {
     const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
     await expect(
       fetchModel("https://makerworld.bblmw.com/m/case.zip", { out: dir, fetcher }),
     ).rejects.toThrow("twice");
     expect(existsSync(join(dir, "model.stl"))).toBe(false);
+    await expect(
+      fetchModel("https://makerworld.bblmw.com/m/forms.zip", { out: dir, fetcher }),
+    ).rejects.toThrow("twice");
   });
   it("saves a single file under its own name and refuses an expired link's page", async () => {
     const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));

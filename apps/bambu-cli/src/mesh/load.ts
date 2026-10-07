@@ -44,7 +44,10 @@ export function companionPath(model: string, reference: string, from = model): s
 // What every declared accessor would take in memory, checked on the
 // declaration before the reader allocates it all (a sparse accessor is
 // zero-filled with no bytes behind it, so the file's size bounds nothing).
-export const MAX_ACCESSOR_BYTES = 1024 * 1024 * 1024;
+const MAX_ACCESSOR_BYTES = 1024 * 1024 * 1024;
+// And per accessor by element, since decoding one into plain arrays costs
+// far more than its bytes; the same bound the STL loader puts on triangles.
+const MAX_ACCESSOR_COUNT = 20_000_000;
 const COMPONENTS: Record<string, number> = {
   SCALAR: 1,
   VEC2: 2,
@@ -297,6 +300,11 @@ export async function readGltf(
   const accessors = jsonDoc.json.accessors ?? [];
   if (!accessors.every((a) => Number.isInteger(a.count) && a.count >= 0))
     throw new MeshLoadError("glTF accessor has an invalid count");
+  const largest = Math.max(0, ...accessors.map((a) => a.count));
+  if (largest > MAX_ACCESSOR_COUNT)
+    throw new MeshLoadError(
+      `glTF accessor has ${largest} elements; the limit is ${MAX_ACCESSOR_COUNT}`,
+    );
   const declared = accessors.reduce(
     (sum, a) =>
       sum + a.count * (COMPONENTS[a.type] ?? 16) * (COMPONENT_BYTES[a.componentType] ?? 4),

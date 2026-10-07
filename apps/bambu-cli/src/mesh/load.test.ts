@@ -173,6 +173,17 @@ describe("glTF declarations", () => {
       ),
     );
     await expect(load("/negative.gltf", io)).rejects.toThrow("invalid count");
+    // Few bytes declared, but far too many elements to decode into arrays.
+    files.set(
+      "/bytes.gltf",
+      strToU8(
+        JSON.stringify({
+          ...doc,
+          accessors: [{ bufferView: 0, componentType: 5121, type: "SCALAR", count: 250_000_000 }],
+        }),
+      ),
+    );
+    await expect(load("/bytes.gltf", io)).rejects.toThrow("elements; the limit is");
     files.set("/empty.gltf", strToU8(JSON.stringify({ ...doc, scenes: [{ nodes: [] }] })));
     await expect(load("/empty.gltf", io)).rejects.toThrow("no triangles");
   });

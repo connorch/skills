@@ -59,6 +59,11 @@ export function makerworldLink(input: string): URL | undefined {
   }
   return undefined;
 }
+// How the job folder's filesystem (APFS, by default) identifies a name:
+// without regard to case or Unicode normalization form.
+function fold(name: string): string {
+  return name.normalize("NFC").toLowerCase();
+}
 // A file name as the site or archive gave it, kept verbatim (an MTL refers to
 // its texture by exact name) once it is known to be a plain name.
 function safeName(name: unknown, site: string): string {
@@ -125,7 +130,9 @@ export async function fetchModel(
 // Stream one file to `tmp`, abandoning it after 30 s without a byte however
 // long the whole Model takes, and refusing anything past what a printable
 // Model could be: by the declared size first, then by the bytes received. The
-// head is kept so the caller can check the file is what it is named.
+// head is kept so the caller can check the file is what it is named. The .tmp
+// is created exclusively, so one a fetch is already writing (or a stale one)
+// is never truncated, and is removed again if this download fails.
 async function download(
   link: string,
   {
@@ -136,8 +143,18 @@ async function download(
     fs,
   }: { tmp: string; name: string; expected: number; fetcher: Fetch; fs: Files },
 ): Promise<{ bytes: number; head: Buffer }> {
-  const handle = await fs.open(tmp, "w");
+  let handle;
+  try {
+    handle = await fs.open(tmp, "wx");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    throw new Error(
+      `${tmp} exists: another fetch is writing it, or a stale one left it; remove it to retry`,
+      { cause: error },
+    );
+  }
   const stall = stallGuard(STALL_MS);
+  let failed = false;
   try {
     const response = await fetcher(link, {
       headers: { "User-Agent": USER_AGENT },
@@ -156,9 +173,13 @@ async function download(
         await handle.write(chunk);
       },
     });
+  } catch (error) {
+    failed = true;
+    throw error;
   } finally {
     stall.clear();
     await handle.close();
+    if (failed) await fs.rm(tmp, { force: true });
   }
 }
 // Each file streams to a .tmp beside its destination; the job is committed
@@ -222,8 +243,8 @@ async function fetchMakerworld(
   if (ext === ".zip") {
     // The archive is read once, up front, so the names it holds can be
     // checked against the folder before anything is staged.
+    await download(link.href, { tmp, name, expected: 0, fetcher, fs });
     try {
-      await download(link.href, { tmp, name, expected: 0, fetcher, fs });
       archive = unzipWithin(new Uint8Array(await fs.readFile(tmp)), {
         keep: (entry) => {
           if (entry.endsWith("/")) return false;
@@ -241,8 +262,8 @@ async function fetchMakerworld(
     }
     const textured = Object.keys(archive).some((n) => extname(n).toLowerCase() === ".obj"),
       wrapper = commonFolder(Object.keys(archive));
-    // Names are compared case-folded: the job folder is on a case-insensitive
-    // filesystem by default, where Model.stl and model.stl are one file.
+    // Names are compared as the filesystem identifies them, where Model.stl
+    // and model.stl are one file.
     const folded = new Set<string>();
     for (const [inner, data] of Object.entries(archive)) {
       const relative = safePath(inner.slice(wrapper.length), "MakerWorld"),
@@ -251,20 +272,19 @@ async function fetchMakerworld(
         skipped.push(inner);
         continue;
       }
-      if (folded.has(relative.toLowerCase()))
-        throw new SiteError(`${name} holds ${relative} twice`);
-      folded.add(relative.toLowerCase());
+      if (folded.has(fold(relative))) throw new SiteError(`${name} holds ${relative} twice`);
+      folded.add(fold(relative));
       members.set(relative, data);
     }
     // A member that is also a folder of another could not be written beside it.
     const folders = new Set<string>();
     for (const member of members.keys()) {
-      const parts = member.toLowerCase().split("/");
+      const parts = fold(member).split("/");
       for (let depth = 1; depth < parts.length; depth++)
         folders.add(parts.slice(0, depth).join("/"));
     }
     for (const member of members.keys())
-      if (folders.has(member.toLowerCase()))
+      if (folders.has(fold(member)))
         throw new SiteError(`${name} holds ${member} as both a file and a folder`);
     if (![...members.keys()].some((n) => MODEL_EXTENSIONS.has(extname(n).toLowerCase())))
       throw new SiteError(
@@ -282,7 +302,6 @@ async function fetchMakerworld(
         for (const [member, data] of members) {
           const path = resolve(out, member),
             memberTmp = `${path}.tmp`;
-          staged.push({ name: member, path, tmp: memberTmp, bytes: data.length });
           // Checked by real path before anything is created: a folder already
           // here could be a link out of the job folder, and nothing may be
           // made through it. The nearest existing ancestor is where a write lands.
@@ -292,7 +311,9 @@ async function fetchMakerworld(
           if (inside.startsWith("..") || isAbsolute(inside))
             throw new SiteError(`${member} would leave the job folder`);
           await fs.mkdir(dirname(path), { recursive: true });
-          await fs.writeFile(memberTmp, data);
+          // Exclusive, and staged only once it exists, as download() does.
+          await fs.writeFile(memberTmp, data, { flag: "wx" });
+          staged.push({ name: member, path, tmp: memberTmp, bytes: data.length });
           const format = extname(member).slice(1).toLowerCase();
           const problem = MODEL_EXTENSIONS.has(`.${format}`)
             ? sniffProblem(Buffer.from(data.subarray(0, 1024)), format as SniffFormat, data.length)
@@ -302,13 +323,12 @@ async function fetchMakerworld(
         return;
       }
       const path = resolve(out, name);
-      staged.push({ name, path, tmp, bytes: 0 });
       const { bytes, head } = await download(link.href, { tmp, name, expected: 0, fetcher, fs });
+      staged.push({ name, path, tmp, bytes });
       // A signed host can answer 200 with an error page (or an expired-link
       // notice); the file must look like the Model it is named as.
       const problem = sniffProblem(head, ext.slice(1) as SniffFormat, bytes);
       if (problem) throw new SiteError(`${name}: ${problem}`);
-      staged[0]!.bytes = bytes;
     },
   );
   return { model: { id: name, name: source.title, url: source.url }, source, files, skipped };
@@ -352,9 +372,8 @@ async function fetchPrintables(
     safeName(file.name, "Printables");
     const fileId = modelId(file.id);
     if (!fileId) throw new SiteError("Printables returned an invalid file id");
-    // Case-folded, as the job folder's filesystem is by default.
-    if (names.has(name.toLowerCase())) throw new SiteError(`Printables lists ${name} twice`);
-    names.add(name.toLowerCase());
+    if (names.has(fold(name))) throw new SiteError(`Printables lists ${name} twice`);
+    names.add(fold(name));
     wanted.push({ name, fileId, fileSize: file.fileSize, model: isModel });
   }
   if (!wanted.some((f) => f.model))
@@ -393,9 +412,9 @@ async function fetchPrintables(
           throw new SiteError("Printables returned an unsafe download link");
         const path = resolve(out, name),
           tmp = `${path}.tmp`;
-        staged.push({ name, path, tmp, bytes: 0 });
         const expected = Number(fileSize) || 0;
         const { bytes, head } = await download(link, { tmp, name, expected, fetcher, fs });
+        staged.push({ name, path, tmp, bytes });
         // Printables reports each file's exact size, so a body that ended early
         // (chunked, no Content-Length) is caught here rather than saved truncated.
         if (expected && bytes !== expected)
@@ -406,7 +425,6 @@ async function fetchPrintables(
           ? sniffProblem(head, extname(name).slice(1).toLowerCase() as SniffFormat, bytes)
           : undefined;
         if (problem) throw new SiteError(`${name}: ${problem}`);
-        staged[staged.length - 1]!.bytes = bytes;
       }
     },
   );
