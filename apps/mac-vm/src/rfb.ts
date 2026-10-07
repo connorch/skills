@@ -15,7 +15,7 @@ const RAW = 0,
 
 // VNC authentication: DES of the challenge with the password's bytes bit-reversed.
 // Node ships only triple DES, and two-key DES with both keys equal is single DES.
-function vncResponse(password: string, challenge: Buffer): Buffer {
+export function vncResponse(password: string, challenge: Buffer): Buffer {
   const key = Buffer.alloc(8);
   for (let i = 0; i < 8; i++) {
     const byte = i < password.length ? password.charCodeAt(i) : 0;

@@ -299,27 +299,29 @@ async function screen(vm: string, request: Exclude<ScreenRequest, { cmd: "quit" 
     // open a VNC connection, which Tart's server does not survive.
     const lock = `${socketFile(vm)}.lock`,
       screenLog = join(STATE_DIR, `${vm}.screen.log`);
-    let starter = false;
     // A lock left by a starter that died is ignored once it is older than any start could take.
     try {
       if (Date.now() - statSync(lock).mtimeMs > 15_000) rmSync(lock, { force: true });
     } catch {
       // No lock.
     }
+    let starter = false;
     try {
-      closeSync(openSync(lock, "wx"));
-      starter = true;
-      rmSync(socketFile(vm), { force: true });
-      const log = openSync(screenLog, "a", 0o600);
-      spawn(process.execPath, [process.argv[1]!, "screen-daemon", "--vm", vm], {
-        detached: true,
-        stdio: ["ignore", log, log],
-      }).unref();
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-    }
-    const deadline = Date.now() + 10_000;
-    try {
+      try {
+        closeSync(openSync(lock, "wx"));
+        starter = true;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      }
+      if (starter) {
+        rmSync(socketFile(vm), { force: true });
+        const log = openSync(screenLog, "a", 0o600);
+        spawn(process.execPath, [process.argv[1]!, "screen-daemon", "--vm", vm], {
+          detached: true,
+          stdio: ["ignore", log, log],
+        }).unref();
+      }
+      const deadline = Date.now() + 10_000;
       while (!reply) {
         await sleep(200);
         try {
@@ -337,8 +339,23 @@ async function screen(vm: string, request: Exclude<ScreenRequest, { cmd: "quit" 
   return reply;
 }
 
+// A request the VM's screen does not answer in time means the connection is
+// no longer usable: the daemon reports the stall and exits, so the next
+// command starts a fresh one. Typing is paced per character, so it gets longer.
+const REQUEST_TIMEOUT_MS = 30_000;
+class ScreenStall extends Error {}
+function within<T>(ms: number, work: Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new ScreenStall(`the VM screen did not answer within ${ms / 1000} s`)),
+      ms,
+    );
+    work.then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
+
 // Holds the VM's one VNC connection and answers requests over a unix socket,
-// one at a time, until the VM goes away or `down` sends quit.
+// one at a time, until the VM goes away, `down` sends quit, or a request stalls.
 async function screenDaemon(vm: string) {
   const url = vncUrl(vm);
   if (!url) fail(`${vm} has no VNC address`);
@@ -360,14 +377,19 @@ async function screenDaemon(vm: string) {
       const request = JSON.parse(data) as ScreenRequest;
       data = "";
       queue = queue.then(async () => {
-        let reply: ScreenReply;
+        let reply: ScreenReply,
+          finished = request.cmd === "quit";
+        const budget = REQUEST_TIMEOUT_MS + (request.cmd === "type" ? request.text.length * 15 : 0);
         try {
-          reply = { ok: true, ...(await perform(rfb, request)) };
+          reply = { ok: true, ...(await within(budget, perform(rfb, request))) };
         } catch (error) {
           reply = { ok: false, error: (error as Error).message };
+          finished ||= error instanceof ScreenStall;
         }
-        connection.end(`${JSON.stringify(reply)}\n`);
-        if (request.cmd === "quit") stop();
+        // The reply is flushed before the process goes.
+        connection.end(`${JSON.stringify(reply)}\n`, () => {
+          if (finished) stop();
+        });
       });
     });
     connection.on("error", () => {});

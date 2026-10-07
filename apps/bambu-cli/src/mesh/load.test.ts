@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import { strToU8, zipSync } from "fflate";
 import { bounds, signedVolume } from "./geometry.ts";
-import { derivedPath, load, loadOBJ, loadSTL, save } from "./load.ts";
+import { derivedPath, load, loadOBJ, loadSTL, readGltf, save } from "./load.ts";
 import { box } from "./test-shapes.ts";
 import { memoryIO } from "./test-io.ts";
 describe("Model file formats", () => {
@@ -194,4 +194,38 @@ describe("sparse glTF accessors", () => {
     files.set("/sparse.gltf", strToU8(JSON.stringify(doc)));
     expect(bounds(await load("/sparse.gltf", io)).extents).toEqual([1, 1, 0]);
   });
+});
+it("reads geometry without the images a glTF names, which only colour reads want", async () => {
+  const { io, files } = memoryIO(),
+    positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+  const doc = {
+    asset: { version: "2.0" },
+    buffers: [
+      {
+        byteLength: 36,
+        uri: `data:application/octet-stream;base64,${Buffer.from(positions.buffer).toString("base64")}`,
+      },
+    ],
+    bufferViews: [{ buffer: 0, byteLength: 36 }],
+    accessors: [
+      {
+        bufferView: 0,
+        componentType: 5126,
+        count: 3,
+        type: "VEC3",
+        min: [0, 0, 0],
+        max: [1, 1, 0],
+      },
+    ],
+    images: [{ uri: "missing.png" }],
+    textures: [{ source: 0 }],
+    materials: [{ pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 }, material: 0 }] }],
+    nodes: [{ mesh: 0 }],
+    scenes: [{ nodes: [0] }],
+    scene: 0,
+  };
+  files.set("/textured.gltf", strToU8(JSON.stringify(doc)));
+  expect((await load("/textured.gltf", io)).indices.length).toBe(3);
+  await expect(readGltf("/textured.gltf", (p) => io.read(p), { images: true })).rejects.toThrow();
 });

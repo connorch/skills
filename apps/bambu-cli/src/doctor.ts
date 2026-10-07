@@ -1,6 +1,7 @@
 // `bambu doctor`: is this Machine set up to find, check, slice and print?
-// Every check is local except one TCP probe of the printer's MQTT port, which
-// tells a printer that is off from a process macOS has cut off from the LAN.
+// Every check is local except a TCP probe of the printer's MQTT port (and of
+// the router, when the printer is unreachable), which tells a printer that is
+// off from a process macOS has cut off from the LAN.
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";

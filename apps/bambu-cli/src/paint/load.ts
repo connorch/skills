@@ -103,7 +103,7 @@ export async function loadColouredModel(
   try {
     if (suffix === ".obj") await loadObj(path, read, model);
     else {
-      const document = await readGltf(path, read);
+      const document = await readGltf(path, read, { images: true });
       // Only what the default scene shows; a GLB can carry other scenes or
       // staging nodes that are not part of the Model.
       // One decode per image however many primitives share it.

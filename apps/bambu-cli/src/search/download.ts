@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, resolve } from "node:path";
-import { unzipSync } from "fflate";
+import { unzipWithin } from "../zip.ts";
 import { UsageError } from "../cli.ts";
 import { SOURCE_FILE, type Source } from "../job.ts";
 import { sniffProblem, stallGuard, streamBody, type SniffFormat } from "../download.ts";
@@ -78,9 +78,8 @@ function safeName(name: unknown, site: string): string {
 // name, so it cannot leave the folder. Subfolders are kept because an OBJ's
 // MTL and texture references name them.
 function safePath(member: string, site: string): string {
-  const segments = member.split("/");
-  for (const segment of segments) safeName(segment, site);
-  return segments.join("/");
+  for (const segment of member.split("/")) safeName(segment, site);
+  return member;
 }
 // The one folder a "download all" zip wraps its files in, if every member shares it.
 function commonFolder(members: string[]): string {
@@ -225,30 +224,26 @@ async function fetchMakerworld(
     // checked against the folder before anything is staged.
     try {
       await download(link.href, { tmp, name, expected: 0, fetcher, fs });
-      let expanded = 0;
-      archive = unzipSync(new Uint8Array(await fs.readFile(tmp)), {
-        filter: (entry) => {
-          const inner = extname(entry.name).toLowerCase();
-          if (
-            entry.name.endsWith("/") ||
-            !(MODEL_EXTENSIONS.has(inner) || COMPANION_EXTENSIONS.has(inner))
-          ) {
-            if (!entry.name.endsWith("/")) skipped.push(entry.name);
-            return false;
-          }
-          expanded += entry.originalSize ?? entry.size;
-          if (expanded > MAX_FILE_BYTES)
-            throw new SiteError(
-              `${name} expands past the ${MAX_FILE_BYTES / 1024 / 1024} MB limit`,
-            );
-          return true;
+      archive = unzipWithin(new Uint8Array(await fs.readFile(tmp)), {
+        keep: (entry) => {
+          if (entry.endsWith("/")) return false;
+          const inner = extname(entry).toLowerCase();
+          if (MODEL_EXTENSIONS.has(inner) || COMPANION_EXTENSIONS.has(inner)) return true;
+          skipped.push(entry);
+          return false;
         },
+        limit: MAX_FILE_BYTES,
+        over: () =>
+          new SiteError(`${name} expands past the ${MAX_FILE_BYTES / 1024 / 1024} MB limit`),
       });
     } finally {
       await fs.rm(tmp, { force: true });
     }
     const textured = Object.keys(archive).some((n) => extname(n).toLowerCase() === ".obj"),
       wrapper = commonFolder(Object.keys(archive));
+    // Names are compared case-folded: the job folder is on a case-insensitive
+    // filesystem by default, where Model.stl and model.stl are one file.
+    const folded = new Set<string>();
     for (const [inner, data] of Object.entries(archive)) {
       const relative = safePath(inner.slice(wrapper.length), "MakerWorld"),
         innerExt = extname(relative).toLowerCase();
@@ -256,7 +251,9 @@ async function fetchMakerworld(
         skipped.push(inner);
         continue;
       }
-      if (members.has(relative)) throw new SiteError(`${name} holds ${relative} twice`);
+      if (folded.has(relative.toLowerCase()))
+        throw new SiteError(`${name} holds ${relative} twice`);
+      folded.add(relative.toLowerCase());
       members.set(relative, data);
     }
     if (![...members.keys()].some((n) => MODEL_EXTENSIONS.has(extname(n).toLowerCase())))
@@ -337,8 +334,9 @@ async function fetchPrintables(
     safeName(file.name, "Printables");
     const fileId = modelId(file.id);
     if (!fileId) throw new SiteError("Printables returned an invalid file id");
-    if (names.has(name)) throw new SiteError(`Printables lists ${name} twice`);
-    names.add(name);
+    // Case-folded, as the job folder's filesystem is by default.
+    if (names.has(name.toLowerCase())) throw new SiteError(`Printables lists ${name} twice`);
+    names.add(name.toLowerCase());
     wanted.push({ name, fileId, fileSize: file.fileSize, model: isModel });
   }
   if (!wanted.some((f) => f.model))

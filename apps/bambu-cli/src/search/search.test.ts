@@ -313,6 +313,10 @@ describe("MakerWorld download links", () => {
     "materials/model.mtl": strToU8("newmtl m\nmap_Kd ../textures/c.png\n"),
     "textures/c.png": strToU8("png"),
   });
+  const caseZip = zipSync({
+    "Model.stl": strToU8("solid a"),
+    "model.stl": strToU8("solid b"),
+  });
   const escapingZip = zipSync({
     "model.obj": strToU8("v 0 0 0\n"),
     "../victim.png": strToU8("png"),
@@ -324,9 +328,11 @@ describe("MakerWorld download links", () => {
         ? new Response(texturedZip)
         : String(input).endsWith("escaping.zip")
           ? new Response(escapingZip)
-          : String(input).includes("expired")
-            ? new Response("<html>expired</html>")
-            : new Response("solid mesh"),
+          : String(input).endsWith("case.zip")
+            ? new Response(caseZip)
+            : String(input).includes("expired")
+              ? new Response("<html>expired</html>")
+              : new Response("solid mesh"),
   );
   it("unpacks the Model files from a signed zip and credits the page", async () => {
     const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
@@ -365,6 +371,13 @@ describe("MakerWorld download links", () => {
     ).rejects.toThrow("unsafe filename");
     expect(existsSync(join(dir, "..", "victim.png"))).toBe(false);
     expect(existsSync(join(dir, "model.obj"))).toBe(false);
+  });
+  it("refuses members whose names differ only in case", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
+    await expect(
+      fetchModel("https://makerworld.bblmw.com/m/case.zip", { out: dir, fetcher }),
+    ).rejects.toThrow("twice");
+    expect(existsSync(join(dir, "model.stl"))).toBe(false);
   });
   it("saves a single file under its own name and refuses an expired link's page", async () => {
     const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));

@@ -9,7 +9,8 @@ import {
   type Node as GltfNode,
 } from "@gltf-transform/core";
 import { KHRMeshQuantization } from "@gltf-transform/extensions";
-import { unzipSync, zipSync, strFromU8, strToU8 } from "fflate";
+import { zipSync, strFromU8, strToU8 } from "fflate";
+import { unzipWithin } from "../zip.ts";
 import { identity, merge, transform, triangle, faceGeometry, bounds, weld } from "./geometry.ts";
 import type { Mesh } from "./geometry.ts";
 
@@ -168,17 +169,11 @@ function mfTransform(text?: string): number[] {
   ];
 }
 export function load3MF(bytes: Uint8Array): Mesh {
-  // Inflate only the model files, and none past what a mesh could be, so a
-  // hostile or huge archive cannot exhaust memory before it is inspected.
-  let expanded = 0;
-  const archive = unzipSync(bytes, {
-    filter: (entry) => {
-      if (!/^3D\/.*\.model$/i.test(entry.name)) return false;
-      expanded += entry.originalSize ?? entry.size;
-      if (expanded > MAX_MODEL_FILE_BYTES)
-        throw new MeshLoadError(`the model files expand past ${MAX_MODEL_FILE_BYTES / 2 ** 30} GB`);
-      return true;
-    },
+  const archive = unzipWithin(bytes, {
+    keep: (name) => /^3D\/.*\.model$/i.test(name),
+    limit: MAX_MODEL_FILE_BYTES,
+    over: () =>
+      new MeshLoadError(`the model files expand past ${MAX_MODEL_FILE_BYTES / 2 ** 30} GB`),
   });
   // Objects by "<model file>#<id>": the production extension (Bambu Studio
   // projects) keeps each object in its own file under 3D/Objects, referenced
@@ -246,11 +241,13 @@ export function load3MF(bytes: Uint8Array): Mesh {
 // Geometry stored by these extensions is not in the accessors a reader sees.
 const COMPRESSION = new Set(["KHR_draco_mesh_compression", "EXT_meshopt_compression"]);
 // The one way a glTF or GLB is opened, for the analysis loader here and the
-// paint loader alike: a gltf-transform Document, with companion files
-// (buffers, images) read through the caller and kept to the Model's folder.
+// paint loader alike: a gltf-transform Document, with companion buffers (and
+// images, only when asked for: geometry reads must not fail on a missing or
+// huge texture) read through the caller and kept to the Model's folder.
 export async function readGltf(
   path: string,
   read: (path: string) => Uint8Array | Promise<Uint8Array>,
+  { images = false }: { images?: boolean } = {},
 ): Promise<Document> {
   // Quantized positions are decoded below; the compressed formats are refused
   // by name, and any other required extension by gltf-transform.
@@ -262,7 +259,7 @@ export async function readGltf(
   else {
     const json = JSON.parse(strFromU8(bytes)) as GLTF.IGLTF,
       resources: Record<string, Uint8Array<ArrayBuffer>> = {};
-    for (const item of [...(json.buffers ?? []), ...(json.images ?? [])])
+    for (const item of [...(json.buffers ?? []), ...(images ? (json.images ?? []) : [])])
       if (item.uri && !item.uri.startsWith("data:")) {
         if (/^[a-z]+:/i.test(item.uri))
           throw new MeshLoadError("remote glTF buffers are unsupported");
