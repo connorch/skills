@@ -128,6 +128,36 @@ describe("Model file formats", () => {
     expect(derivedPath("/a/part.ply", "_scaled")).toBe("/a/part_scaled.stl");
   });
 });
+describe("glTF declarations", () => {
+  it("reads quantized positions, refuses oversized accessors up front, and honours an empty scene", async () => {
+    const { io, files } = memoryIO(),
+      bytes = new Uint8Array(24),
+      view = new DataView(bytes.buffer);
+    // Three SHORT vertices, normalized: (0,0,0), (1,0,0), (0,1,0) in [-1, 1].
+    [0, 0, 0, 0, 32767, 0, 0, 0, 0, 32767, 0, 0].forEach((v, i) => view.setInt16(i * 2, v, true));
+    const uri = "data:application/octet-stream;base64," + Buffer.from(bytes).toString("base64");
+    const doc = {
+      asset: { version: "2.0" },
+      extensionsRequired: ["KHR_mesh_quantization"],
+      extensionsUsed: ["KHR_mesh_quantization"],
+      buffers: [{ byteLength: 24, uri }],
+      bufferViews: [{ buffer: 0, byteLength: 24, byteStride: 8 }],
+      accessors: [{ bufferView: 0, componentType: 5122, normalized: true, type: "VEC3", count: 3 }],
+      meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }],
+      nodes: [{ mesh: 0 }],
+      scenes: [{ nodes: [0] }],
+    };
+    files.set("/q.gltf", strToU8(JSON.stringify(doc)));
+    expect(bounds(await load("/q.gltf", io)).extents.map((n) => Math.round(n))).toEqual([1, 1, 0]);
+    files.set(
+      "/big.gltf",
+      strToU8(JSON.stringify({ ...doc, accessors: [{ ...doc.accessors[0], count: 30_000_000 }] })),
+    );
+    await expect(load("/big.gltf", io)).rejects.toThrow("the limit is");
+    files.set("/empty.gltf", strToU8(JSON.stringify({ ...doc, scenes: [{ nodes: [] }] })));
+    await expect(load("/empty.gltf", io)).rejects.toThrow("no triangles");
+  });
+});
 describe("sparse glTF accessors", () => {
   it("patches sparse POSITION values without a base buffer view", async () => {
     const bytes = new Uint8Array(28),

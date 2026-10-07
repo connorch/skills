@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { basename, extname, resolve } from "node:path";
+import { basename, dirname, extname, resolve } from "node:path";
 import { unzipSync } from "fflate";
 import { UsageError } from "../cli.ts";
 import { SOURCE_FILE, type Source } from "../job.ts";
@@ -71,6 +71,21 @@ function safeName(name: unknown, site: string): string {
   )
     throw new SiteError(`${site} returned an unsafe filename`);
   return name;
+}
+// An archive member's path relative to the job folder: every segment a plain
+// name, so it cannot leave the folder. Subfolders are kept because an OBJ's
+// MTL and texture references name them.
+function safePath(member: string, site: string): string {
+  const segments = member.split("/");
+  for (const segment of segments) safeName(segment, site);
+  return segments.join("/");
+}
+// The one folder a "download all" zip wraps its files in, if every member shares it.
+function commonFolder(members: string[]): string {
+  const first = members[0]?.split("/");
+  if (!first || first.length < 2) return "";
+  const folder = `${first[0]}/`;
+  return members.every((m) => m.startsWith(folder) && m.length > folder.length) ? folder : "";
 }
 type Files = Pick<
   typeof import("node:fs/promises"),
@@ -230,16 +245,17 @@ async function fetchMakerworld(
     } finally {
       await fs.rm(tmp, { force: true });
     }
-    const textured = Object.keys(archive).some((n) => extname(n).toLowerCase() === ".obj");
+    const textured = Object.keys(archive).some((n) => extname(n).toLowerCase() === ".obj"),
+      wrapper = commonFolder(Object.keys(archive));
     for (const [inner, data] of Object.entries(archive)) {
-      const base = safeName(basename(inner), "MakerWorld"),
-        innerExt = extname(base).toLowerCase();
+      const relative = safePath(inner.slice(wrapper.length), "MakerWorld"),
+        innerExt = extname(relative).toLowerCase();
       if (!MODEL_EXTENSIONS.has(innerExt) && !textured) {
         skipped.push(inner);
         continue;
       }
-      if (members.has(base)) throw new SiteError(`${name} holds ${base} twice`);
-      members.set(base, data);
+      if (members.has(relative)) throw new SiteError(`${name} holds ${relative} twice`);
+      members.set(relative, data);
     }
     if (![...members.keys()].some((n) => MODEL_EXTENSIONS.has(extname(n).toLowerCase())))
       throw new SiteError(
@@ -258,6 +274,7 @@ async function fetchMakerworld(
           const path = resolve(out, member),
             memberTmp = `${path}.tmp`;
           staged.push({ name: member, path, tmp: memberTmp, bytes: data.length });
+          await fs.mkdir(dirname(path), { recursive: true });
           await fs.writeFile(memberTmp, data);
           const format = extname(member).slice(1).toLowerCase();
           const problem = MODEL_EXTENSIONS.has(`.${format}`)

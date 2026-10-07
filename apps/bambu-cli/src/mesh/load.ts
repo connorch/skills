@@ -8,6 +8,7 @@ import {
   type Mesh as GltfMesh,
   type Node as GltfNode,
 } from "@gltf-transform/core";
+import { KHRMeshQuantization } from "@gltf-transform/extensions";
 import { unzipSync, zipSync, strFromU8, strToU8 } from "fflate";
 import { identity, merge, transform, triangle, faceGeometry, bounds, weld } from "./geometry.ts";
 import type { Mesh } from "./geometry.ts";
@@ -251,7 +252,9 @@ export async function readGltf(
   path: string,
   read: (path: string) => Uint8Array | Promise<Uint8Array>,
 ): Promise<Document> {
-  const io = new NodeIO(),
+  // Quantized positions are decoded below; the compressed formats are refused
+  // by name, and any other required extension by gltf-transform.
+  const io = new NodeIO().registerExtensions([KHRMeshQuantization]),
     bytes = await read(path);
   let jsonDoc: JSONDocument;
   if (extname(path).toLowerCase() === ".glb")
@@ -273,6 +276,12 @@ export async function readGltf(
   if (compressed)
     throw new MeshLoadError(
       `${compressed} glTF is not supported; export the Model uncompressed (or as STL or 3MF)`,
+    );
+  // Checked on the declaration, before the reader allocates anything from it.
+  const largest = Math.max(0, ...(jsonDoc.json.accessors ?? []).map((a) => a.count));
+  if (largest > MAX_ACCESSOR_COUNT)
+    throw new MeshLoadError(
+      `glTF accessor has ${largest} elements; the limit is ${MAX_ACCESSOR_COUNT}`,
     );
   return io.readJSON(jsonDoc);
 }
@@ -303,10 +312,6 @@ export function loadGLTF(document: Document, format = "gltf"): Mesh {
       surfaces.map((p) => {
         const attribute = p.getAttribute("POSITION")!,
           count = attribute.getCount();
-        if (count > MAX_ACCESSOR_COUNT)
-          throw new MeshLoadError(
-            `glTF accessor has ${count} elements; the limit is ${MAX_ACCESSOR_COUNT}`,
-          );
         // getElement decodes normalized integer positions (KHR_mesh_quantization).
         const positions: number[] = [],
           element: number[] = [];
@@ -328,6 +333,8 @@ export function loadGLTF(document: Document, format = "gltf"): Mesh {
       format,
     );
   };
+  // Only the scene's meshes, or every node's without a scene; bare meshes are
+  // the Model only when the file has neither (an empty scene shows nothing).
   const scene = root.getDefaultScene() ?? root.listScenes()[0],
     nodes: GltfNode[] = [];
   if (scene) scene.traverse((node) => nodes.push(node));
@@ -336,7 +343,7 @@ export function loadGLTF(document: Document, format = "gltf"): Mesh {
     const m = node.getMesh();
     return m ? [transform(meshAt(m), node.getWorldMatrix())] : [];
   });
-  return merge(nodes.length ? instances : root.listMeshes().map(meshAt), format);
+  return merge(scene || nodes.length ? instances : root.listMeshes().map(meshAt), format);
 }
 // Loaders read only local files or embedded buffers; no network requests.
 export async function load(path: string, io: MeshIO = fileIO): Promise<Mesh> {

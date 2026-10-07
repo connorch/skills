@@ -14,7 +14,16 @@
 // apps there can reach host-only services.
 
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { connect, createServer } from "node:net";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -112,14 +121,21 @@ async function withVm<T>(vm: string, work: (started: boolean) => Promise<T>): Pr
   }
 }
 
-// Tart prints the VNC address, password included, into the log; a fresh log
-// per boot keeps only the live one, readable by this user alone.
+// Tart prints the VNC address, password included, into the boot log, which
+// is recreated per boot and readable by this user alone. The address of the
+// live boot is copied to its own file, which `down` removes, so a VM started
+// by hand with `tart run` is not mistaken for one with a VNC server.
 function logFile(vm: string) {
   return join(STATE_DIR, `${vm}.log`);
+}
+function vncFile(vm: string) {
+  return join(STATE_DIR, `${vm}.vnc`);
 }
 async function boot(vm: string, start: boolean) {
   if (start) {
     mkdirSync(STATE_DIR, { recursive: true });
+    rmSync(logFile(vm), { force: true });
+    rmSync(vncFile(vm), { force: true });
     const log = openSync(logFile(vm), "w", 0o600);
     spawn("tart", ["run", "--no-graphics", "--vnc-experimental", vm], {
       detached: true,
@@ -131,6 +147,11 @@ async function boot(vm: string, start: boolean) {
     tart(["exec", vm, "sh", "-c", '[ "$(stat -f %Su /dev/console)" != root ]']).status === 0;
   if (!(await waitFor(BOOT_TIMEOUT_S, loggedIn)))
     fail(`timed out after ${BOOT_TIMEOUT_S}s waiting for the guest desktop login`);
+  if (start) {
+    const url = readFileSync(logFile(vm), "utf8").match(/vnc:\/\/\S+/)?.[0];
+    if (!url) fail(`tart printed no VNC address (see ${logFile(vm)})`);
+    writeFileSync(vncFile(vm), url, { mode: 0o600 });
+  }
 }
 
 function up(vm: string, forwards: number[]) {
@@ -180,7 +201,8 @@ async function forward(vm: string, forwards: number[]) {
 // the guest agent is unreachable or the shutdown hangs.
 async function down(vm: string, timeout: number) {
   if (isRunning(vm)) {
-    await ask(vm, { cmd: "quit" }).catch(() => {});
+    // A daemon stuck on the VM must not hold up the shutdown; it dies with the VM.
+    await Promise.race([ask(vm, { cmd: "quit" }).catch(() => {}), sleep(3000)]);
     const address = tart(["ip", vm]).stdout.trim();
     for (const t of address ? tunnels(address) : []) {
       try {
@@ -198,6 +220,7 @@ async function down(vm: string, timeout: number) {
       if (result.status !== 0) fail(`tart stop failed: ${result.stderr.trim()}`);
     }
   }
+  rmSync(vncFile(vm), { force: true });
   console.log(`${vm} down`);
 }
 
@@ -273,24 +296,43 @@ async function screen(vm: string, request: Exclude<ScreenRequest, { cmd: "quit" 
   try {
     reply = await ask(vm, request);
   } catch {
-    // Not listening: start the daemon and wait for its socket.
-    rmSync(socketFile(vm), { force: true });
-    const log = openSync(join(STATE_DIR, `${vm}.screen.log`), "a", 0o600);
-    spawn(process.execPath, [process.argv[1]!, "screen-daemon", "--vm", vm], {
-      detached: true,
-      stdio: ["ignore", log, log],
-    }).unref();
+    // Not listening: start the daemon, or wait for whoever is starting it. The
+    // lock is taken atomically so two commands arriving together cannot each
+    // open a VNC connection, which Tart's server does not survive.
+    const lock = `${socketFile(vm)}.lock`,
+      screenLog = join(STATE_DIR, `${vm}.screen.log`);
+    let starter = false;
+    // A lock left by a starter that died is ignored once it is older than any start could take.
+    try {
+      if (Date.now() - statSync(lock).mtimeMs > 15_000) rmSync(lock, { force: true });
+    } catch {
+      // No lock.
+    }
+    try {
+      closeSync(openSync(lock, "wx"));
+      starter = true;
+      rmSync(socketFile(vm), { force: true });
+      const log = openSync(screenLog, "a", 0o600);
+      spawn(process.execPath, [process.argv[1]!, "screen-daemon", "--vm", vm], {
+        detached: true,
+        stdio: ["ignore", log, log],
+      }).unref();
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    }
     const deadline = Date.now() + 10_000;
-    while (!reply) {
-      await sleep(200);
-      try {
-        reply = await ask(vm, request);
-      } catch (error) {
-        if (Date.now() > deadline)
-          fail(
-            `the screen daemon did not start (see ${join(STATE_DIR, `${vm}.screen.log`)}): ${(error as Error).message}`,
-          );
+    try {
+      while (!reply) {
+        await sleep(200);
+        try {
+          reply = await ask(vm, request);
+        } catch (error) {
+          if (Date.now() > deadline)
+            fail(`the screen daemon did not start (see ${screenLog}): ${(error as Error).message}`);
+        }
       }
+    } finally {
+      if (starter) rmSync(lock, { force: true });
     }
   }
   if (!reply.ok) fail(reply.error);

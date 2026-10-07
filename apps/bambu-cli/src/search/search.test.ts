@@ -308,12 +308,19 @@ describe("MakerWorld download links", () => {
     "clip/clip-120mm.stl": strToU8("solid mesh"),
     "clip/readme.txt": strToU8("hi"),
   });
+  const texturedZip = zipSync({
+    "model.obj": strToU8("mtllib materials/model.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"),
+    "materials/model.mtl": strToU8("newmtl m\nmap_Kd ../textures/c.png\n"),
+    "textures/c.png": strToU8("png"),
+  });
   const fetcher: Fetch = vi.fn(async (input) =>
     String(input).endsWith(".zip?at=1&key=2")
       ? new Response(zip)
-      : String(input).includes("expired")
-        ? new Response("<html>expired</html>")
-        : new Response("solid mesh"),
+      : String(input).endsWith("textured.zip")
+        ? new Response(texturedZip)
+        : String(input).includes("expired")
+          ? new Response("<html>expired</html>")
+          : new Response("solid mesh"),
   );
   it("unpacks the Model files from a signed zip and credits the page", async () => {
     const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
@@ -331,6 +338,19 @@ describe("MakerWorld download links", () => {
       title: "stls",
       url: "https://makerworld.com/en/models/42-clip",
     });
+  });
+  it("keeps an OBJ's companion folders so its MTL and texture references resolve", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
+    const report = await fetchModel("https://makerworld.bblmw.com/m/textured.zip", {
+      out: dir,
+      fetcher,
+    });
+    expect(report.files.map((f) => f.name).sort()).toEqual([
+      "materials/model.mtl",
+      "model.obj",
+      "textures/c.png",
+    ]);
+    expect(existsSync(join(dir, "materials", "model.mtl"))).toBe(true);
   });
   it("saves a single file under its own name and refuses an expired link's page", async () => {
     const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
