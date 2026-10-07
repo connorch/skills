@@ -5,12 +5,17 @@
 // The VM is off by default: `up` boots it headless, `down` shuts it off. Run
 // commands and copy files with `tart exec` (the Cirrus images ship its guest
 // agent). The guest's screen and input go through Tart's VNC server
-// (`shot`, `click`, `type`, `key`), so no agent runs inside the guest. SSH is
-// only used for `--forward`, which reverse-tunnels host loopback ports into
-// the guest so apps there can reach host-only services.
+// (`shot`, `click`, `type`, `key`), so no agent runs inside the guest. Those
+// commands talk to a screen daemon (started on demand, one per VM) that holds
+// the single VNC connection for the VM's lifetime: Tart's server asserts when
+// a client connects after the screen changed since the last one left, so the
+// connection is never dropped while the VM runs. SSH is only used for
+// `--forward`, which reverse-tunnels host loopback ports into the guest so
+// apps there can reach host-only services.
 
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { connect, createServer } from "node:net";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -175,6 +180,7 @@ async function forward(vm: string, forwards: number[]) {
 // the guest agent is unreachable or the shutdown hangs.
 async function down(vm: string, timeout: number) {
   if (isRunning(vm)) {
+    await ask(vm, { cmd: "quit" }).catch(() => {});
     const address = tart(["ip", vm]).stdout.trim();
     for (const t of address ? tunnels(address) : []) {
       try {
@@ -228,66 +234,177 @@ function vncUrl(vm: string): URL | undefined {
   }
 }
 
-// Open the screen of a running VM for one command, and close it after.
-async function withScreen<T>(vm: string, work: (screen: Rfb) => Promise<T>): Promise<T> {
+// One request to the screen daemon, which is started if it is not listening.
+type ScreenRequest =
+  | { cmd: "shot" }
+  | { cmd: "click"; x: number; y: number; double: boolean; right: boolean }
+  | { cmd: "type"; text: string }
+  | { cmd: "key"; keysyms: number[] }
+  | { cmd: "quit" };
+type ScreenReply =
+  | { ok: true; width: number; height: number; png?: string }
+  | { ok: false; error: string };
+function socketFile(vm: string) {
+  return join(STATE_DIR, `${vm}.sock`);
+}
+function ask(vm: string, request: ScreenRequest): Promise<ScreenReply> {
+  return new Promise((resolve, reject) => {
+    const socket = connect(socketFile(vm));
+    let data = "";
+    socket.on("error", reject);
+    socket.on("data", (chunk) => {
+      data += chunk;
+      if (data.endsWith("\n")) {
+        socket.destroy();
+        resolve(JSON.parse(data) as ScreenReply);
+      }
+    });
+    socket.on("close", () => reject(new Error("the screen daemon closed the connection")));
+    socket.write(`${JSON.stringify(request)}\n`);
+  });
+}
+async function screen(vm: string, request: Exclude<ScreenRequest, { cmd: "quit" }>) {
   if (!isRunning(vm)) fail(`${vm} is not running; run \`mac-vm up\` first`);
-  const url = vncUrl(vm);
-  if (!url)
+  if (!vncUrl(vm))
     fail(
       `${vm} has no VNC address; it was booted outside mac-vm, so run \`mac-vm down\` then \`mac-vm up\``,
     );
-  const screen = await Rfb.open(url);
+  let reply: ScreenReply | undefined;
   try {
-    return await work(screen);
-  } finally {
-    await screen.close();
+    reply = await ask(vm, request);
+  } catch {
+    // Not listening: start the daemon and wait for its socket.
+    rmSync(socketFile(vm), { force: true });
+    const log = openSync(join(STATE_DIR, `${vm}.screen.log`), "a", 0o600);
+    spawn(process.execPath, [process.argv[1]!, "screen-daemon", "--vm", vm], {
+      detached: true,
+      stdio: ["ignore", log, log],
+    }).unref();
+    const deadline = Date.now() + 10_000;
+    while (!reply) {
+      await sleep(200);
+      try {
+        reply = await ask(vm, request);
+      } catch (error) {
+        if (Date.now() > deadline)
+          fail(
+            `the screen daemon did not start (see ${join(STATE_DIR, `${vm}.screen.log`)}): ${(error as Error).message}`,
+          );
+      }
+    }
   }
+  if (!reply.ok) fail(reply.error);
+  return reply;
+}
+
+// Holds the VM's one VNC connection and answers requests over a unix socket,
+// one at a time, until the VM goes away or `down` sends quit.
+async function screenDaemon(vm: string) {
+  const url = vncUrl(vm);
+  if (!url) fail(`${vm} has no VNC address`);
+  const rfb = await Rfb.open(url);
+  const file = socketFile(vm);
+  const stop = () => {
+    rfb.close();
+    server.close();
+    rmSync(file, { force: true });
+    process.exit(0);
+  };
+  rfb.onClose(stop);
+  let queue = Promise.resolve();
+  const server = createServer((connection) => {
+    let data = "";
+    connection.on("data", (chunk) => {
+      data += chunk;
+      if (!data.endsWith("\n")) return;
+      const request = JSON.parse(data) as ScreenRequest;
+      data = "";
+      queue = queue.then(async () => {
+        let reply: ScreenReply;
+        try {
+          reply = { ok: true, ...(await perform(rfb, request)) };
+        } catch (error) {
+          reply = { ok: false, error: (error as Error).message };
+        }
+        connection.end(`${JSON.stringify(reply)}\n`);
+        if (request.cmd === "quit") stop();
+      });
+    });
+    connection.on("error", () => {});
+  });
+  rmSync(file, { force: true });
+  server.listen(file);
+  process.on("SIGTERM", stop);
+}
+
+async function perform(
+  rfb: Rfb,
+  request: ScreenRequest,
+): Promise<{ png?: string; width: number; height: number }> {
+  switch (request.cmd) {
+    case "shot": {
+      const png = (await rfb.screenshot()).toString("base64");
+      return { png, width: rfb.width, height: rfb.height };
+    }
+    case "click": {
+      // The screen only shows its size after the first update, so a click takes
+      // a frame first; that also lets the pointer land after the desktop settled.
+      await rfb.screenshot();
+      if (request.x >= rfb.width || request.y >= rfb.height)
+        throw new Error(
+          `(${request.x}, ${request.y}) is outside the ${rfb.width}x${rfb.height} screen`,
+        );
+      const button = request.right ? 4 : 1;
+      rfb.move(request.x, request.y, 0);
+      for (let n = request.double ? 2 : 1; n > 0; n--) {
+        rfb.move(request.x, request.y, button);
+        await sleep(60);
+        rfb.move(request.x, request.y, 0);
+        await sleep(60);
+      }
+      break;
+    }
+    case "type":
+      for (const char of request.text) {
+        const keysym = charKeysym(char),
+          shift = needsShift(char);
+        if (shift) rfb.key(KEYSYMS.shift!, true);
+        rfb.key(keysym, true);
+        rfb.key(keysym, false);
+        if (shift) rfb.key(KEYSYMS.shift!, false);
+        await sleep(15);
+      }
+      break;
+    case "key":
+      for (const keysym of request.keysyms) rfb.key(keysym, true);
+      await sleep(30);
+      for (const keysym of request.keysyms.toReversed()) rfb.key(keysym, false);
+      break;
+    case "quit":
+      break;
+  }
+  return { width: rfb.width, height: rfb.height };
 }
 
 async function shot(vm: string, file: string) {
-  await withScreen(vm, async (screen) => {
-    writeFileSync(file, await screen.screenshot());
-    console.log(`${file} (${screen.width}x${screen.height})`);
-  });
+  const reply = await screen(vm, { cmd: "shot" });
+  writeFileSync(file, Buffer.from(reply.png!, "base64"));
+  console.log(`${file} (${reply.width}x${reply.height})`);
 }
 
-// The screen only shows its size after the first update, so a click takes a
-// frame first; that also lets the pointer land after the desktop has settled.
 async function click(
   vm: string,
   x: number,
   y: number,
   { double, right }: { double: boolean; right: boolean },
 ) {
-  await withScreen(vm, async (screen) => {
-    await screen.screenshot();
-    if (x >= screen.width || y >= screen.height)
-      fail(`(${x}, ${y}) is outside the ${screen.width}x${screen.height} screen`);
-    const button = right ? 4 : 1;
-    screen.move(x, y, 0);
-    for (let n = double ? 2 : 1; n > 0; n--) {
-      screen.move(x, y, button);
-      await sleep(60);
-      screen.move(x, y, 0);
-      await sleep(60);
-    }
-    console.log(`${double ? "double-" : right ? "right-" : ""}clicked (${x}, ${y})`);
-  });
+  await screen(vm, { cmd: "click", x, y, double, right });
+  console.log(`${double ? "double-" : right ? "right-" : ""}clicked (${x}, ${y})`);
 }
 
 async function type(vm: string, text: string) {
-  await withScreen(vm, async (screen) => {
-    for (const char of text) {
-      const keysym = charKeysym(char),
-        shift = needsShift(char);
-      if (shift) screen.key(KEYSYMS.shift!, true);
-      screen.key(keysym, true);
-      screen.key(keysym, false);
-      if (shift) screen.key(KEYSYMS.shift!, false);
-      await sleep(15);
-    }
-    console.log(`typed ${text.length} characters`);
-  });
+  await screen(vm, { cmd: "type", text });
+  console.log(`typed ${text.length} characters`);
 }
 
 // `cmd+shift+a`: modifiers held in order, the last key pressed, all released.
@@ -299,12 +416,8 @@ async function key(vm: string, combo: string) {
     return known;
   });
   if (!keysyms.length) fail("no key given");
-  await withScreen(vm, async (screen) => {
-    for (const keysym of keysyms) screen.key(keysym, true);
-    await sleep(30);
-    for (const keysym of keysyms.toReversed()) screen.key(keysym, false);
-    console.log(`pressed ${combo}`);
-  });
+  await screen(vm, { cmd: "key", keysyms });
+  console.log(`pressed ${combo}`);
 }
 
 // One-time setup: clone the image, size it, and authorize this host's SSH key
@@ -452,6 +565,11 @@ program
   .argument("<combo>")
   .addOption(vmOption)
   .action((combo: string, o: { vm: string }) => key(o.vm, combo));
+
+program
+  .command("screen-daemon", { hidden: true })
+  .addOption(vmOption)
+  .action((o: { vm: string }) => screenDaemon(o.vm));
 
 program
   .command("status")

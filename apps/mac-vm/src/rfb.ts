@@ -6,7 +6,6 @@
 
 import { createCipheriv } from "node:crypto";
 import { connect, type Socket } from "node:net";
-import { setTimeout as sleep } from "node:timers/promises";
 import { crc32, deflateSync } from "node:zlib";
 
 const RAW = 0,
@@ -157,9 +156,17 @@ export class Rfb {
   }
 
   // Read one FramebufferUpdate into the frame; false if the screen was resized.
+  // A bell or clipboard message the server sends on its own is skipped.
   private async update(): Promise<boolean> {
-    const head = await this.read(4);
-    if (head[0] !== 0) throw new Error(`VNC: unexpected server message ${head[0]}`);
+    let head = await this.read(4);
+    while (head[0] !== 0) {
+      if (head[0] === 2) head = Buffer.concat([head.subarray(1), await this.read(1)]);
+      else if (head[0] === 3) {
+        const length = Buffer.concat([head.subarray(1), await this.read(4)]).readUInt32BE(3);
+        await this.read(length);
+        head = await this.read(4);
+      } else throw new Error(`VNC: unexpected server message ${head[0]}`);
+    }
     let resized = false;
     for (let rect = head.readUInt16BE(2); rect > 0; rect--) {
       const r = await this.read(12),
@@ -225,15 +232,13 @@ export class Rfb {
     this.socket.write(message);
   }
 
-  // Flush what was written and give the server a moment to notice the close:
-  // Tart's VNC server asserts when a new client arrives while the last one
-  // is still being torn down, so one command's connection must be gone
-  // before the next command's begins.
-  async close(): Promise<void> {
-    await new Promise<void>((resolve) => this.socket.end(resolve));
-    await Promise.race([new Promise((resolve) => this.socket.once("close", resolve)), sleep(500)]);
+  // Called when the server drops the connection, which is how the VM's end is seen.
+  onClose(callback: () => void) {
+    this.socket.on("close", callback);
+  }
+
+  close() {
     this.socket.destroy();
-    await sleep(300);
   }
 }
 

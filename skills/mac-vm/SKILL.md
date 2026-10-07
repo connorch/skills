@@ -55,8 +55,9 @@ tart exec -i agent-vm sh -c 'cat > ~/Downloads/file.3mf' < file.3mf   # copy a f
 from any agent with a shell and need nothing inside the guest. Take a `shot`
 and look at it before the first click, and again after anything that changes
 the screen; click coordinates are pixels of that PNG (the guest is Retina, so
-a 1024x768 desktop is a 2048x1536 image). Each command opens its own
-connection and paces itself; run them one at a time, not in parallel.
+a 1024x768 desktop is a 2048x1536 image). The first command starts a screen
+daemon that holds the VM's one VNC connection until `down`; do not point
+another VNC client at the VM while it runs.
 
 ### With OpenClaw (optional)
 
@@ -97,8 +98,10 @@ Grant Accessibility and Screen Recording to whatever drives the UI in the guest.
 - `vnc: not available (booted outside mac-vm?)`: the VM was started with
   `tart run` by hand, so mac-vm has no VNC address. `mac-vm down`, then `up`.
 - `VNC: the server closed the connection` and `status` says stopped: Tart's
-  VNC server crashed, which it does when a new client connects while the last
-  one is being torn down. mac-vm paces its own commands; do not run two at once.
+  VNC server crashed. It asserts when a client connects after the screen
+  changed since the last client left, which is why mac-vm keeps one
+  connection open in its daemon. `mac-vm up` boots it again.
+- `the screen daemon did not start`: see `~/.local/state/mac-vm/<vm>.screen.log`.
 - `open -a "Some App"` cannot find an app copied in: open it by path,
   `open "/Applications/Some App.app"`.
 - The guest renders OpenGL in software, so GL-heavy apps (Bambu Studio's 3D
