@@ -22,6 +22,7 @@ export default mergeConfig(
           "zod",
           "@gltf-transform/core",
           "@gltf-transform/functions",
+          "@gltf-transform/extensions",
           "meshoptimizer",
           "manifold-3d",
           "fflate",
