@@ -313,14 +313,20 @@ describe("MakerWorld download links", () => {
     "materials/model.mtl": strToU8("newmtl m\nmap_Kd ../textures/c.png\n"),
     "textures/c.png": strToU8("png"),
   });
+  const escapingZip = zipSync({
+    "model.obj": strToU8("v 0 0 0\n"),
+    "../victim.png": strToU8("png"),
+  });
   const fetcher: Fetch = vi.fn(async (input) =>
     String(input).endsWith(".zip?at=1&key=2")
       ? new Response(zip)
       : String(input).endsWith("textured.zip")
         ? new Response(texturedZip)
-        : String(input).includes("expired")
-          ? new Response("<html>expired</html>")
-          : new Response("solid mesh"),
+        : String(input).endsWith("escaping.zip")
+          ? new Response(escapingZip)
+          : String(input).includes("expired")
+            ? new Response("<html>expired</html>")
+            : new Response("solid mesh"),
   );
   it("unpacks the Model files from a signed zip and credits the page", async () => {
     const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
@@ -351,6 +357,14 @@ describe("MakerWorld download links", () => {
       "textures/c.png",
     ]);
     expect(existsSync(join(dir, "materials", "model.mtl"))).toBe(true);
+  });
+  it("refuses a zip whose member path climbs out of the job folder", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));
+    await expect(
+      fetchModel("https://makerworld.bblmw.com/m/escaping.zip", { out: dir, fetcher }),
+    ).rejects.toThrow("unsafe filename");
+    expect(existsSync(join(dir, "..", "victim.png"))).toBe(false);
+    expect(existsSync(join(dir, "model.obj"))).toBe(false);
   });
   it("saves a single file under its own name and refuses an expired link's page", async () => {
     const dir = await mkdtemp(join(tmpdir(), "bambu-search-"));

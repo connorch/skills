@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { unzipSync, strFromU8 } from "fflate";
+import { unzipSync, zipSync, strFromU8, strToU8 } from "fflate";
 import p1s from "./fixtures/p1s.json" with { type: "json" };
 import perFilament from "./data/per_filament_keys.json" with { type: "json" };
 import { buildProject, paintCode, paintFilament, projectSettings, readProject } from "./project.ts";
@@ -51,6 +51,22 @@ describe("upstream Bambu project contract", () => {
     expect(strFromU8(archive["3D/3dmodel.model"]!)).toContain("BambuStudio-02.07");
     expect(strFromU8(archive["Metadata/model_settings.config"]!)).toContain(
       'value="fox &amp; &quot;friends&quot;"',
+    );
+  });
+  it("reads past unrelated members and refuses a non-project archive", () => {
+    const cube = box([10, 10, 10]),
+      data = buildProject(
+        cube.positions,
+        cube.faces,
+        cube.faces.map(() => 0),
+        ["#000000"],
+        "c",
+      ),
+      archive = unzipSync(data);
+    const padded = zipSync({ ...archive, "Metadata/plate_1.png": new Uint8Array(1024 * 1024) });
+    expect(readProject(padded).faces).toEqual(cube.faces);
+    expect(() => readProject(zipSync({ "3D/3dmodel.model": strToU8("<model/>") }))).toThrow(
+      "not a painted Bambu project",
     );
   });
   it("uses a configured recorded printer profile and tower fits the plate", () => {

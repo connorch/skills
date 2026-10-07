@@ -245,13 +245,11 @@ function status(vm: string, json: boolean) {
   for (const t of report.tunnels) console.log(`tunnel ${t.port}: up`);
 }
 
-// The VNC address of the running VM, from the boot log.
+// The VNC address of the VM that up booted, which down removes. A VM booted
+// by hand has none.
 function vncUrl(vm: string): URL | undefined {
   try {
-    const match = readFileSync(logFile(vm), "utf8")
-      .match(/vnc:\/\/[^\s]+/g)
-      ?.at(-1);
-    return match ? new URL(match) : undefined;
+    return new URL(readFileSync(vncFile(vm), "utf8").trim());
   } catch {
     return undefined;
   }

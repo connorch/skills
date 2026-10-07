@@ -140,9 +140,28 @@ export function buildProject(
   };
   return zipSync(Object.fromEntries(Object.entries(files).map(([k, v]) => [k, strToU8(v)])));
 }
+// The entries a painted project is read from, inflated to no more than a
+// Bambu project could need, so a hostile archive cannot exhaust memory.
+const PROJECT_ENTRIES = [
+  "3D/Objects/object_1.model",
+  "3D/3dmodel.model",
+  "Metadata/project_settings.config",
+];
+export const MAX_PROJECT_BYTES = 1024 * 1024 * 1024;
 export function readProject(data: Uint8Array) {
-  const files = unzipSync(data),
-    mesh = strFromU8(files["3D/Objects/object_1.model"]!),
+  let expanded = 0;
+  const files = unzipSync(data, {
+    filter: (entry) => {
+      if (!PROJECT_ENTRIES.includes(entry.name)) return false;
+      expanded += entry.originalSize ?? entry.size;
+      if (expanded > MAX_PROJECT_BYTES)
+        throw new RangeError(`the project files expand past ${MAX_PROJECT_BYTES / 2 ** 30} GB`);
+      return true;
+    },
+  });
+  for (const entry of PROJECT_ENTRIES)
+    if (!files[entry]) throw new RangeError(`not a painted Bambu project: no ${entry}`);
+  const mesh = strFromU8(files["3D/Objects/object_1.model"]!),
     root = strFromU8(files["3D/3dmodel.model"]!);
   const vertices = [...mesh.matchAll(/<vertex x="([^"]+)" y="([^"]+)" z="([^"]+)"/g)].map(
     (m) => [Number(m[1]), Number(m[2]), Number(m[3])] as Vec3,

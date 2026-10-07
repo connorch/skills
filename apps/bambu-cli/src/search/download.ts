@@ -65,6 +65,8 @@ function safeName(name: unknown, site: string): string {
   if (
     typeof name !== "string" ||
     !name ||
+    name === "." ||
+    name === ".." ||
     basename(name) !== name ||
     name.includes("\\") ||
     /[\p{Cc}]/u.test(name)
