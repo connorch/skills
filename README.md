@@ -24,6 +24,7 @@ skills add connorch/skills --skill claude-code-subagent
 skills add connorch/skills --skill step-back
 skills add connorch/skills --skill pull-upstream
 skills add connorch/skills --skill babysit-pr
+skills add connorch/skills --skill merge-risk
 skills add connorch/skills --skill file-pr
 skills add connorch/skills --skill implement-and-review
 skills add connorch/skills --skill handoff
@@ -40,7 +41,7 @@ skills add connorch/skills --skill motion-explainer
 You can also install multiple specific skills in one command:
 
 ```sh
-skills add connorch/skills --skill qa-ux-plan qa-ux-verify codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr file-pr implement-and-review handoff html-communication wovn-file-hosting fleet-exec jev mac-vm bambu-print t3-browser motion-explainer
+skills add connorch/skills --skill qa-ux-plan qa-ux-verify codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr merge-risk file-pr implement-and-review handoff html-communication wovn-file-hosting fleet-exec jev mac-vm bambu-print t3-browser motion-explainer
 ```
 
 ## Shipping to your machines
@@ -124,9 +125,10 @@ These skills help you plan, verify, write, refactor, and fix code.
 - **claude-code-subagent** — For non-Claude agents (Codex, Hermes, etc.): delegate bounded implementation, review, or investigation to Claude Code CLI (`claude -p`) on the user's Claude subscription, then inspect the result and diff.
 - **step-back** — Step-back review of a branch after a batch of point fixes, finding and fixing the damage the iteration itself caused.
 - **pull-upstream** - Sync a fork with its upstream: inventory the fork's features, merge upstream in with upstream taking priority, re-apply the fork's work on top, and verify every feature survived - clean merges included.
-- **implement-and-review** - Take an approved plan through implementation, browser QA, PR filing, the review-bot loop with step-back every three Codex rounds, a final QA pass, and a handoff writeup of unplanned decisions and deferred findings.
+- **implement-and-review** - Take an approved plan through implementation, browser QA, PR filing, the review-bot loop with step-back every three Codex rounds, a final QA pass, a handoff writeup of unplanned decisions and deferred findings, and an explainer video in the PR description when merge-risk rates the PR Moderate or higher.
 - **handoff** - Compact the current conversation into a handoff document in the OS temp directory so a fresh agent can pick up the work. Invoked by the user only. Adapted from a skill by [Matt Pocock](https://github.com/mattpocock/skills).
 - **babysit-pr** — Monitor a pull request through review and CI, verifying bot findings, fixing real failures, and dismissing false positives with reasons. Adapted from a skill by [Theo Browne](https://youtu.be/e1snsuY4lTI).
+- **merge-risk** - Rate a PR's merge risk on a Minimal-to-Critical scale in an independent subagent, verifying existing bot findings before they count toward the rating.
 - **html-communication** — Create self-contained HTML writeups (plans, specs, findings, UI mocks) and publish them privately to files.wovn.org with the wovn CLI. Adapted from a skill by Theo Browne.
 - **wovn-file-hosting** - Upload any local file to files.wovn.org and return a permanent URL (private by default, public on request), backed by the Cloudflare Worker in `apps/wovn-files/` and the `wovn` CLI in `apps/wovn-cli/`. Adapted from a skill by Theo Browne.
 - **t3-browser** - Drive T3 Code's built-in Browser panel, which the user watches live, for browser QA and screenshots whenever its `preview_*` tools are available, reaching dev servers by environment port so they resolve to the machine running the code.

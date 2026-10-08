@@ -1,0 +1,4 @@
+interface:
+  display_name: "Merge Risk"
+  short_description: "Rate a PR's merge risk in an independent subagent"
+  default_prompt: "Use $merge-risk to rate the merge risk of this PR at its current head."
