@@ -4,9 +4,7 @@ description: >-
   Rates how risky it is to merge a pull request or branch, on a Minimal / Low /
   Moderate / High / Critical scale, with the blockers that set the rating. The
   assessment runs in a subagent so it is independent of the thread that wrote
-  the code. Use when asked for the "merge risk" of a PR or branch, whether a PR
-  is "safe to merge" or "ready to merge", or to check or second-guess a review
-  bot's risk rating.
+  the code. Use when asked to assess the merge risk of a PR or branch.
 ---
 
 # Merge Risk
