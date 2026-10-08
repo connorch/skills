@@ -25,7 +25,8 @@ Copy this checklist and track your progress:
 - [ ] 3. File and babysit the PR, stepping back every third Codex round
 - [ ] 4. Final QA, with bots and checks green on the final commit
 - [ ] 5. Handoff writeup
-- [ ] 6. Report
+- [ ] 6. Explainer video, if merge risk is Moderate or higher
+- [ ] 7. Report
 ```
 
 ## 1. Implement
@@ -90,7 +91,27 @@ Use the $html-communication skill to write one file with two sections:
 
 If both sections would be empty, skip the file and say so in the report.
 
-## 6. Report
+## 6. Explainer video
+
+Only once everything above is done: the PR is reviewed, QA'd, and green on its
+final commit.
+
+1. Run the $merge-risk skill on the PR's final commit. It rates the PR in a
+   subagent. If the rating is Minimal or Low, skip the rest of this phase and
+   give the rating in the report.
+2. Run the $motion-explainer skill on the PR.
+3. Upload the local MP4 to GitHub itself and embed it in the PR description.
+   GitHub plays only videos on its own CDN, so do not use the Wovn link. GitHub
+   has no API for attachments: edit the PR description in a browser signed in
+   to GitHub, attach the file through the editor, and wait for the upload to
+   finish. It inserts a `https://github.com/user-attachments/assets/...` URL on
+   its own line, which GitHub renders as a player. Keep it at the end of the
+   description, above the model and harness blurb, and save.
+4. If GitHub rejects the file as too large, re-encode it smaller with ffmpeg
+   (lower the bitrate, keep 1080p) and upload again.
+5. Reload the PR and confirm the video plays.
+
+## 7. Report
 
 Report back with:
 
@@ -101,4 +122,6 @@ Report back with:
   step-back ran.
 - The handoff writeup URL, or a note that there were no unplanned decisions
   and nothing was deferred.
+- The merge risk rating, and whether the explainer video is in the PR
+  description.
 - Anything left open that needs Connor's decision.
