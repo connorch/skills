@@ -57,6 +57,7 @@ follow them except where the overrides below say otherwise:
 | Add missing features to the engine | Work within the engine; report the gap |
 | Commit the scene and engine changes | Commit nothing; publish to Wovn (step 7) |
 | Narrate with Fish Audio, ElevenLabs, or `say` | ElevenLabs or `say` as in step 4; Fish Audio is not set up |
+| Plain, confident narration, no hype (`STORY.md`) | Keep the words plain, but direct an expressive delivery (step 4) |
 
 ## Steps
 
@@ -140,9 +141,11 @@ follow them except where the overrides below say otherwise:
      If the item is missing, ask the user to run
      `security add-generic-password -U -s elevenlabs -a api-key -w "$(op read 'op://Personal/ElevenLabs API Key/credential')"`
      (the same line updates it after a key rotation) rather than falling back
-     to the draft voice. Unless the user names another voice, start the script
-     with
-     `"engine": "elevenlabs", "model": "eleven_v4", "voice": "Vep3bcB7LhKa3wfjMiI6", "settings": { "stability": 0.5, "similarity": 0.7 }`.
+     to the draft voice. Start the script with
+     `"engine": "elevenlabs", "model": "eleven_v4", "voice": "<id>", "settings": { "stability": 0.2, "similarity": 0.65 }, "loudness": "linear"`,
+     with the voice chosen as below. Low stability lets the voice follow the
+     directions, and linear loudness keeps a whisper quieter than a shout
+     (the default evens out the level within each clip).
    - **Draft**, when the user asks for a quick draft or ElevenLabs is
      unavailable: `bun scripts/narrate.ts "$S/narration/script.json" --draft`.
      It speaks with macOS `say` (`SAY_VOICE`, default Samantha) and times words
@@ -151,6 +154,45 @@ follow them except where the overrides below say otherwise:
      user the video uses the draft voice.
    - **No voice**, only when the user asks: time beats in seconds instead of
      phrases, as `$PP/scenes/hello` does.
+
+   **Pick a voice** that fits the subject, unless the user names one:
+
+   | Voice | id | Character |
+   | --- | --- | --- |
+   | Damian | `Vep3bcB7LhKa3wfjMiI6` | deep, intimate, dark |
+   | George | `JBFqnCBsd6RMkjVDRZzb` | warm British storyteller |
+   | Brian | `nPczCjzI2devNBz1zQrb` | deep, resonant narrator |
+   | Daniel | `onwK4e9ZLuTAKqWW03F9` | steady broadcaster |
+   | Tarquin | `7cOBG34AiHrAzs842Rdi` | posh British, Received Pronunciation |
+   | Clyde | `QMJTqaMXmGnG8TCm8WQG` | vintage radio announcer |
+
+   When the user asks for a voice the table does not cover, such as "an old
+   woman", search the ElevenLabs Voice Library. Map the request to filters
+   (`gender`, `age`, `accent`, `language`, `use_cases`, `descriptives`) and
+   add `search=` only for flavor they cannot express ("pirate"); free-text
+   search alone returns poor matches:
+
+   ```sh
+   curl -s -H "xi-api-key: $(security find-generic-password -s elevenlabs -a api-key -w)" \
+     "https://api.elevenlabs.io/v1/shared-voices?gender=female&age=old&language=en&sort=usage_character_count_1y&page_size=10" \
+     | jq -r '.voices[] | select(.free_users_allowed) | [.voice_id, .name, .accent, .description] | @tsv'
+   ```
+
+   Pick the best match by its description. The first generation adds a
+   library voice to the user's ElevenLabs account, so do not try voices you
+   will not use.
+
+   **Direct the delivery** the way `$PP/scenes/psychopomp-intro/src/main.rs`
+   does: put a bracketed direction before every clause
+   (`[whispering, conspiratorial, slow] And when a server misbehaves...
+   [screaming at the top of his lungs] YOU BLOW IT UP!!! [calm, sweet,
+   matter-of-fact] And then you rewind it.`). Contrast carries it: drop
+   quiet before a reveal, break loud on the impact, snap back to calm. Put
+   the loudest line on the biggest visual hit, usually the failure, and
+   settle into relief on the fix. Capitals and `!!` raise intensity, and
+   `...` adds a pause. At this stability a take can speak a direction or
+   garble a word: check each `.words.json`, and re-voice a bad clip with
+   `--only <id>`.
 
    Anchors match Whisper's transcript, not the script: it writes numbers as
    digits ("58") and splits brand names ("Eleven Labs"). Check the
@@ -218,4 +260,4 @@ follow them except where the overrides below say otherwise:
    image.
 
    Report the video URL, the poster URL, the local path, the length, and the
-   narration engine.
+   narration engine and voice.
