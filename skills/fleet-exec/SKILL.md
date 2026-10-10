@@ -29,8 +29,9 @@ Reach them with `tailscale ssh`, not plain `ssh`.
 - **Paths differ between machines.** Find a repo by its `origin` URL
   (`git -C <dir> remote get-url origin`), not by path. When the user names no
   repo, they mean the one you are working in. Act on the primary clone, not an
-  agent worktree (where `.git` is a file), and leave the Ship's Managed Clone
-  under `~/.local/share/` alone.
+  agent worktree (where `.git` is a file), and leave the Ship's Managed Clones
+  (under `~/.local/share/fleetfizz/clones`, or `/Volumes/StudioStack SSD` on the
+  Studio) alone.
 - **Never lose work over the wire.** "Pull main" means fast-forward only:
   `git merge --ff-only origin/main` when `main` is checked out, otherwise
   `git fetch origin main:main`. If git refuses, report why and ask. Do not

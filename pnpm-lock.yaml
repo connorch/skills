@@ -6,6 +6,9 @@ settings:
 
 catalogs:
   default:
+    fleetfizz:
+      specifier: 0.1.0
+      version: 0.1.0
     skills:
       specifier: 1.7.0
       version: 1.7.0
@@ -27,6 +30,9 @@ importers:
       '@types/node':
         specifier: 24.12.4
         version: 24.12.4
+      fleetfizz:
+        specifier: 'catalog:'
+        version: 0.1.0
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
@@ -185,8 +191,6 @@ importers:
       vite-plus:
         specifier: 'catalog:'
         version: 1.0.0-rc.0(@types/node@24.12.4)(@vitest/ui@5.0.1)(esbuild@0.28.1)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.1)
-
-  apps/psychopomp: {}
 
   apps/ship:
     dependencies:
@@ -2682,6 +2686,11 @@ packages:
 
   flatted@3.4.4:
     resolution: {integrity: sha512-5+ybhBZANEJxaH3X5evAFatUxLfEHSr7n6kYJ+1Qd0mUqr4eu9gIf6GDbWHf8RJijHrjjO8G+la14SlL2SeS1Q==}
+
+  fleetfizz@0.1.0:
+    resolution: {integrity: sha512-FZvRkZKiR1FUaRJLCA9UAcbcGccsJOJ6t6860gpwv+YBicdPxMrsbRFYhvHP327lvUrJArlR6R2X+NtRlmEQBQ==}
+    engines: {node: '>=24'}
+    hasBin: true
 
   forwarded@0.2.0:
     resolution: {integrity: sha512-buRG0fpBtRHSTCOASe6hD258tEubFoRLb4ZNA6NxMVHNw2gOcwHo9wyablzMzOA5z9xA9L1KNjk/Nt6MT9aYow==}
@@ -6392,6 +6401,8 @@ snapshots:
       locate-path: 3.0.0
 
   flatted@3.4.4: {}
+
+  fleetfizz@0.1.0: {}
 
   forwarded@0.2.0: {}
 

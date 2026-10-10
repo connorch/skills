@@ -46,34 +46,42 @@ skills add connorch/skills --skill qa-ux-plan qa-ux-verify codex-review codex-im
 
 ## Shipping to your machines
 
-`pnpm ship:fleet` installs this repo's skills, agent instructions, and CLIs on
-every macOS and linux machine on your tailnet, in parallel. The machine you run
-it from ships your working copy; every other machine resets a clone of this repo at
-`~/.local/share/<owner>-<repo>` to `origin/main` over `tailscale ssh` and ships
-that. Offline machines are skipped with a warning.
+`pnpm ship` runs [fleetfizz](https://www.npmjs.com/package/fleetfizz), pinned as
+a devDependency. It brings every macOS and linux machine on your tailnet in
+line with [`fleet.config.jsonc`](fleet.config.jsonc), in parallel, over
+`tailscale ssh`:
 
-Output is one line per event, tagged `PLAN`, `RUN`, `SKIP`, `OK`, or `FAIL`, so
-`grep FAIL` works on a saved log. Build output is hidden unless that machine
-fails, in which case its full output prints under the `FAIL` line.
+- the vite-plus toolchain: the vp version, the Node default, and global
+  packages at semver ranges
+- each Tracked Repo in the config (this repo, psychopomp), installed from its
+  origin ref. Every machine, this one included, keeps a Managed Clone of the
+  repo that fleetfizz resets to the ref, then runs the repo's Install Command
+  there when something changed. For this repo that is
+  `pnpm install --frozen-lockfile && pnpm ship:machine`.
 
-```
- 0.2s  connors-macbook-pro  PLAN  working copy 41c471d · 15 skills · +15 new · wovn-cli
- 0.5s  connors-macbook-pro  RUN   ship:machine wovn-cli
- 0.9s  connors-macbook-pro  OK    15 skills (+15) · wovn-cli
- 1.2s  bluefin              SKIP  offline
- 1.2s  fleet                DONE  ok 1  skipped 1  failed 0
-```
+The config is read from your working copy, but nothing installs from it: push to
+`main` first. Offline machines are skipped with a warning.
 
 ```sh
-pnpm ship:fleet                         # every machine
-pnpm ship:fleet --dry-run               # print each machine's plan, change nothing
-pnpm ship:fleet --only connors-mac-studio
-pnpm ship:machine                       # just this machine, from this checkout
+pnpm ship                          # every machine
+pnpm ship --dry-run                # print each machine's plan, change nothing
+pnpm ship --only connors-mac-studio
+pnpm ship:machine                  # install this checkout here, by hand
 ```
 
-Each machine needs `git`, `node` 24, and `pnpm`, and must accept Tailscale SSH:
-on macOS that means the open-source `tailscaled` rather than Tailscale.app (see
-[`docs/adr/0001-push-based-ship-over-tailscale-ssh.md`](docs/adr/0001-push-based-ship-over-tailscale-ssh.md)).
+`pnpm ship:machine` installs this checkout's skills, agent instructions, and
+CLIs on the machine it runs on. fleetfizz runs it with `FLEETFIZZ_MACHINE`,
+`FLEETFIZZ_PLATFORM`, and `FLEETFIZZ_MACHINES` set; run by hand, it reads the
+same facts from `tailscale status --json`. A hand install of a working copy
+stays until the next `pnpm ship --rebuild connorch-skills`, because the commit
+in the Managed Clone has not changed.
+
+The machine you ship from needs `tailscale` and a logged-in `gh` (its token is
+lent to the others for one Ship so private repos clone). Every machine needs
+`git` and `vp` on its login-shell PATH, and must accept Tailscale SSH: on macOS
+that means the open-source `tailscaled` rather than Tailscale.app (see
+[`docs/adr/0001-push-based-ship-over-tailscale-ssh.md`](docs/adr/0001-push-based-ship-over-tailscale-ssh.md)
+and [`docs/adr/0002-install-from-origin-with-fleetfizz.md`](docs/adr/0002-install-from-origin-with-fleetfizz.md)).
 
 A skill chooses where it ships with optional `metadata` in its `SKILL.md`
 frontmatter. The fields combine: a machine gets the skill only if it passes all
@@ -84,16 +92,15 @@ metadata:
   agents: [claude-code] # skills CLI agent slugs. Default: [claude-code, codex]
   platforms: [darwin] # darwin and/or linux. Default: both
   machines: [connors-mac-studio] # tailnet names. Default: every machine
-  fleet: false # only the machine running the ship. Default: true
 ```
 
 A workspace package ships by defining a `ship:machine` script, which installs it
 on the machine it runs on, and can restrict itself with the same fields (except
 `agents`) under a `ship` key in its `package.json`.
 
-Each machine records what ships have installed in
-`~/.local/state/<owner>-<repo>/manifest.json`, so skills deleted, archived, or
-retargeted in this repo are removed on the next ship. Skills installed from
+Each machine records what `pnpm ship:machine` has installed in
+`~/.local/state/<owner>-<repo>/manifest.json` (the Install Manifest), so skills
+deleted, archived, or retargeted in this repo are removed on the next install. Skills installed from
 anywhere else are never touched.
 
 ## Agent instructions
@@ -156,8 +163,7 @@ domain docs).
 - `apps/mac-vm` - the `mac-vm` CLI the `mac-vm` skill calls (connors-mac-studio only).
 - `apps/bambu-cli` - the `bambu` CLI for the P1S on the home LAN (connors-mac-studio only).
 - `apps/claude-router` - the `claude-router` proxy and CLI the `claude-router` skill describes (both Macs).
-- `apps/psychopomp` - clones Kit Langton's psychopomp engine to `~/.local/share/psychopomp` at a pinned commit and builds it, for the `motion-explainer` skill (macOS only).
-- `apps/ship` - `pnpm ship:fleet` and `pnpm ship:machine`.
+- `apps/ship` - the skills installer behind `pnpm ship:machine`.
 - `instructions` - the global agent instructions (see above).
 
 ```sh

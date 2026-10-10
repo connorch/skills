@@ -1,12 +1,13 @@
 // This repo's identity and the per-Machine paths derived from it. Everything
-// keys off the checkout's `origin` remote, so a fork ships its own repo.
+// keys off the checkout's `origin` remote, so a fork installs as its own repo.
 
 import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// The checkout this code runs from: a working copy or a Managed Clone.
+// The checkout this code runs from: fleetfizz's Managed Clone, or a working
+// copy when run by hand.
 export const REPO_ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 
 function git(...args: string[]): string {
@@ -19,15 +20,6 @@ export function repoSlug(): string {
   const match = /github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(origin);
   if (!match) throw new Error(`origin is not a GitHub repo: ${origin}`);
   return `${match[1]}/${match[2]}`;
-}
-
-export function cloneUrl(slug: string): string {
-  return `https://github.com/${slug}.git`;
-}
-
-// Kept relative to $HOME so a Ship can hand them to another Machine's shell.
-export function managedCloneDir(slug: string): string {
-  return `.local/share/${slug.replace("/", "-")}`;
 }
 
 export function manifestPath(slug: string): string {

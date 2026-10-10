@@ -26,7 +26,7 @@ function ship(overrides: Partial<ShipMachineOptions> = {}) {
     root,
     slug: "connorch/skills",
     manifestPath: join(home, ".local/state/connorch-skills/manifest.json"),
-    machine: { name: "connors-mac-studio", platform: "darwin", starting: false },
+    machine: { name: "connors-mac-studio", platform: "darwin" },
     knownMachines: ["connors-mac-studio", "hermes-agent"],
     source: "test",
     dryRun: false,

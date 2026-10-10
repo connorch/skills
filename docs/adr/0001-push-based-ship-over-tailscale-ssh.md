@@ -1,5 +1,11 @@
 # Push-based Ship over Tailscale SSH
 
+> **Partly superseded by [ADR 0002](0002-install-from-origin-with-fleetfizz.md).** The
+> push over Tailscale SSH still holds, and the Consequences below still apply: fleetfizz
+> now owns the transport (its ADR 0001 covers the same ground). What changed is what a
+> Ship installs: `pnpm ship:fleet` and its rule that the starting Machine ships its working
+> copy are gone. Every Machine installs from a fleetfizz Managed Clone of `origin/main`.
+
 Skills and CLIs reach the Fleet through a manual, push-based Ship: `pnpm ship:fleet`
 opens `tailscale ssh` to every reachable Machine and runs the same `pnpm ship:machine`
 there against a Managed Clone reset to `origin/main`. We chose this over the earlier

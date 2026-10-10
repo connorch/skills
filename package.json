@@ -12,11 +12,12 @@
     "fmt:check": "vp fmt --check",
     "test": "vp run -r test",
     "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules apps/*/dist packages/*/dist .vite-plus apps/*/.vite-plus packages/*/.vite-plus",
-    "ship:fleet": "node apps/ship/src/fleet.ts",
+    "ship": "fleetfizz ship",
     "ship:machine": "node apps/ship/src/machine.ts"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "fleetfizz": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:"
   },
