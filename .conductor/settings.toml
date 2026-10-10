@@ -3,8 +3,8 @@
 [scripts]
 run_mode = "nonconcurrent"
 
-[scripts.run.ship-fleet]
+[scripts.run.ship]
 available_in = ["local"]
-command = "pnpm ship:fleet"
+command = "pnpm ship"
 default = true
 icon = "package"
