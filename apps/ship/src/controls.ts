@@ -8,7 +8,8 @@
 import { z } from "zod";
 
 const PLATFORMS = ["darwin", "linux"] as const;
-export type Platform = (typeof PLATFORMS)[number];
+export const Platform = z.enum(PLATFORMS);
+export type Platform = z.infer<typeof Platform>;
 
 const DEFAULT_AGENTS = ["claude-code", "codex"];
 
@@ -16,13 +17,11 @@ const nonEmptyList = z.array(z.string().min(1)).nonempty();
 
 export const PackageControls = z.object({
   platforms: z
-    .array(z.enum(PLATFORMS))
+    .array(Platform)
     .nonempty()
     .default([...PLATFORMS]),
   // Tailnet short names, e.g. connors-mac-studio. Unset means every Machine.
   machines: nonEmptyList.optional(),
-  // false: ship only to the Machine that started the Ship.
-  fleet: z.boolean().default(true),
 });
 export type PackageControls = z.infer<typeof PackageControls>;
 
@@ -38,19 +37,16 @@ export const SkillFrontmatter = z.object({
   metadata: SkillControls.prefault({}),
 });
 
-// The Machine a Ship is running on.
+// The Machine the installer is running on.
 export interface MachineContext {
   name: string;
   platform: Platform;
-  // True on the Machine that started the Ship (or ran ship:machine directly).
-  starting: boolean;
 }
 
 export function shipsTo(controls: PackageControls, machine: MachineContext): boolean {
   return (
     controls.platforms.includes(machine.platform) &&
-    (controls.machines?.includes(machine.name) ?? true) &&
-    (controls.fleet || machine.starting)
+    (controls.machines?.includes(machine.name) ?? true)
   );
 }
 

@@ -1,14 +1,31 @@
-// One machine Ship: bring this Machine's skills and packages in line with a
-// source tree. Validation covers the whole tree before anything changes.
+// The skills installer: bring this Machine's skills and packages in line with
+// a source tree (the Install Command fleetfizz runs in this repo's Managed
+// Clone). Validation covers the whole tree before anything changes.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { shipsTo, skillAgents, type MachineContext } from "./controls.ts";
 import { EMPTY_MANIFEST, Manifest, nextManifest, planSkills } from "./plan.ts";
-import type { MachineReport, ShipEvent } from "./report.ts";
 import { addSkills, readLockSources, removeSkills, supportedAgents } from "./skills-cli.ts";
 import { readSource, ValidationError } from "./source.ts";
+
+// Progress from inside an install: its plan, and each package it runs.
+export interface ShipEvent {
+  tag: "PLAN" | "RUN";
+  message: string;
+}
+
+export interface MachineReport {
+  // e.g. "1a2b3c4" or "1a2b3c4+dirty".
+  source: string;
+  skills: number;
+  added: string[];
+  removed: string[];
+  packages: string[];
+  failures: string[];
+  dryRun: boolean;
+}
 
 export interface ShipMachineOptions {
   root: string;

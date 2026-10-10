@@ -3,8 +3,8 @@
   "iconPath": "assets/icon.png",
   "scripts": [
     {
-      "name": "ship-fleet",
-      "command": "pnpm ship:fleet",
+      "name": "ship",
+      "command": "pnpm ship",
       "icon": "configure"
     }
   ]

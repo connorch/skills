@@ -3,7 +3,7 @@ name: motion-explainer
 description: Use when the user asks for a motion graphic, animated explainer, or explainer video of a pull request, or of how something works ("make a video explaining X"). Renders it with Kit Langton's psychopomp engine and publishes the MP4 privately to files.wovn.org.
 metadata:
   platforms: [darwin]
-  requires: "the psychopomp checkout at ~/.local/share/psychopomp (shipped by apps/psychopomp in the skills repo), ffmpeg, ImageMagick, uv, bun, gh, and the wovn CLI"
+  requires: "the psychopomp checkout at ~/.local/share/psychopomp (a Tracked Repo in the skills repo's fleet.config.jsonc), ffmpeg, ImageMagick, uv, bun, gh, and the wovn CLI"
 ---
 
 # Motion explainer
@@ -16,16 +16,16 @@ on an annotated diff). Then publish it to Wovn.
 ## The engine
 
 [Psychopomp](https://github.com/kitlangton/psychopomp) is Kit's Rust motion
-graphics engine. A Ship clones it to `~/.local/share/psychopomp` at a pinned
-commit and builds it (`apps/psychopomp` in the skills repo).
+graphics engine. A Ship (`pnpm ship` in the skills repo) clones it at a pinned
+commit, builds it, and links `~/.local/share/psychopomp` to that checkout.
 
 ```sh
 PP=~/.local/share/psychopomp
 PSY=$PP/target/release/psychopomp
 ```
 
-- If `$PSY` does not exist, tell the user to run `pnpm ship:machine` in the
-  skills repo. Do not clone or build it yourself.
+- If `$PSY` does not exist, tell the user to run `pnpm ship` in the skills
+  repo. Do not clone or build it yourself.
 - The checkout is read-only. Do not edit, commit to, pull, or check out
   anything in it. If the engine cannot do something, work within it and tell the
   user what was missing.

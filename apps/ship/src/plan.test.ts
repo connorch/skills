@@ -2,7 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { skillAgents, SkillFrontmatter, type MachineContext } from "./controls.ts";
 import { EMPTY_MANIFEST, nextManifest, planSkills, type Manifest } from "./plan.ts";
 
-const studio: MachineContext = { name: "connors-mac-studio", platform: "darwin", starting: false };
+const studio: MachineContext = { name: "connors-mac-studio", platform: "darwin" };
 
 function controls(metadata: object) {
   return SkillFrontmatter.parse({ name: "x", metadata }).metadata;
@@ -13,14 +13,9 @@ describe("skillAgents", () => {
     expect(skillAgents(controls({}), studio)).toEqual(["claude-code", "codex"]);
   });
 
-  it("combines platforms, machines, and fleet with AND", () => {
+  it("combines platforms and machines with AND", () => {
     expect(skillAgents(controls({ platforms: ["linux"] }), studio)).toEqual([]);
     expect(skillAgents(controls({ machines: ["hermes-agent"] }), studio)).toEqual([]);
-    expect(skillAgents(controls({ fleet: false }), studio)).toEqual([]);
-    expect(skillAgents(controls({ fleet: false }), { ...studio, starting: true })).toEqual([
-      "claude-code",
-      "codex",
-    ]);
     expect(
       skillAgents(controls({ agents: ["codex"], machines: ["connors-mac-studio"] }), studio),
     ).toEqual(["codex"]);

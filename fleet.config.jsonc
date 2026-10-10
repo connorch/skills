@@ -1,0 +1,58 @@
+{
+  // What `pnpm ship` installs on every Machine (fleetfizz). Terms and rules:
+  // https://www.npmjs.com/package/fleetfizz. Each Tracked Repo installs from
+  // its origin ref into a Managed Clone, on every Machine, this one included.
+  "$schema": "./node_modules/fleetfizz/fleet.schema.json",
+  "machines": {
+    // The Studio keeps its Clone Root on the external SSD. Every other Machine
+    // uses the default, ~/.local/share/fleetfizz/clones.
+    "connors-mac-studio": { "clones": "/Volumes/StudioStack SSD/fleetfizz/clones" },
+  },
+  "repos": [
+    // Before connorch/skills: until the cutover lands on main, that repo's
+    // installer still runs apps/psychopomp, which needs this link in place.
+    {
+      "origin": "kitlangton/psychopomp",
+      "ref": "b517dd423fd19282898c33e43acb8eb67546ebab",
+      "platforms": ["darwin"],
+      // The motion-explainer skill reads psychopomp at this fixed path.
+      "install": "cargo build --release && ln -sfn \"$PWD\" ~/.local/share/psychopomp",
+    },
+    {
+      "origin": "connorch/skills",
+      "ref": "main",
+      "install": "pnpm install --frozen-lockfile && pnpm ship:machine",
+    },
+    // Waits on the code signing spike: over Tailscale SSH the keychain is
+    // locked, so a remote build cannot sign with "T3 Code Local Signing".
+    // {
+    //   "origin": "connorch/t3code",
+    //   "ref": "main",
+    //   "platforms": ["darwin"],
+    //   "install": "pnpm install --frozen-lockfile && pnpm install:desktop:local && pnpm --filter t3 build:bundle && mkdir -p ~/.local/bin && ln -sf \"$PWD/apps/server/dist/bin.mjs\" ~/.local/bin/t3",
+    // },
+    // Waits on Connor confirming its Install Command (and on the same signing
+    // spike, for "OpenWhispr Local").
+    // {
+    //   "origin": "connorch/openwhispr",
+    //   "ref": "main",
+    //   "platforms": ["darwin"],
+    //   "install": "TBD",
+    // },
+  ],
+  "vp": {
+    "version": "1.1.0",
+    "node": "24.18.1",
+    "globals": {
+      "@playwright/cli": "^0.1.21",
+      "@posthog/cli": "^0.18.9",
+      "agent-browser": "^0.38.1",
+      "inngest-cli": "^1.45.1",
+      "neonctl": "^5.0.1",
+      "skills": "^1.7.0",
+      "turbo": "^2.11.3",
+      "vercel": "^59.25.4",
+      "wrangler": "^4.136.3",
+    },
+  },
+}
