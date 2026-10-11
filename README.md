@@ -47,7 +47,7 @@ skills add connorch/skills --skill qa-ux-plan qa-ux-verify codex-review codex-im
 ## Shipping to your machines
 
 This repo is one Tracked Repo in [fleetfizz](https://www.npmjs.com/package/fleetfizz)'s
-config at `~/.config/fleetfizz/fleet.config.jsonc`, which lists every machine in the
+config at `~/.config/fleetfizz/config.jsonc`, which lists every machine in the
 fleet, the vite-plus toolchain they share, and each repo to install (this one,
 psychopomp). `fizz ship` brings every listed machine in line with it, in
 parallel, over `tailscale ssh`, and copies the config to each of them, so any
