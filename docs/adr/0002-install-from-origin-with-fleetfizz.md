@@ -1,7 +1,9 @@
 # Install from origin on every Machine, with fleetfizz
 
-A Ship is `pnpm ship`, which runs fleetfizz (an npm devDependency) with `fleet.config.jsonc`
-at the repo root. This repo is one Tracked Repo in that config. On every Machine, the one
+A Ship is `fleetfizz ship`. fleetfizz is a vp Global, and its config lives at
+`~/.config/fleetfizz/fleet.config.jsonc` on every Machine, copied there by every Ship (fleetfizz
+ADR 0008); it was this repo's `fleet.config.jsonc` and devDependency until fleetfizz 0.2.0. This
+repo is one Tracked Repo in that config. On every Machine, the one
 starting the Ship included, fleetfizz resets a Managed Clone of `origin/main` and, when it
 changed, runs this repo's Install Command there: `pnpm install --frozen-lockfile && pnpm
 ship:machine`. `apps/ship` is now only that installer. This supersedes ADR 0001's rule that the
@@ -27,15 +29,15 @@ starting Machine ships its working copy while every other Machine ships `origin/
 ## Consequences
 
 - Nothing installs from a working copy except a hand-run `pnpm ship:machine`. Push to `main`
-  before shipping. A hand install stays until `pnpm ship --rebuild connorch-skills`, because
-  the Managed Clone's commit has not changed.
+  before shipping. A hand install stays until `fleetfizz ship --rebuild connorch-skills`,
+  because the Managed Clone's commit has not changed.
 - fleetfizz passes the Machine to the installer as `FLEETFIZZ_MACHINE`, `FLEETFIZZ_PLATFORM`,
   and `FLEETFIZZ_MACHINES`. Run by hand, the installer reads `tailscale status --json`.
 - The `fleet: false` targeting control is gone: there is no special starting Machine to ship
   only to. Use `machines` instead.
 - psychopomp is a Tracked Repo pinned to a commit. Its Install Command links
   `~/.local/share/psychopomp` to its Managed Clone, so the motion-explainer skill keeps its path.
-- Upgrading fleetfizz means bumping it in the pnpm catalog. Its CLI and the JSON Schema that
-  `fleet.config.jsonc` is checked against are always the same version.
+- fleetfizz pins itself: a Ship installs the shipping Machine's fleetfizz version on every
+  Machine, and writes the matching JSON Schema next to the config.
 - fleetfizz never deletes. Managed Clones and records of repos removed from the config stay
   until someone removes them by hand.

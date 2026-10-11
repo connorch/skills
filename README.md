@@ -46,26 +46,23 @@ skills add connorch/skills --skill qa-ux-plan qa-ux-verify codex-review codex-im
 
 ## Shipping to your machines
 
-`pnpm ship` runs [fleetfizz](https://www.npmjs.com/package/fleetfizz), pinned as
-a devDependency. It brings every macOS and linux machine on your tailnet in
-line with [`fleet.config.jsonc`](fleet.config.jsonc), in parallel, over
-`tailscale ssh`:
+This repo is one Tracked Repo in [fleetfizz](https://www.npmjs.com/package/fleetfizz)'s
+config at `~/.config/fleetfizz/fleet.config.jsonc`, which lists every machine in the
+fleet, the vite-plus toolchain they share, and each repo to install (this one,
+psychopomp). `fleetfizz ship` brings every listed machine in line with it, in
+parallel, over `tailscale ssh`, and copies the config to each of them, so any
+machine can run the next Ship.
 
-- the vite-plus toolchain: the vp version, the Node default, and global
-  packages at semver ranges
-- each Tracked Repo in the config (this repo, psychopomp), installed from its
-  origin ref. Every machine, this one included, keeps a Managed Clone of the
-  repo that fleetfizz resets to the ref, then runs the repo's Install Command
-  there when something changed. For this repo that is
-  `pnpm install --frozen-lockfile && pnpm ship:machine`.
-
-The config is read from your working copy, but nothing installs from it: push to
-`main` first. Offline machines are skipped with a warning.
+Every machine, this one included, keeps a Managed Clone of this repo that
+fleetfizz resets to `origin/main`, then runs the Install Command there when
+something changed: `pnpm install --frozen-lockfile && pnpm ship:machine`. Nothing
+installs from a working copy: push to `main` first.
 
 ```sh
-pnpm ship                          # every machine
-pnpm ship --dry-run                # print each machine's plan, change nothing
-pnpm ship --only connors-mac-studio
+vp install -g fleetfizz            # once, on the machine you ship from
+fleetfizz ship                     # every machine
+fleetfizz ship --dry-run           # print each machine's plan, change nothing
+fleetfizz ship --only connors-mac-studio
 pnpm ship:machine                  # install this checkout here, by hand
 ```
 
@@ -73,13 +70,13 @@ pnpm ship:machine                  # install this checkout here, by hand
 CLIs on the machine it runs on. fleetfizz runs it with `FLEETFIZZ_MACHINE`,
 `FLEETFIZZ_PLATFORM`, and `FLEETFIZZ_MACHINES` set; run by hand, it reads the
 same facts from `tailscale status --json`. A hand install of a working copy
-stays until the next `pnpm ship --rebuild connorch-skills`, because the commit
-in the Managed Clone has not changed.
+stays until the next `fleetfizz ship --rebuild connorch-skills`, because the
+commit in the Managed Clone has not changed.
 
 The machine you ship from needs `tailscale` and a logged-in `gh` (its token is
-lent to the others for one Ship so private repos clone). Every machine needs
-`git` and `vp` on its login-shell PATH, and must accept Tailscale SSH: on macOS
-that means the open-source `tailscaled` rather than Tailscale.app (see
+lent to the others for one Ship so private repos clone). Every other machine
+needs `git`, `curl`, and Tailscale SSH: on macOS that means the open-source
+`tailscaled` rather than Tailscale.app (see
 [`docs/adr/0001-push-based-ship-over-tailscale-ssh.md`](docs/adr/0001-push-based-ship-over-tailscale-ssh.md)
 and [`docs/adr/0002-install-from-origin-with-fleetfizz.md`](docs/adr/0002-install-from-origin-with-fleetfizz.md)).
 
