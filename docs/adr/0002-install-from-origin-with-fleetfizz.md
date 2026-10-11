@@ -1,6 +1,6 @@
 # Install from origin on every Machine, with fleetfizz
 
-A Ship is `fleetfizz ship`. fleetfizz is a vp Global, and its config lives at
+A Ship is `fizz ship`. fleetfizz is a vp Global, and its config lives at
 `~/.config/fleetfizz/fleet.config.jsonc` on every Machine, copied there by every Ship (fleetfizz
 ADR 0008); it was this repo's `fleet.config.jsonc` and devDependency until fleetfizz 0.2.0. This
 repo is one Tracked Repo in that config. On every Machine, the one
@@ -29,7 +29,7 @@ starting Machine ships its working copy while every other Machine ships `origin/
 ## Consequences
 
 - Nothing installs from a working copy except a hand-run `pnpm ship:machine`. Push to `main`
-  before shipping. A hand install stays until `fleetfizz ship --rebuild connorch-skills`,
+  before shipping. A hand install stays until `fizz ship --rebuild connorch-skills`,
   because the Managed Clone's commit has not changed.
 - fleetfizz passes the Machine to the installer as `FLEETFIZZ_MACHINE`, `FLEETFIZZ_PLATFORM`,
   and `FLEETFIZZ_MACHINES`. Run by hand, the installer reads `tailscale status --json`.
