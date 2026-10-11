@@ -164,7 +164,6 @@ follow them except where the overrides below say otherwise:
    | Damian | `Vep3bcB7LhKa3wfjMiI6` | deep, intimate, dark |
    | George | `JBFqnCBsd6RMkjVDRZzb` | warm British storyteller |
    | Brian | `nPczCjzI2devNBz1zQrb` | deep, resonant narrator |
-   | Daniel | `onwK4e9ZLuTAKqWW03F9` | steady broadcaster |
    | Tarquin | `7cOBG34AiHrAzs842Rdi` | posh British, Received Pronunciation |
    | Clyde | `QMJTqaMXmGnG8TCm8WQG` | vintage radio announcer |
 
