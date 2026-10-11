@@ -1,7 +1,7 @@
 # Install from origin on every Machine, with fleetfizz
 
 A Ship is `fizz ship`. fleetfizz is a vp Global, and its config lives at
-`~/.config/fleetfizz/fleet.config.jsonc` on every Machine, copied there by every Ship (fleetfizz
+`~/.config/fleetfizz/config.jsonc` on every Machine, copied there by every Ship (fleetfizz
 ADR 0008); it was this repo's `fleet.config.jsonc` and devDependency until fleetfizz 0.2.0. This
 repo is one Tracked Repo in that config. On every Machine, the one
 starting the Ship included, fleetfizz resets a Managed Clone of `origin/main` and, when it
