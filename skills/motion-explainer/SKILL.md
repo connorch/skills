@@ -16,8 +16,8 @@ on an annotated diff). Then publish it to Wovn.
 ## The engine
 
 [Psychopomp](https://github.com/kitlangton/psychopomp) is Kit's Rust motion
-graphics engine. A Ship (`pnpm ship` in the skills repo) clones it at a pinned
-commit, builds it, and links `~/.local/share/psychopomp` to that checkout.
+graphics engine. A Ship (`fleetfizz ship`) clones it at a pinned commit, builds
+it, and links `~/.local/share/psychopomp` to that checkout.
 
 ```sh
 PP=~/.local/share/psychopomp
@@ -25,9 +25,9 @@ PSY=$PP/target/release/psychopomp
 ```
 
 - If `$PSY` does not exist, tell the user to run
-  `pnpm ship --rebuild kitlangton-psychopomp` in the skills repo. A plain
-  `pnpm ship` skips psychopomp when its pinned commit has not changed, even if
-  the binary is gone. Do not clone or build it yourself.
+  `fleetfizz ship --rebuild kitlangton-psychopomp`. A plain `fleetfizz ship`
+  skips psychopomp when its pinned commit has not changed, even if the binary
+  is gone. Do not clone or build it yourself.
 - The checkout is read-only. Do not edit, commit to, pull, or check out
   anything in it. If the engine cannot do something, work within it and tell the
   user what was missing.
