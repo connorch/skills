@@ -25,7 +25,7 @@ One member of the Fleet, identified by its tailnet hostname (e.g. `connors-mac-s
 _Avoid_: device, host, box
 
 **Ship**:
-A manual run of `fleetfizz ship` that brings every reachable Machine in line with fleetfizz's config: its vite-plus toolchain and every Tracked Repo, this one included.
+A manual run of `fizz ship` that brings every reachable Machine in line with fleetfizz's config: its vite-plus toolchain and every Tracked Repo, this one included.
 _Avoid_: deploy, publish, sync, rollout
 
 **Tracked Repo**:
@@ -59,8 +59,8 @@ _Avoid_: install log, history
 > **Dev:** "The Studio was asleep during the last **Ship** - is it stuck on old skills now?"
 > **Connor:** "Until the next **Ship**, yes. There's no background sync; a **Ship** only reaches **Machines** that are online."
 
-> **Dev:** "I changed a skill on my branch. Does `fleetfizz ship` install it?"
-> **Connor:** "No, a **Ship** installs `origin/main`. Run `pnpm ship:machine` to **Install** your checkout here; the next `fleetfizz ship --rebuild connorch-skills` puts main back."
+> **Dev:** "I changed a skill on my branch. Does `fizz ship` install it?"
+> **Connor:** "No, a **Ship** installs `origin/main`. Run `pnpm ship:machine` to **Install** your checkout here; the next `fizz ship --rebuild connorch-skills` puts main back."
 
 ## Flagged ambiguities
 

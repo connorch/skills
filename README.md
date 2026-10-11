@@ -49,7 +49,7 @@ skills add connorch/skills --skill qa-ux-plan qa-ux-verify codex-review codex-im
 This repo is one Tracked Repo in [fleetfizz](https://www.npmjs.com/package/fleetfizz)'s
 config at `~/.config/fleetfizz/fleet.config.jsonc`, which lists every machine in the
 fleet, the vite-plus toolchain they share, and each repo to install (this one,
-psychopomp). `fleetfizz ship` brings every listed machine in line with it, in
+psychopomp). `fizz ship` brings every listed machine in line with it, in
 parallel, over `tailscale ssh`, and copies the config to each of them, so any
 machine can run the next Ship.
 
@@ -60,9 +60,9 @@ installs from a working copy: push to `main` first.
 
 ```sh
 vp install -g fleetfizz            # once, on the machine you ship from
-fleetfizz ship                     # every machine
-fleetfizz ship --dry-run           # print each machine's plan, change nothing
-fleetfizz ship --only connors-mac-studio
+fizz ship                          # every machine
+fizz ship --dry-run                # print each machine's plan, change nothing
+fizz ship --only connors-mac-studio
 pnpm ship:machine                  # install this checkout here, by hand
 ```
 
@@ -70,7 +70,7 @@ pnpm ship:machine                  # install this checkout here, by hand
 CLIs on the machine it runs on. fleetfizz runs it with `FLEETFIZZ_MACHINE`,
 `FLEETFIZZ_PLATFORM`, and `FLEETFIZZ_MACHINES` set; run by hand, it reads the
 same facts from `tailscale status --json`. A hand install of a working copy
-stays until the next `fleetfizz ship --rebuild connorch-skills`, because the
+stays until the next `fizz ship --rebuild connorch-skills`, because the
 commit in the Managed Clone has not changed.
 
 The machine you ship from needs `tailscale` and a logged-in `gh` (its token is
