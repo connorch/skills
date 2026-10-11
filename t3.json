@@ -4,7 +4,7 @@
   "scripts": [
     {
       "name": "ship",
-      "command": "pnpm ship",
+      "command": "fleetfizz ship",
       "icon": "configure"
     }
   ]
