@@ -89,27 +89,33 @@ initial design>
 
 ## What's shaped well
 
-- **<decision>** - <why it is right: the property it buys, the class of bug it
-  makes unrepresentable, the existing pattern it matches>.
+- **A1. <decision>** - <why it is right: the property it buys, the class of
+  bug it makes unrepresentable, the existing pattern it matches>.
 
 ## What I'd change
 
-<Ranked prose, heaviest first. Name the single thing to actively walk back and
-the gap to close first; mark minor notes as minor. For each: what is wrong,
-what churn produced it, the concrete alternative anchored to a pattern the
-codebase already has, and the cost of leaving it.>
+**B1. <change>** - <ranked prose, heaviest first. Name the single thing to
+actively walk back and the gap to close first; mark minor notes as minor. For
+each: what is wrong, what churn produced it, the concrete alternative anchored
+to a pattern the codebase already has, and the cost of leaving it.>
 
 ## Residue
 
-- **<file:line>** - <artifact>. Left behind by <which fix>. <What changed, or
-  the proposed fix in assess mode.>
-- Examined and kept: **<file:line>** - <what it looks like> but correct as-is:
-  <one-line reason>.
+- **C1. <file:line>** - <artifact>. Left behind by <which fix>. <What
+  changed, or the proposed fix in assess mode.>
+- **C2. Examined and kept: <file:line>** - <what it looks like> but correct
+  as-is: <one-line reason>.
 
 ## Out of scope, noted
 
 <pre-existing or unrelated issues found along the way; omit if empty>
 ```
+
+Label every item in "What's shaped well", "What I'd change", and "Residue"
+with a letter-number ID - one letter per section, numbered from 1 - so the
+user can reply with "do B2, skip C4". A/B/C above is only an example: pick
+letters that no other labeled list in the thread already uses (an earlier
+step-back report, mocks, options) so every ID stays unambiguous.
 
 Writing rules: complete sentences, not fragment bullets. "What's shaped well"
 is mandatory and must carry the *why* - affirmation with reasons is what makes
