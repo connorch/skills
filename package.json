@@ -4,7 +4,6 @@
   "type": "module",
   "scripts": {
     "prepare": "vp config --no-agent",
-    "dev:wovn-files": "vp run --filter wovn-files dev",
     "build": "vp run -r build",
     "typecheck": "vp run -r typecheck",
     "lint": "vp lint --report-unused-disable-directives",

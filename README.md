@@ -49,7 +49,7 @@ skills add connorch/skills --skill qa-ux-plan qa-ux-verify codex-review codex-im
 This repo is one Tracked Repo in [fleetfizz](https://www.npmjs.com/package/fleetfizz)'s
 config at `~/.config/fleetfizz/config.jsonc`, which lists every machine in the
 fleet, the vite-plus toolchain they share, and each repo to install (this one,
-psychopomp). `fizz ship` brings every listed machine in line with it, in
+connorch/wovn, psychopomp). `fizz ship` brings every listed machine in line with it, in
 parallel, over `tailscale ssh`, and copies the config to each of them, so any
 machine can run the next Ship.
 
@@ -134,7 +134,7 @@ These skills help you plan, verify, write, refactor, and fix code.
 - **babysit-pr** — Monitor a pull request through review and CI, verifying bot findings, fixing real failures, and dismissing false positives with reasons. Adapted from a skill by [Theo Browne](https://youtu.be/e1snsuY4lTI).
 - **merge-risk** - Rate a PR's merge risk on a Minimal-to-Critical scale in an independent subagent, verifying existing bot findings before they count toward the rating.
 - **html-communication** — Create self-contained HTML writeups (plans, specs, findings, UI mocks) and publish them privately to files.wovn.org with the wovn CLI. Adapted from a skill by Theo Browne.
-- **wovn-file-hosting** - Upload any local file to files.wovn.org and return a permanent URL (private by default, public on request), backed by the Cloudflare Worker in `apps/wovn-files/` and the `wovn` CLI in `apps/wovn-cli/`. Adapted from a skill by Theo Browne.
+- **wovn-file-hosting** - Upload any local file to files.wovn.org and return a permanent URL (private by default, public on request), backed by the host and the `wovn` CLI in [connorch/wovn](https://github.com/connorch/wovn). Adapted from a skill by Theo Browne.
 - **t3-browser** - Drive T3 Code's built-in Browser panel, which the user watches live, for browser QA and screenshots whenever its `preview_*` tools are available, reaching dev servers by environment port so they resolve to the machine running the code.
 - **motion-explainer** - Turn a pull request, or a question about how something works, into a 1080p60 motion graphic explainer in the style of [Kit Langton's PR films](https://x.com/kitlangton/status/2106623769146233112), rendered with his [psychopomp](https://github.com/kitlangton/psychopomp) engine and published privately to files.wovn.org. Ships to macOS only.
 - **jev** - Use TypeSafe's Jev decision model for bulk classification and fast Jev-driven browsing in the Agents Chrome, through the `jevx` CLI in `apps/jevx-cli/`. Ships only to connors-mac-studio.
@@ -152,10 +152,6 @@ root. Skills live under `skills/` as plain directories; the code behind them
 lives in `apps/` (see [`CONTEXT-MAP.md`](CONTEXT-MAP.md) for each app's
 domain docs).
 
-- `apps/wovn-files` - the files.wovn.org Worker (TanStack Start on
-  Cloudflare).
-- `apps/wovn-cli` - the `wovn` CLI the `wovn-file-hosting` and
-  `html-communication` skills call.
 - `apps/jevx-cli` - the `jevx` CLI the `jev` skill calls (Mac Studio only).
 - `apps/mac-vm` - the `mac-vm` CLI the `mac-vm` skill calls (connors-mac-studio only).
 - `apps/bambu-cli` - the `bambu` CLI for the P1S on the home LAN (connors-mac-studio only).
@@ -166,7 +162,6 @@ domain docs).
 ```sh
 pnpm install
 pnpm ship:machine    # install skills, instructions, and CLIs here
-pnpm dev:wovn-files  # the host with HMR
 pnpm typecheck       # every workspace package
 pnpm lint            # oxlint via vp
 pnpm fmt             # oxfmt via vp (skills/ is left as written)

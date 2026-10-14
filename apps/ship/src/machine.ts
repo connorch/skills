@@ -18,7 +18,7 @@ const { dryRun } = new Command("ship:machine")
 
 const line = (tag: string, message: string) => console.log(`${tag.padEnd(4)}  ${message}`);
 
-// The result line, e.g. "15 skills (+2 -1) · wovn-cli".
+// The result line, e.g. "15 skills (+2 -1) · bambu-cli".
 function describeChanges(report: MachineReport): string {
   const delta = [
     report.added.length > 0 ? `+${report.added.length}` : "",

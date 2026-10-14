@@ -6,7 +6,6 @@ packages:
 # true = allowed to run build scripts.
 allowBuilds:
   esbuild: true
-  workerd: false
 
 catalog:
   "@types/node": 24.12.4

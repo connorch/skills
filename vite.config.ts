@@ -5,9 +5,6 @@ const IGNORE_PATTERNS = [
   "node_modules",
   "pnpm-lock.yaml",
   "*.tsbuildinfo",
-  "**/routeTree.gen.ts",
-  "**/worker-configuration.d.ts",
-  "**/.wrangler/**",
   "output/**",
   ".context/**",
   // Upstream reference code (see vendor/README.md): read, never built.
