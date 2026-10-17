@@ -2,14 +2,14 @@
 name: wovn-file-hosting
 description: Use whenever the user provides a link to files.wovn.org, when a local file needs a public or private URL, or when the user asks to upload, host, share, list, or retrieve files through Wovn.
 metadata:
-  requires: "the wovn CLI on PATH, or WOVN_TOKEN in the environment"
+  requires: "the wovn CLI on PATH, signed in with wovn login"
 ---
 
 # Wovn file hosting
 
 Upload files to `https://files.wovn.org` and return the permanent URL from the
 response body. Files are **private by default** - only Connor can open them
-(browser login, or the CLI's token). Pass `--public` only when the URL must be
+(signed in to wovn.org in the browser, or through the CLI). Pass `--public` only when the URL must be
 readable by others (PR screenshots, images embedded on GitHub, anything
 shared externally). Prefer the `wovn` CLI:
 
@@ -19,19 +19,16 @@ wovn put --public pr-142-upload-flow-after.png  # public, for sharing
 wovn put --public --name pr-142-after.png "/tmp/Screenshot 2026-08-11 at 3.14.15 PM.png"
 ```
 
-If `wovn` is not on the PATH, fall back to curl with `WOVN_TOKEN`
-(`-X POST` matters: POST mints an immutable URL, PUT overwrites a stable
-path; add `-H "x-wovn-visibility: public"` for a public upload):
+The CLI is `@wovn/cli` and signs in once per machine through the browser:
 
 ```sh
-file="/path/to/screenshot.png"
-curl -sS -X POST -T "$file" \
-  -H "Authorization: Bearer $WOVN_TOKEN" \
-  "https://files.wovn.org/$(basename "$file" | tr ' ' '-')"
+npm i -g @wovn/cli
+wovn login   # opens wovn.org to confirm a code; saves a Token in ~/.config/wovn/config.json
 ```
 
-If neither the CLI nor the token is available, tell the user instead of
-guessing.
+On a machine without a browser, `wovn login --token <token> --host files.wovn.org`
+takes a Token minted in wovn.org's settings. If the CLI is missing or not
+signed in and neither works, tell the user instead of guessing.
 
 The response body is the URL, nothing else. Generated keys are dated plus a
 random slug, so uploading never overwrites anything, URLs never change, and a
@@ -44,8 +41,8 @@ render inline in browsers.
 Every file carries its own visibility (public, private, or shared with
 specific emails - see below); there is one host and one URL per file, and
 flipping visibility never changes the URL. A private URL opened in
-a browser bounces through `files.wovn.org/login` (Cloudflare Access); other
-people cannot open it - never embed a private URL in a public PR or issue.
+a browser bounces through wovn.org's login; other people cannot open it -
+never embed a private URL in a public PR or issue.
 
 ```sh
 wovn visibility get docs/q3-roadmap.html         # public | private
@@ -56,14 +53,14 @@ wovn visibility set docs/q3-roadmap.html private # unpublish (best effort:
 
 Reading a private file back (for example a previously uploaded plan):
 `wovn read <url-or-path>`; bare paths like `docs/plan.html` work everywhere a
-URL does. Without the CLI: `curl -H "Authorization: Bearer $WOVN_TOKEN" <url>`.
+URL does.
 
 ## Sharing with specific people
 
 `wovn share` opens a private file to a list of emails without making it
-public. Guests open the normal URL, enter their email at files.wovn.org, and
-type the one-time code Cloudflare emails them; they get the file's bytes and
-nothing else (no listing, no history). The URL never changes, so share the
+public. Guests open the normal URL, land on wovn.org's guest login, enter
+their email and the one-time code Wovn emails them; they get the file's bytes
+and nothing else (no listing, no history). The URL never changes, so share the
 file's own URL.
 
 ```sh
@@ -204,7 +201,8 @@ opens a File in the browser from the terminal.
 
 ## Where it runs
 
-files.wovn.org is a Cloudflare Worker in front of one R2 bucket. This skill
-is for using the CLI; changing the host is a separate job. Both live in
-the connorch/wovn repo, which fleetfizz ships to every machine as its own
-Tracked Repo; its `pnpm ship:machine` installs the CLI on this machine.
+files.wovn.org is the `files` Org on wovn.org, Connor's own R2 bucket served
+by Wovn (the connorch/wovn repo). This skill is for using the CLI; changing
+the host is a separate job. fleetfizz ships the repo to every machine as a
+Tracked Repo; its `pnpm ship:machine` installs the same CLI
+`npm i -g @wovn/cli` does, and `wovn login` is still a per-machine step.

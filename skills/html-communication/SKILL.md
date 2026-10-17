@@ -75,9 +75,9 @@ separate permission or stop at the local file.
 
 Re-upload to the same `--at` path with `--force` to update the document in
 place; the URL stays stable across iterations. Use a new path only for a
-genuinely new document. Only Connor can open private URLs (browser login via
-files.wovn.org/login, or the CLI's token); never embed them in public PRs or
-issues. To read one back, run `wovn read <url>`.
+genuinely new document. Only Connor can open private URLs (signed in to
+wovn.org in the browser, or through the CLI); never embed them in public PRs
+or issues. To read one back, run `wovn read <url>`.
 
-If `wovn` or its token is missing, tell the user instead of guessing. Never claim the document is hosted before the upload succeeds. Do
+If `wovn` is missing or not signed in, tell the user instead of guessing. Never claim the document is hosted before the upload succeeds. Do
 not verify in a browser unless the user asks.
