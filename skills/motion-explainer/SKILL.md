@@ -3,7 +3,7 @@ name: motion-explainer
 description: Use when the user asks for a motion graphic, animated explainer, or explainer video of a pull request, or of how something works ("make a video explaining X"). Renders it with Kit Langton's psychopomp engine and publishes the MP4 privately to files.wovn.org.
 metadata:
   platforms: [darwin]
-  requires: "the psychopomp checkout at ~/.local/share/psychopomp (a Tracked Repo in the skills repo's fleet.config.jsonc), ffmpeg, ImageMagick, uv, bun, gh, and the wovn CLI"
+  requires: "the psychopomp checkout at ~/.local/share/psychopomp (a Tracked Repo in fleetfizz's config.jsonc), ffmpeg, ImageMagick, uv, bun, gh, and the wovn CLI"
 ---
 
 # Motion explainer
