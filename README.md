@@ -49,7 +49,7 @@ skills add connorch/skills --skill qa-ux-plan qa-ux-verify codex-review codex-im
 This repo is one Tracked Repo in [fleetfizz](https://www.npmjs.com/package/fleetfizz)'s
 config at `~/.config/fleetfizz/config.jsonc`, which lists every machine in the
 fleet, the vite-plus toolchain they share, and each repo to install (this one,
-connorch/wovn, psychopomp). `fizz ship` brings every listed machine in line with it, in
+connorch/wovn, connorch/claude-router, psychopomp). `fizz ship` brings every listed machine in line with it, in
 parallel, over `tailscale ssh`, and copies the config to each of them, so any
 machine can run the next Ship.
 
@@ -155,7 +155,6 @@ domain docs).
 - `apps/jevx-cli` - the `jevx` CLI the `jev` skill calls (Mac Studio only).
 - `apps/mac-vm` - the `mac-vm` CLI the `mac-vm` skill calls (connors-mac-studio only).
 - `apps/bambu-cli` - the `bambu` CLI for the P1S on the home LAN (connors-mac-studio only).
-- `apps/claude-router` - the `claude-router` proxy and CLI the `claude-router` skill describes (both Macs).
 - `apps/ship` - the skills installer behind `pnpm ship:machine`.
 - `instructions` - the global agent instructions (see above).
 
