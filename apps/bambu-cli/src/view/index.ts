@@ -1,7 +1,7 @@
 // `bambu view <model>`: the Review Page for one Model (docs/adr/0002). Loads
 // the Model, runs the Printability Report checks on it as-is, packs a preview
 // GLB, fills the viewer template, writes review.html beside the Model, and
-// publishes it privately on wovn.
+// publishes it privately on vaut.
 
 import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, resolve } from "node:path";
@@ -274,7 +274,7 @@ type ViewOptions = z.infer<typeof viewOptions>;
 export function register(program: Command, config: Config): void {
   program
     .command("view")
-    .description("Review Page for a Model: review.html beside it, published on wovn")
+    .description("Review Page for a Model: review.html beside it, published on vaut")
     .argument("<model>", "STL, 3MF, OBJ, or GLB")
     .option("-o, --output <file>", "page to write (default: review.html beside the Model)")
     .option("--job <name>", "Print Job name (default: the Model's folder)")

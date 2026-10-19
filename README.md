@@ -29,7 +29,7 @@ skills add connorch/skills --skill file-pr
 skills add connorch/skills --skill implement-and-review
 skills add connorch/skills --skill handoff
 skills add connorch/skills --skill html-communication
-skills add connorch/skills --skill wovn-file-hosting
+skills add connorch/skills --skill vaut-file-hosting
 skills add connorch/skills --skill fleet-exec
 skills add connorch/skills --skill jev
 skills add connorch/skills --skill mac-vm
@@ -41,7 +41,7 @@ skills add connorch/skills --skill motion-explainer
 You can also install multiple specific skills in one command:
 
 ```sh
-skills add connorch/skills --skill qa-ux-plan qa-ux-verify codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr merge-risk file-pr implement-and-review handoff html-communication wovn-file-hosting fleet-exec jev mac-vm bambu-print t3-browser motion-explainer
+skills add connorch/skills --skill qa-ux-plan qa-ux-verify codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr merge-risk file-pr implement-and-review handoff html-communication vaut-file-hosting fleet-exec jev mac-vm bambu-print t3-browser motion-explainer
 ```
 
 ## Shipping to your machines
@@ -49,7 +49,7 @@ skills add connorch/skills --skill qa-ux-plan qa-ux-verify codex-review codex-im
 This repo is one Tracked Repo in [fleetfizz](https://www.npmjs.com/package/fleetfizz)'s
 config at `~/.config/fleetfizz/config.jsonc`, which lists every machine in the
 fleet, the vite-plus toolchain they share, and each repo to install (this one,
-connorch/wovn, connorch/claude-router, psychopomp). `fizz ship` brings every listed machine in line with it, in
+connorch/vaut, connorch/claude-router, psychopomp). `fizz ship` brings every listed machine in line with it, in
 parallel, over `tailscale ssh`, and copies the config to each of them, so any
 machine can run the next Ship.
 
@@ -133,10 +133,10 @@ These skills help you plan, verify, write, refactor, and fix code.
 - **handoff** - Compact the current conversation into a handoff document in the OS temp directory so a fresh agent can pick up the work. Invoked by the user only. Adapted from a skill by [Matt Pocock](https://github.com/mattpocock/skills).
 - **babysit-pr** — Monitor a pull request through review and CI, verifying bot findings, fixing real failures, and dismissing false positives with reasons. Adapted from a skill by [Theo Browne](https://youtu.be/e1snsuY4lTI).
 - **merge-risk** - Rate a PR's merge risk on a Minimal-to-Critical scale in an independent subagent, verifying existing bot findings before they count toward the rating.
-- **html-communication** — Create self-contained HTML writeups (plans, specs, findings, UI mocks) and publish them privately to files.wovn.org with the wovn CLI. Adapted from a skill by Theo Browne.
-- **wovn-file-hosting** - Upload any local file to files.wovn.org and return a permanent URL (private by default, public on request), backed by the host and the `wovn` CLI in [connorch/wovn](https://github.com/connorch/wovn). Adapted from a skill by Theo Browne.
+- **html-communication** — Create self-contained HTML writeups (plans, specs, findings, UI mocks) and publish them privately to files.vaut.dev with the vaut CLI. Adapted from a skill by Theo Browne.
+- **vaut-file-hosting** - Upload any local file to files.vaut.dev and return a permanent URL (private by default, public on request), backed by the host and the `vaut` CLI in [connorch/vaut](https://github.com/connorch/vaut). Adapted from a skill by Theo Browne.
 - **t3-browser** - Drive T3 Code's built-in Browser panel, which the user watches live, for browser QA and screenshots whenever its `preview_*` tools are available, reaching dev servers by environment port so they resolve to the machine running the code.
-- **motion-explainer** - Turn a pull request, or a question about how something works, into a 1080p60 motion graphic explainer in the style of [Kit Langton's PR films](https://x.com/kitlangton/status/2106623769146233112), rendered with his [psychopomp](https://github.com/kitlangton/psychopomp) engine and published privately to files.wovn.org. Ships to macOS only.
+- **motion-explainer** - Turn a pull request, or a question about how something works, into a 1080p60 motion graphic explainer in the style of [Kit Langton's PR films](https://x.com/kitlangton/status/2106623769146233112), rendered with his [psychopomp](https://github.com/kitlangton/psychopomp) engine and published privately to files.vaut.dev. Ships to macOS only.
 - **jev** - Use TypeSafe's Jev decision model for bulk classification and fast Jev-driven browsing in the Agents Chrome, through the `jevx` CLI in `apps/jevx-cli/`. Ships only to connors-mac-studio.
 
 ## Fleet

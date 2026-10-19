@@ -306,7 +306,7 @@ workspace-local file such as `.context/qa-ux-fix-loop.md` when working in a repo
 
 ## Publish
 
-When the report is final, invoke the `wovn-file-hosting` skill: upload the
+When the report is final, invoke the `vaut-file-hosting` skill: upload the
 screenshots first, rewrite the report's image links to the returned URLs, then
 upload `qa-ux-report.html` privately. Publishing the HTML alone leaves the hosted
 report with broken images.

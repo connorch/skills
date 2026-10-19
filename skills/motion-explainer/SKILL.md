@@ -1,9 +1,9 @@
 ---
 name: motion-explainer
-description: Use when the user asks for a motion graphic, animated explainer, or explainer video of a pull request, or of how something works ("make a video explaining X"). Renders it with Kit Langton's psychopomp engine and publishes the MP4 privately to files.wovn.org.
+description: Use when the user asks for a motion graphic, animated explainer, or explainer video of a pull request, or of how something works ("make a video explaining X"). Renders it with Kit Langton's psychopomp engine and publishes the MP4 privately to files.vaut.dev.
 metadata:
   platforms: [darwin]
-  requires: "the psychopomp checkout at ~/.local/share/psychopomp (a Tracked Repo in fleetfizz's config.jsonc), ffmpeg, ImageMagick, uv, bun, gh, and the wovn CLI"
+  requires: "the psychopomp checkout at ~/.local/share/psychopomp (a Tracked Repo in fleetfizz's config.jsonc), ffmpeg, ImageMagick, uv, bun, gh, and the vaut CLI"
 ---
 
 # Motion explainer
@@ -11,7 +11,7 @@ metadata:
 Make a 1080p60 motion graphic that explains one pull request or one mechanism,
 in the style of Kit Langton's PR explainers (a dark stage of cards, wires,
 packets, and a particle orb; the bug plays, rewinds, and replays fixed; it ends
-on an annotated diff). Then publish it to Wovn.
+on an annotated diff). Then publish it to Vaut.
 
 ## The engine
 
@@ -57,7 +57,7 @@ follow them except where the overrides below say otherwise:
 | --- | --- |
 | Author in `$PP/scenes/<name>`, add it to the workspace, `cargo run -p` | A standalone crate in `~/.local/share/psychopomp-scenes/<slug>` (step 3) |
 | Add missing features to the engine | Work within the engine; report the gap |
-| Commit the scene and engine changes | Commit nothing; publish to Wovn (step 7) |
+| Commit the scene and engine changes | Commit nothing; publish to Vaut (step 7) |
 | Narrate with Fish Audio, ElevenLabs, or `say` | ElevenLabs or `say` as in step 4; Fish Audio is not set up |
 | Plain, confident narration, no hype (`STORY.md`) | Keep the words plain, but direct an expressive delivery (step 4) |
 
@@ -77,7 +77,7 @@ follow them except where the overrides below say otherwise:
    - Mechanism with no fix: setup, the mechanism step by step, the payoff, then
      the code that does it.
    - Slug: `<repo>-pr-<number>` or a kebab-case topic, such as
-     `skills-pr-57` or `wovn-token-rotation`. It is also the crate name, so use
+     `skills-pr-57` or `vaut-token-rotation`. It is also the crate name, so use
      only lowercase letters, digits, and hyphens, starting with a letter
      (`next.js` becomes `nextjs-pr-12`).
 
@@ -246,12 +246,12 @@ follow them except where the overrides below say otherwise:
    `ffmpeg -i <mp4> -af ebur128=peak=true -f null -` shows loudness near
    -16 LUFS with peaks under -1 dBFS.
 
-7. **Publish to Wovn**, privately, with a poster frame for links:
+7. **Publish to Vaut**, privately, with a poster frame for links:
 
    ```sh
    $PSY plan frame "$S/<slug>.reel.json" <seconds> "$S/output/<slug>-poster.png" --theme neutral --shutter
-   wovn put --at videos/<slug>.mp4 "$S/output/<slug>.mp4"
-   wovn put --at videos/<slug>-poster.png "$S/output/<slug>-poster.png"
+   vaut put --at videos/<slug>.mp4 "$S/output/<slug>.mp4"
+   vaut put --at videos/<slug>-poster.png "$S/output/<slug>-poster.png"
    ```
 
    Add `--force` when you re-render a slug that is already published; the

@@ -10,7 +10,7 @@ Skills and CLIs reach the Fleet through a manual, push-based Ship: `pnpm ship:fl
 opens `tailscale ssh` to every reachable Machine and runs the same `pnpm ship:machine`
 there against a Managed Clone reset to `origin/main`. We chose this over the earlier
 plan, where each Mac ran a LaunchAgent that polled `origin/main` every five minutes
-and published status reports to Wovn. A manual push is simpler (no daemon, lock,
+and published status reports to Vaut. A manual push is simpler (no daemon, lock,
 report outbox, or heartbeat questions), and the person shipping sees every Machine's
 result in one terminal.
 
