@@ -98,7 +98,7 @@ button {
   color: var(--z);
 }
 
-/* Top clears the wovn banner, which overlays the page when it is published. */
+/* Top clears the vaut banner, which overlays the page when it is published. */
 .head {
   position: fixed;
   left: 28px;

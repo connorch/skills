@@ -42,7 +42,7 @@ The seven checks (mesh, build volume, floating parts, overhangs, wall thickness,
 _Avoid_: analysis, validation, lint
 
 **Review Page**:
-A self-contained HTML page, published to Wovn, that renders one Model or the Candidates for Connor to look at.
+A self-contained HTML page, published to Vaut, that renders one Model or the Candidates for Connor to look at.
 _Avoid_: preview, viewer (for the published page), render
 
 **Palette**:

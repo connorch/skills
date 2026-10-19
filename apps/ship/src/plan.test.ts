@@ -22,7 +22,7 @@ describe("skillAgents", () => {
   });
 
   it("ignores unrelated metadata and rejects malformed controls", () => {
-    expect(controls({ requires: "the wovn CLI" }).agents).toEqual(["claude-code", "codex"]);
+    expect(controls({ requires: "the vaut CLI" }).agents).toEqual(["claude-code", "codex"]);
     expect(() => controls({ platforms: ["windows"] })).toThrow();
     expect(() => controls({ agents: "codex" })).toThrow();
   });

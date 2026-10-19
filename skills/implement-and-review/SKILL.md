@@ -101,7 +101,7 @@ final commit.
    give the rating in the report.
 2. Run the $motion-explainer skill on the PR.
 3. Upload the local MP4 to GitHub itself and embed it in the PR description.
-   GitHub plays only videos on its own CDN, so do not use the Wovn link. GitHub
+   GitHub plays only videos on its own CDN, so do not use the Vaut link. GitHub
    has no API for attachments: edit the PR description in a browser signed in
    to GitHub, attach the file through the editor, and wait for the upload to
    finish. It inserts a `https://github.com/user-attachments/assets/...` URL on

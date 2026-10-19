@@ -1,8 +1,8 @@
 ---
 name: html-communication
-description: Writes HTML writeups and publishes them privately to files.wovn.org. Use when the user asks for an HTML writeup of work, such as a plan, spec, findings, report, or UI mocks, that is not part of the codebase.
+description: Writes HTML writeups and publishes them privately to files.vaut.dev. Use when the user asks for an HTML writeup of work, such as a plan, spec, findings, report, or UI mocks, that is not part of the codebase.
 metadata:
-  requires: "the wovn CLI on PATH (see the $wovn-file-hosting skill)"
+  requires: "the vaut CLI on PATH (see the $vaut-file-hosting skill)"
 ---
 
 # HTML Communication
@@ -66,18 +66,18 @@ Connor has given standing permission to upload every artifact created or updated
 with this skill. Upload is required, including in Auto mode. Do not ask for
 separate permission or stop at the local file.
 
-1. Write the HTML file locally, named per the $wovn-file-hosting skill's naming
+1. Write the HTML file locally, named per the $vaut-file-hosting skill's naming
    convention (kebab-case, descriptive, `.html`).
-2. Run `wovn put --at docs/<file name> <file path>` (uploads are private by
+2. Run `vaut put --at docs/<file name> <file path>` (uploads are private by
    default; add `--force` when updating a document that is already
    published).
-3. Report the local path and the returned files.wovn.org URL.
+3. Report the local path and the returned files.vaut.dev URL.
 
 Re-upload to the same `--at` path with `--force` to update the document in
 place; the URL stays stable across iterations. Use a new path only for a
 genuinely new document. Only Connor can open private URLs (signed in to
-wovn.org in the browser, or through the CLI); never embed them in public PRs
-or issues. To read one back, run `wovn read <url>`.
+vaut.dev in the browser, or through the CLI); never embed them in public PRs
+or issues. To read one back, run `vaut read <url>`.
 
-If `wovn` is missing or not signed in, tell the user instead of guessing. Never claim the document is hosted before the upload succeeds. Do
+If `vaut` is missing or not signed in, tell the user instead of guessing. Never claim the document is hosted before the upload succeeds. Do
 not verify in a browser unless the user asks.

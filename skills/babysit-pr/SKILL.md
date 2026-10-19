@@ -23,7 +23,7 @@ Always reply before resolving a thread, and resolving means marking it resolved 
 [actual reply]
 ```
 
-Screenshots and videos help as well. Use the $wovn-file-hosting skill when needed.
+Screenshots and videos help as well. Use the $vaut-file-hosting skill when needed.
 
 If nothing has changed, stay quiet rather than posting filler comments. Stop when the review bots and required checks are green on the latest commit. Merge only when the user explicitly requested it; otherwise report that the PR is ready.
 

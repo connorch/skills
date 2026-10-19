@@ -3,7 +3,7 @@ name: bambu-print
 description: Use when the user asks to 3D print something, find or design a model to print, check a model for printability, slice it, check on the Bambu printer or the AMS, or see what is on the print bed. Covers finding models on MakerWorld and Printables, generating them with AI, making them from a script, the Printability Report and Review Page, multi-colour painting, slicing, printer status, and starting prints through Bambu Connect.
 metadata:
   machines: [connors-mac-studio]
-  requires: "the bambu CLI on PATH (apps/bambu-cli, `pnpm ship:machine`), Bambu Studio in /Applications for slicing, wovn on PATH for Review Pages, the $mac-vm skill with Bambu Connect in the guest for starting prints, and optionally an AI provider key for generation"
+  requires: "the bambu CLI on PATH (apps/bambu-cli, `pnpm ship:machine`), Bambu Studio in /Applications for slicing, vaut on PATH for Review Pages, the $mac-vm skill with Bambu Connect in the guest for starting prints, and optionally an AI provider key for generation"
 ---
 
 # Bambu print
@@ -76,7 +76,7 @@ purpose (decorative or functional). Ask for what's missing in one message, then 
 **Search**
 
 ```sh
-bambu search "phone stand" --limit 6 --page          # MakerWorld + Printables, Candidates page on wovn
+bambu search "phone stand" --limit 6 --page          # MakerWorld + Printables, Candidates page on vaut
 bambu fetch <printables url or id> --out <job folder>   # Printables downloads anonymously
 bambu fetch "<makerworld.bblmw.com link>" --out <job folder> --page <model page url>
 ```
@@ -159,7 +159,7 @@ the colour table (colour, share, Slot) and let him trim it (`--max-colors 3`) be
 ### 4. Review Page
 
 ```sh
-bambu view model_oriented.stl        # review.html next to it, published on wovn; --job names the page
+bambu view model_oriented.stl        # review.html next to it, published on vaut; --job names the page
 bambu view model.glb --height 60     # a generated GLB, at the height it will be painted and printed
 ```
 

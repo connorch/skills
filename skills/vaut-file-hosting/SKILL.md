@@ -1,38 +1,38 @@
 ---
-name: wovn-file-hosting
-description: Use whenever the user provides a link to files.wovn.org, when a local file needs a public or private URL, or when the user asks to upload, host, share, list, or retrieve files through Wovn.
+name: vaut-file-hosting
+description: Use whenever the user provides a link to files.vaut.dev, when a local file needs a public or private URL, or when the user asks to upload, host, share, list, or retrieve files through Vaut.
 metadata:
-  requires: "the wovn CLI on PATH, signed in with wovn login"
+  requires: "the vaut CLI on PATH, signed in with vaut login"
 ---
 
-# Wovn file hosting
+# Vaut file hosting
 
-Upload files to `https://files.wovn.org` and return the permanent URL from the
+Upload files to `https://files.vaut.dev` and return the permanent URL from the
 response body. Files are **private by default** - only Connor can open them
-(signed in to wovn.org in the browser, or through the CLI). Pass `--public` only when the URL must be
+(signed in to vaut.dev in the browser, or through the CLI). Pass `--public` only when the URL must be
 readable by others (PR screenshots, images embedded on GitHub, anything
-shared externally). Prefer the `wovn` CLI:
+shared externally). Prefer the `vaut` CLI:
 
 ```sh
-wovn put /path/to/plan.html                     # private (default)
-wovn put --public pr-142-upload-flow-after.png  # public, for sharing
-wovn put --public --name pr-142-after.png "/tmp/Screenshot 2026-08-11 at 3.14.15 PM.png"
+vaut put /path/to/plan.html                     # private (default)
+vaut put --public pr-142-upload-flow-after.png  # public, for sharing
+vaut put --public --name pr-142-after.png "/tmp/Screenshot 2026-08-11 at 3.14.15 PM.png"
 ```
 
-The CLI is `@wovn/cli` and signs in once per machine through the browser:
+The CLI is `@vaut/cli` and signs in once per machine through the browser:
 
 ```sh
-npm i -g @wovn/cli
-wovn login   # opens wovn.org to confirm a code; saves a Token in ~/.config/wovn/config.json
+npm i -g @vaut/cli
+vaut login   # opens vaut.dev to confirm a code; saves a Token in ~/.config/vaut/config.json
 ```
 
-On a machine without a browser, `wovn login --token <token> --host files.wovn.org`
-takes a Token minted in wovn.org's settings. If the CLI is missing or not
+On a machine without a browser, `vaut login --token <token> --host files.vaut.dev`
+takes a Token minted in vaut.dev's settings. If the CLI is missing or not
 signed in and neither works, tell the user instead of guessing.
 
 The response body is the URL, nothing else. Generated keys are dated plus a
 random slug, so uploading never overwrites anything, URLs never change, and a
-URL is never reused; files exist until explicitly deleted with `wovn rm`.
+URL is never reused; files exist until explicitly deleted with `vaut rm`.
 Content types are inferred from the file extension, so images and videos
 render inline in browsers.
 
@@ -41,33 +41,33 @@ render inline in browsers.
 Every file carries its own visibility (public, private, or shared with
 specific emails - see below); there is one host and one URL per file, and
 flipping visibility never changes the URL. A private URL opened in
-a browser bounces through wovn.org's login; other people cannot open it -
+a browser bounces through vaut.dev's login; other people cannot open it -
 never embed a private URL in a public PR or issue.
 
 ```sh
-wovn visibility get docs/q3-roadmap.html         # public | private
-wovn visibility set docs/q3-roadmap.html public  # publish; URL unchanged
-wovn visibility set docs/q3-roadmap.html private # unpublish (best effort:
+vaut visibility get docs/q3-roadmap.html         # public | private
+vaut visibility set docs/q3-roadmap.html public  # publish; URL unchanged
+vaut visibility set docs/q3-roadmap.html private # unpublish (best effort:
                                                  # caches/readers may have seen it)
 ```
 
 Reading a private file back (for example a previously uploaded plan):
-`wovn read <url-or-path>`; bare paths like `docs/plan.html` work everywhere a
+`vaut read <url-or-path>`; bare paths like `docs/plan.html` work everywhere a
 URL does.
 
 ## Sharing with specific people
 
-`wovn share` opens a private file to a list of emails without making it
-public. Guests open the normal URL, land on wovn.org's guest login, enter
-their email and the one-time code Wovn emails them; they get the file's bytes
+`vaut share` opens a private file to a list of emails without making it
+public. Guests open the normal URL, land on vaut.dev's guest login, enter
+their email and the one-time code Vaut emails them; they get the file's bytes
 and nothing else (no listing, no history). The URL never changes, so share the
 file's own URL.
 
 ```sh
-wovn share docs/q3-roadmap.html --email sam@acme.com --email lee@acme.com
-wovn share docs/q3-roadmap.html -e sam@acme.com,lee@acme.com --expires 7d  # 12h, 2w, a date, or never
-wovn share docs/q3-roadmap.html                  # print who it is shared with
-wovn visibility set docs/q3-roadmap.html private # stop sharing
+vaut share docs/q3-roadmap.html --email sam@acme.com --email lee@acme.com
+vaut share docs/q3-roadmap.html -e sam@acme.com,lee@acme.com --expires 7d  # 12h, 2w, a date, or never
+vaut share docs/q3-roadmap.html                  # print who it is shared with
+vaut visibility set docs/q3-roadmap.html private # stop sharing
 ```
 
 `--email` replaces the whole list each time; without `--expires` the current
@@ -77,17 +77,17 @@ stable path with `--force` keeps it shared.
 
 ## Stable URLs
 
-`wovn put --at <remote-path> <file>` writes to that exact path instead of a
+`vaut put --at <remote-path> <file>` writes to that exact path instead of a
 generated key - the URL never changes. If the path is already taken the upload
 is rejected; pass `--force` to replace it in place. Use it for living
 documents (plans, reports, mocks) that get updated across iterations; use
-plain `wovn put` for everything else. Updating a published document keeps it
+plain `vaut put` for everything else. Updating a published document keeps it
 public - visibility belongs to the path and only changes via
-`wovn visibility set` or an explicit `--public`/`--private` on the upload.
+`vaut visibility set` or an explicit `--public`/`--private` on the upload.
 
 ```sh
-wovn put --at docs/q3-roadmap.html /tmp/q3-roadmap.html
-wovn put --at docs/q3-roadmap.html --force /tmp/q3-roadmap.html  # update in place
+vaut put --at docs/q3-roadmap.html /tmp/q3-roadmap.html
+vaut put --at docs/q3-roadmap.html --force /tmp/q3-roadmap.html  # update in place
 ```
 
 ## Version history
@@ -96,59 +96,59 @@ Overwriting a stable path never destroys anything: the worker first copies
 the old version to `archive/<path>/<timestamp>`, a permanent URL of its own.
 Archived versions are **always private**, even for public documents; the
 `archive/` prefix is reserved (`--at` cannot write there) and hidden from
-`wovn list` - only per-path history shows it.
+`vaut list` - only per-path history shows it.
 
-`wovn history <path-or-url>` prints every version of a stable path, newest
-first, with the current one marked. `wovn diff` fetches two versions and runs
+`vaut history <path-or-url>` prints every version of a stable path, newest
+first, with the current one marked. `vaut diff` fetches two versions and runs
 `git diff` on them; with a single argument it compares a stable path's
 previous version against its current one - "what changed in the last
 update?".
 
 ```sh
-wovn history docs/q3-roadmap.html
-wovn diff docs/q3-roadmap.html                  # previous vs current
-wovn diff <old-url-or-path> <new-url-or-path>   # any two versions
+vaut history docs/q3-roadmap.html
+vaut diff docs/q3-roadmap.html                  # previous vs current
+vaut diff <old-url-or-path> <new-url-or-path>   # any two versions
 ```
 
 ## Deleting
 
-`wovn rm <path-or-url>` deletes a file permanently - and for a stable path,
+`vaut rm <path-or-url>` deletes a file permanently - and for a stable path,
 its entire archived history too, so nothing lingers. Passing a specific
 archive URL prunes just that version. It prints every key it deleted.
 
 ```sh
-wovn rm docs/old-plan.html
+vaut rm docs/old-plan.html
 ```
 
 ## Listing recent files
 
-`wovn list` prints recent uploads, newest first, one line per file
+`vaut list` prints recent uploads, newest first, one line per file
 (timestamp, size, `pub`/`shr`/`prv`, URL). `--public` / `--shared` /
 `--private` filter by visibility; `-n <count>` changes the limit (default 20). Listing is
 authenticated - public URLs are unguessable, so the listing itself is never
 open.
 
 ```sh
-wovn list
-wovn list --private -n 50
+vaut list
+vaut list --private -n 50
 ```
 
 ## Filtering by git context
 
-Every `wovn put` automatically tags the upload with the environment it ran
+Every `vaut put` automatically tags the upload with the environment it ran
 in: the working directory, and (when inside a git repo) the branch, the
 worktree root, and the project - the main checkout the worktree was created
 off of. Nothing needs to be passed at upload time.
 
-`wovn list` filters on those tags with `--project`, `--branch`, `--worktree`,
+`vaut list` filters on those tags with `--project`, `--branch`, `--worktree`,
 and `--dir`. Each takes an optional value; a bare flag means "the current
 one", inferred the same way uploads are tagged:
 
 ```sh
-wovn list --branch                    # uploads made from the branch I'm on now
-wovn list --project                   # uploads from this project, any worktree/branch
-wovn list --project skills            # by project name (or full path)
-wovn list --branch main --private     # explicit values combine with other flags
+vaut list --branch                    # uploads made from the branch I'm on now
+vaut list --project                   # uploads from this project, any worktree/branch
+vaut list --project skills            # by project name (or full path)
+vaut list --branch main --private     # explicit values combine with other flags
 ```
 
 `--project` matches the project name or its full path; `--worktree` and
@@ -157,16 +157,16 @@ curl fallback, carry no context and never match a filter.
 
 ## Filtering by file type
 
-`wovn list --type` narrows the listing to a file type, matched on the
+`vaut list --type` narrows the listing to a file type, matched on the
 extension in the URL. Values are either a category - `image`, `video`,
 `document`, `data`, `archive` - or a bare extension, and can be
 comma-separated or repeated:
 
 ```sh
-wovn list --type image                 # png, jpg, jpeg, gif, webp, svg
-wovn list --type document              # pdf, doc, docx, odt, rtf, md, html, txt, log
-wovn list --type pdf,png               # exact extensions
-wovn list --type image --private -n 50
+vaut list --type image                 # png, jpg, jpeg, gif, webp, svg
+vaut list --type document              # pdf, doc, docx, odt, rtf, md, html, txt, log
+vaut list --type pdf,png               # exact extensions
+vaut list --type image --private -n 50
 ```
 
 The filter runs before the limit, so `--type pdf -n 20` means the 20 newest
@@ -193,16 +193,16 @@ the real extension. Characters outside `a-z A-Z 0-9 . _ -` are replaced with
 
 ## In the browser
 
-A File opened in a logged-in browser renders inside a Wovn wrapper (path,
+A File opened in a logged-in browser renders inside a Vaut wrapper (path,
 visibility, versions) around the content, so it does not look like the bytes
-`wovn read` returns. Public URLs and every non-browser reader get the exact
-bytes; append `?raw` to see them in a browser. `wovn open <url-or-path>`
+`vaut read` returns. Public URLs and every non-browser reader get the exact
+bytes; append `?raw` to see them in a browser. `vaut open <url-or-path>`
 opens a File in the browser from the terminal.
 
 ## Where it runs
 
-files.wovn.org is the `files` Org on wovn.org, Connor's own R2 bucket served
-by Wovn (the connorch/wovn repo). This skill is for using the CLI; changing
+files.vaut.dev is the `files` Org on vaut.dev, Connor's own R2 bucket served
+by Vaut (the connorch/vaut repo). This skill is for using the CLI; changing
 the host is a separate job. fleetfizz ships the repo to every machine as a
 Tracked Repo; its `pnpm ship:machine` installs the same CLI
-`npm i -g @wovn/cli` does, and `wovn login` is still a per-machine step.
+`npm i -g @vaut/cli` does, and `vaut login` is still a per-machine step.
