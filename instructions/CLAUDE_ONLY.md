@@ -25,12 +25,12 @@ Rankings, higher = better. Cost reflects what I actually pay (OpenAI is near-fre
 * Anything user-facing (UI, copy, API design) needs taste >= 8.
 * Reviews of plans/implementations: fable-5.1 or gpt-6-astra.
 * Never use Haiku.
-* Mechanics: gpt models are only reachable through the Codex CLI - `codex exec` / `codex review` (my `~/.codex/config.toml` defaults to gpt-6-astra). Use the codex-implementation, and codex-review skills; for work they don't cover (investigation, data analysis), run `codex exec -s read-only` directly with a self-contained prompt (computer use is the exception, above).
+* Mechanics: gpt models are only reachable through the Codex CLI - `codex exec` / `codex review` (my `~/.codex/config.toml` defaults to gpt-6-astra). Use the codex-implementation and codex-review skills for all implementation and review work, including whole-repo audits. For work they don't cover (investigation, data analysis), run `codex exec -s read-only - < prompt.md` directly with a self-contained prompt (computer use is the exception, above). Always pass the prompt on stdin with `-`: given a prompt argument, codex also waits for stdin to close, and the Bash tool leaves stdin open when the command contains a heredoc, so the run hangs silently.
 * Claude models (sonnet, opus, or fable) run via the Agent/Workflow model parameter.
 
 ### Using gpt-6-astra inside workflows and subagents (the model parameter only takes Claude models, so use a wrapper)
 
-* Spawn a thin Claude wrapper agent with `model: 'sonnet', effort: 'low'` whose prompt instructs it to write a self-contained codex prompt, run `codex exec` via Bash, and return the report (use `schema` on the wrapper to get structured output back).
+* Spawn a thin Claude wrapper agent with `model: 'sonnet', effort: 'low'` whose prompt instructs it to write a self-contained codex prompt to a file, run `codex exec ... - < prompt.md` via Bash, and return the report (use `schema` on the wrapper to get structured output back).
 * Always label these agents with a `gpt-6-astra:` prefix, e.g. `{label: 'gpt-6-astra:review-auth'}` - the workflow UI shows the wrapper's Claude model, so the label is the only indication the real worker is gpt-6-sol.
 * Codex runs can exceed Bash's 10-minute timeout: pass an explicit timeout, or run in the background and poll for the report file.
 * Parallel gpt-6-astra implementation agents must use `isolation: 'worktree'` so codex edits don't collide in the shared checkout.

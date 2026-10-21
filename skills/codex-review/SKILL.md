@@ -1,6 +1,6 @@
 ---
 name: codex-review
-description: Gets an independent code review from Codex CLI. This is how the GPT model rated intelligence 9 in the model-selection table is invoked for review work. Use when the user asks to have Codex or a GPT model review work, when the model-selection rubric calls for that model's review perspective, or when Codex should audit uncommitted changes, a branch diff, a commit, or a specific implementation for bugs, regressions, or gaps against requirements. For a review by Claude itself, use the normal review process instead.
+description: Gets an independent code review from Codex CLI. This is how the GPT model rated intelligence 9 in the model-selection table is invoked for review work. Use when the user asks to have Codex or a GPT model review work, when the model-selection rubric calls for that model's review perspective, or when Codex should audit uncommitted changes, a branch diff, a commit, a specific implementation, or a whole repo or subsystem for bugs, regressions, or gaps against requirements. For a review by Claude itself, use the normal review process instead.
 metadata:
   agents: [claude-code]
 ---
@@ -11,7 +11,7 @@ Use Codex as an independent reviewer when the user wants a second pass or when a
 
 Prefer Claude's normal review process for small local checks. Do not delegate review just to avoid reading the code yourself. Treat Codex's output as evidence, not authority.
 
-## Two modes
+## Three modes
 
 ### Full review (no custom prompt)
 
@@ -64,6 +64,24 @@ Scope the diff to keep the prompt manageable. For large commits, use `git show H
 Choose this when: you have a specific concern (e.g. "is the auth check missing on this new endpoint?"), you're providing extra context Codex can't see (requirements, prior bugs, risk areas), or you want to scope the review to a subset of the changes.
 
 **Limitation:** Custom mode requires you to supply the diff. Codex will not auto-discover untracked files or staged-only hunks the way the native targeting flags do. For full working-tree coverage, prefer `--uncommitted`.
+
+### Audit (no diff)
+
+Use this to review existing code rather than a change: launch readiness, a subsystem, a security pass over the whole repo. `codex review` is diff-shaped, so run `codex exec` read-only and let Codex explore the repo itself.
+
+```bash
+ARTIFACT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/codex-review.XXXXXX")"
+PROMPT="$ARTIFACT_DIR/prompt.md"
+REPORT="$ARTIFACT_DIR/report.md"
+
+cat > "$PROMPT" <<'EOF'
+<what to audit, the context Codex can't discover, what to hunt for, and the report format>
+EOF
+
+codex exec -C "$PWD" -s read-only -o "$REPORT" - < "$PROMPT" > "$ARTIFACT_DIR/run.log" 2>&1
+```
+
+Pass the prompt on stdin with `-`, never as an argument. Given a prompt argument, `codex exec` also reads stdin to EOF and appends it, and Claude Code's Bash tool leaves stdin open when the command contains a heredoc, so the run hangs before it starts. Audits often outlast the 10-minute Bash timeout; run it in the background and wait on the report file.
 
 ## Reporting Back
 
