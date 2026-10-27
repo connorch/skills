@@ -18,18 +18,13 @@ branch belong in a separate code review - and **not a style pass** - naming and
 formatting preferences are out of scope unless something is actively
 misleading. Note anything serious but out of scope in the report.
 
+This skill is read-only: deliver the report and change nothing. Fixing is the
+$shape-fix skill's job.
+
 **Order matters: form the architectural verdict first, sweep for mechanical
 residue second.** Checklist-first reviews sink into grep sweeps and produce a
 flat list of trivia while missing the shape. The highest-value findings are
 architectural; the sweeps exist to serve and then supplement that verdict.
-
-## Mode
-
-- **Assess** - the default, and always when the invocation is a question ("how
-  is the shape", "give me your assessment"). Deliver the report, change
-  nothing, offer the cleanup.
-- **Fix** - only when explicitly instructed to clean up. Produce the same
-  assessment first, then apply step 5.
 
 ## Workflow
 
@@ -91,8 +86,8 @@ to a pattern the codebase already has, and the cost of leaving it.>
 
 ## Residue
 
-- **C1. <file:line>** - <artifact>. Left behind by <which fix>. <What
-  changed, or the proposed fix in assess mode.>
+- **C1. <file:line>** - <artifact>. Left behind by <which fix>. <The
+  proposed fix.>
 - **C2. Examined and kept: <file:line>** - <what it looks like> but correct
   as-is: <one-line reason>.
 
@@ -116,22 +111,5 @@ initial call" have different fixes, so say which one produced each finding.
 "Examined and kept" is not optional; if it is empty, say so - that usually
 means the sweep was not skeptical enough.
 
-**5. Fix (fix mode only).** Apply the changes, run the repo's own verification
-commands (lint, typecheck, tests, format), and re-run any empirical check
-whose subject changed. Small related cleanups may share one commit, and the
-message must explain what churn produced each artifact:
-
-```
-Settle post-review churn on the launcher path
-
-- Drop resolveLegacyRoot; the retry fix in 3f2a1c9 rerouted its only caller
-- Move formatProbeArgs into probe/, which already owns arg construction
-- Add a 5s timeout to the startup health probe added by the hang fix
-- Correct "three guarded spots" in docs/probes.md; there are now two
-```
-
-If verification fails because of a shape-check fix, fix it before reporting. If
-the failure predates the branch, report it and leave it. Architectural
-walk-backs from "What I'd change" are their own decision: propose them in the
-report and apply only the ones the user approved or the invocation clearly
-covered.
+End the report by offering the $shape-fix skill, for every finding or for the
+IDs the user picks.

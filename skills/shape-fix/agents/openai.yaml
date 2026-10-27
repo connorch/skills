@@ -1,0 +1,4 @@
+interface:
+  display_name: "Shape Fix"
+  short_description: "Shape-check a branch after iterative fixes, then clean up what it found"
+  default_prompt: "Use $shape-fix on this branch: run the shape check, apply the residue cleanup and in-scope changes, verify, and commit with messages that explain what churn produced each artifact. List architectural walk-backs that would widen the PR as follow-ups."

@@ -22,7 +22,7 @@ Copy this checklist and track your progress:
 ```
 - [ ] 1. Implement, and pass the verification commands
 - [ ] 2. QA: plan, verify, fix and retest failures
-- [ ] 3. File and babysit the PR, running shape-check every third Codex round
+- [ ] 3. File and babysit the PR, running shape-fix every third Codex round
 - [ ] 4. Final QA, with bots and checks green on the final commit
 - [ ] 5. Handoff writeup
 - [ ] 6. Explainer video, if merge risk is Moderate or higher
@@ -60,14 +60,13 @@ them there rather than working from memory or substituting your own criteria.
 One addition: when a finding is real but declined as a follow-up, also record
 it for the deferred findings in phase 5.
 
-### Shape check every three rounds
+### Shape fix every three rounds
 
 A round is one review pass from the Codex bot on a pushed revision. After every
-third round (3, 6, 9, ...), run the $shape-check skill in fix mode before pushing further
-fixes. Apply the residue cleanup and any in-scope changes it recommends;
-architectural walk-backs that would widen the PR go in the handoff writeup
-as deferred findings instead. If the loop ends with fix commits landed since the last shape check, run
-it once more before the final QA pass.
+third round (3, 6, 9, ...), run the $shape-fix skill before pushing further
+fixes. The walk-backs it lists as follow-ups go in the handoff writeup as
+deferred findings. If the loop ends with fix commits landed since the last
+shape fix, run it once more before the final QA pass.
 
 ## 4. Final QA
 
@@ -81,7 +80,7 @@ the $babysit-pr skill confirm the bots and checks are green on the final commit.
 Use the $html-communication skill to write one file with two sections:
 
 - **Decisions not in the plan.** Every significant call made during
-  implementation, QA fixes, review fixes, or shape-check that the approved plan
+  implementation, QA fixes, review fixes, or shape fixes that the approved plan
   did not cover: what was decided, why, and what the alternative was. Connor
   reviews the PR against the plan, so anything that diverged from it belongs
   here. Track these as they happen; they are hard to reconstruct at the end.
@@ -119,7 +118,7 @@ Report back with:
 - QA outcome: the published report URL, what was fixed along the way, and
   anything not covered.
 - Review outcome: how many Codex rounds ran, what was fixed, and when
-  shape-check ran.
+  shape-fix ran.
 - The handoff writeup URL, or a note that there were no unplanned decisions
   and nothing was deferred.
 - The merge risk rating, and whether the explainer video is in the PR
