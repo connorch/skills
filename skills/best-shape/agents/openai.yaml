@@ -1,0 +1,4 @@
+interface:
+  display_name: "Best Shape"
+  short_description: "Verdict-first best-shape review of a branch after iterative fixes"
+  default_prompt: "Use $best-shape to step back from this branch: judge whether the big architecture calls are right, whether abstractions and shared logic sit in the right places, and whether the iteration left residue (dead code, redundant guards, stale docs, duplicated machinery, untested hot paths). Lead with the verdict; assess before fixing anything."

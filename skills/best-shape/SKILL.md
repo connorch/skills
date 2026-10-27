@@ -1,5 +1,5 @@
 ---
-name: step-back
+name: best-shape
 description: >-
   Step back from a branch that grew through iteration - review rounds, point
   fixes, PR feedback - and judge the end state as a whole: are the big
@@ -7,13 +7,13 @@ description: >-
   logic shared when appropriate, and did the churn leave residue (dead code,
   redundant guards, stale docs, duplicated machinery, untested hot paths)?
   Produces a verdict-first assessment; fixes only when asked. Use when asked to
-  "take a step back", run a "step-back review", assess "the shape of the
+  "take a step back", run a "best-shape review", assess "the shape of the
   changes", judge "optimal end state vs tech debt", do a "post-churn cleanup",
   or after finishing a batch of sequential review fixes on one branch. Not a
   bug hunt and not a style pass.
 ---
 
-# Step Back
+# Best Shape
 
 A branch has grown through iteration: an initial design plus rounds of review
 findings, bug reports, and point fixes, each applied and committed on its own.
@@ -115,7 +115,7 @@ Label every item in "What's shaped well", "What I'd change", and "Residue"
 with a letter-number ID - one letter per section, numbered from 1 - so the
 user can reply with "do B2, skip C4". A/B/C above is only an example: pick
 letters that no other labeled list in the thread already uses (an earlier
-step-back report, mocks, options) so every ID stays unambiguous.
+best-shape report, mocks, options) so every ID stays unambiguous.
 
 Writing rules: complete sentences, not fragment bullets. "What's shaped well"
 is mandatory and must carry the *why* - affirmation with reasons is what makes
@@ -140,7 +140,7 @@ Settle post-review churn on the launcher path
 - Correct "three guarded spots" in docs/probes.md; there are now two
 ```
 
-If verification fails because of a step-back fix, fix it before reporting. If
+If verification fails because of a best-shape fix, fix it before reporting. If
 the failure predates the branch, report it and leave it. Architectural
 walk-backs from "What I'd change" are their own decision: propose them in the
 report and apply only the ones the user approved or the invocation clearly

@@ -21,7 +21,7 @@ skills add connorch/skills --skill qa-ux-verify
 skills add connorch/skills --skill codex-review
 skills add connorch/skills --skill codex-implementation
 skills add connorch/skills --skill claude-code-subagent
-skills add connorch/skills --skill step-back
+skills add connorch/skills --skill best-shape
 skills add connorch/skills --skill pull-upstream
 skills add connorch/skills --skill babysit-pr
 skills add connorch/skills --skill merge-risk
@@ -46,7 +46,7 @@ skills add connorch/skills --skill motion-explainer
 You can also install multiple specific skills in one command:
 
 ```sh
-skills add connorch/skills --skill qa-ux-plan qa-ux-verify codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr merge-risk file-pr leaving-pr-comments sol-loop full-send full-stop modernize implement-and-review handoff html-communication vaut-file-hosting fleet-exec jev mac-vm bambu-print t3-browser motion-explainer
+skills add connorch/skills --skill qa-ux-plan qa-ux-verify codex-review codex-implementation claude-code-subagent best-shape pull-upstream babysit-pr merge-risk file-pr leaving-pr-comments sol-loop full-send full-stop modernize implement-and-review handoff html-communication vaut-file-hosting fleet-exec jev mac-vm bambu-print t3-browser motion-explainer
 ```
 
 ## Shipping to your machines
@@ -132,9 +132,9 @@ These skills help you plan, verify, write, refactor, and fix code.
 - **codex-review** — Ask Codex CLI for an independent review of uncommitted changes, branch diffs, commits, or specific implementations.
 - **codex-implementation** — Delegate bounded code changes to Codex CLI, then inspect the resulting diff and verification.
 - **claude-code-subagent** — For non-Claude agents (Codex, Hermes, etc.): delegate bounded implementation, review, or investigation to Claude Code CLI (`claude -p`) on the user's Claude subscription, then inspect the result and diff.
-- **step-back** — Step-back review of a branch after a batch of point fixes, finding and fixing the damage the iteration itself caused.
+- **best-shape** - Best-shape review of a branch after a batch of point fixes, finding and fixing the damage the iteration itself caused.
 - **pull-upstream** - Sync a fork with its upstream: inventory the fork's features, merge upstream in with upstream taking priority, re-apply the fork's work on top, and verify every feature survived - clean merges included.
-- **implement-and-review** - Take an approved plan through implementation, browser QA, PR filing, the review-bot loop with step-back every three Codex rounds, a final QA pass, a handoff writeup of unplanned decisions and deferred findings, and an explainer video in the PR description when merge-risk rates the PR Moderate or higher.
+- **implement-and-review** - Take an approved plan through implementation, browser QA, PR filing, the review-bot loop with a best-shape review every three Codex rounds, a final QA pass, a handoff writeup of unplanned decisions and deferred findings, and an explainer video in the PR description when merge-risk rates the PR Moderate or higher.
 - **handoff** - Compact the current conversation into a handoff document in the OS temp directory so a fresh agent can pick up the work. Invoked by the user only. Adapted from a skill by [Matt Pocock](https://github.com/mattpocock/skills).
 - **babysit-pr** - Monitor a pull request through review and CI with one watcher (T3 Code's `watch_pull_request`, or the bundled `pr-wait` script), verifying bot findings, fixing real failures, and dismissing false positives with reasons. From Theo Browne's [tstack](https://github.com/t3dotgg/tstack) (MIT, see `vendor/tstack/LICENSE`).
 - **file-pr** - File a concise PR whose title explains why the change matters and whose description leads with the problem. From Theo Browne's [tstack](https://github.com/t3dotgg/tstack) (MIT, see `vendor/tstack/LICENSE`).
