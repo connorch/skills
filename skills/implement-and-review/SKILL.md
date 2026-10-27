@@ -54,11 +54,11 @@ until the review bots and required checks are green on the latest commit.
 
 ### Triage review findings
 
-Triage every review finding with the rubric in the $babysit-pr skill. Follow it
-exactly as that skill states it, and re-read it there rather than working from
-memory or substituting your own criteria. One addition: when a finding is real
-but fails the rubric because it is out of scope or not worth the change, also
-record it for the deferred findings in phase 5.
+Triage every review finding with the rules in the Reviews section of the
+$babysit-pr skill. Follow them exactly as that skill states them, and re-read
+them there rather than working from memory or substituting your own criteria.
+One addition: when a finding is real but declined as a follow-up, also record
+it for the deferred findings in phase 5.
 
 ### Step back every three rounds
 
