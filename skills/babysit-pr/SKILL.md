@@ -30,9 +30,10 @@ branch conflicts.
   `watch_pull_request`. The parent owns the PR. Do not watch PRs you are not
   working on.
 - **A wake is news, not a merge decision.** Check the merge gate yourself.
-  Green required checks do not mean Codex reviewed the head: its summary
-  comment names the commit it last reviewed. If it skipped the head, comment
-  `@codex review`.
+  Green required checks do not mean the review bots reviewed the head.
+  Codex's summary comment names the commit it last reviewed; if it skipped
+  the head, comment `@codex review`. CodeRabbit's `CodeRabbit` status reads
+  "Review paused" when it stopped reviewing; comment `@coderabbitai review`.
 - **Unwatch when you hand off.** A watched thread stays in Working and out of
   the user's inbox. When you stop (ready, blocked, or asking the user a question),
   call `unwatch_pull_request` first. A merge or close ends the watch on its
@@ -56,9 +57,9 @@ met or the PR merges, 1 when it needs you (a required check failed, conflicts,
 unresolved threads, PR closed), and 2 on bad input.
 
 - `ready` (default): required checks green, every review bot seen on the PR
-  (Greptile, Macroscope, Codex) reviewed the head, and no unresolved threads.
-  When the repo uses Codex, `ready` waits for it even before its first comment.
-  Use this to babysit.
+  (Greptile, Macroscope, Codex, CodeRabbit) reviewed the head, and no
+  unresolved threads. When the repo uses Codex or CodeRabbit, `ready` waits for
+  it even before its first comment. Use this to babysit.
 - `green`: required checks only. Use it when the repo has none of those bots.
 - `any-change`: exit on the first event.
 
@@ -66,11 +67,12 @@ In Claude Code, run it with the Monitor tool (`timeout_ms: 3600000`), so each
 line wakes you. Without a monitor, run it as one long command. It ends on its
 own.
 
-Codex runs no check, and sometimes never starts on a pushed head. When it has
-not started on the head 90 seconds after `pr-wait` first saw that head,
-`pr-wait` exits 1 with Codex's latest state. Judge whether it is stuck: if so,
-comment `@codex review` on the PR, then start `pr-wait` again, which gives
-Codex another 90 seconds. If kicks keep failing, report it to the user.
+Codex sometimes never starts on a pushed head, and CodeRabbit pauses reviews
+once a branch has many commits. When either is not reviewing the head 90
+seconds after `pr-wait` first saw that head, `pr-wait` exits 1 with its latest
+state. Judge whether it is stuck: if so, comment `@codex review` or
+`@coderabbitai review` on the PR, then start `pr-wait` again, which gives it
+another 90 seconds. If kicks keep failing, report it to the user.
 
 Start it again after you push, after you handle an exit 1, and after a resume.
 It remembers what it already reported, so nothing that arrived in between is
@@ -96,9 +98,6 @@ with a written reason when dismissing false positives.
 
 If the repo has `.macroscope/check-run-agents/*.md`, read those rules before you
 reply to a Macroscope finding. Its findings cite them.
-
-CodeRabbit is advisory. Treat its findings like any other finding, but never
-wait for it and never hold a merge for it.
 
 If a review bot leaves feedback you believe is not worth addressing, reply with
 a written reason and resolve the comment. Use the $leaving-pr-comments skill
