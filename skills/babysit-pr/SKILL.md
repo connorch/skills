@@ -57,6 +57,7 @@ unresolved threads, PR closed), and 2 on bad input.
 
 - `ready` (default): required checks green, every review bot seen on the PR
   (Greptile, Macroscope, Codex) reviewed the head, and no unresolved threads.
+  When the repo uses Codex, `ready` waits for it even before its first comment.
   Use this to babysit.
 - `green`: required checks only. Use it when the repo has none of those bots.
 - `any-change`: exit on the first event.
@@ -65,9 +66,11 @@ In Claude Code, run it with the Monitor tool (`timeout_ms: 3600000`), so each
 line wakes you. Without a monitor, run it as one long command. It ends on its
 own.
 
-Codex can skip a head pushed while it reviews an older one. When it has not
-started on a green head after five minutes, `pr-wait` exits 1 and says so.
-Comment `@codex review` on the PR, then start it again.
+Codex runs no check, and sometimes never starts on a pushed head. When it has
+not started on the head 90 seconds after `pr-wait` first saw that head,
+`pr-wait` exits 1 with Codex's latest state. Judge whether it is stuck: if so,
+comment `@codex review` on the PR, then start `pr-wait` again, which gives
+Codex another 90 seconds. If kicks keep failing, report it to the user.
 
 Start it again after you push, after you handle an exit 1, and after a resume.
 It remembers what it already reported, so nothing that arrived in between is
