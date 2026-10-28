@@ -86,13 +86,11 @@ function danglingReferences(root: string, skills: LiveSkill[]): string[] {
     const dir = join(root, "skills", skill.name);
     const dangling = new Set(
       globSync(["**/*.md", "**/*.yaml"], { cwd: dir })
-        .flatMap((file) => [...readFileSync(join(dir, file), "utf8").matchAll(SKILL_REFERENCE)])
-        .map(([reference]) => reference.slice(1))
-        .filter((name) => !live.has(name)),
+        .flatMap((file) => readFileSync(join(dir, file), "utf8").match(SKILL_REFERENCE) ?? [])
+        .filter((reference) => !live.has(reference.slice(1))),
     );
     if (dangling.size === 0) return [];
-    const names = [...dangling].map((name) => `$${name}`).join(", ");
-    return [`skills/${skill.name}: no Live Skill named ${names}`];
+    return [`skills/${skill.name}: no Live Skill named ${[...dangling].join(", ")}`];
   });
 }
 
