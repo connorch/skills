@@ -10,6 +10,8 @@ metadata:
 Many repos have AI review bots. They're helpful, even if they are not always
 right.
 
+If the PR doesn't exist yet, open one with the $file-pr skill first.
+
 ## Waiting
 
 Never write your own watcher, polling loop, or `sleep` loop. Use one watcher
@@ -92,7 +94,7 @@ If a review bot leaves feedback you believe is not worth addressing, reply with
 a written reason and resolve the comment. Use the $leaving-pr-comments skill
 for every comment posted on the user's behalf.
 
-Screenshots and videos help as well, when you have a way to upload them.
+Screenshots and videos help as well. Use the $vaut-file-hosting skill when needed.
 
 Keep the PR at the size the user's goal needs. Review loops tend to grow a
 PR one cheap-looking fix at a time. Fix real bugs in the intended case.

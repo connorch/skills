@@ -33,7 +33,8 @@ as shown in his video "These 3 skills changed my life". MIT; see
 `tstack/LICENSE`. `babysit-pr`, `file-pr`, `full-send`, `full-stop`,
 `leaving-pr-comments`, `modernize`, and `sol-loop` were copied into `skills/`
 from this commit, with skill references rewritten to `$skill` and `requires`
-metadata added. `council` and `takeover` are not used.
+metadata added. `babysit-pr` also keeps the old version's `$file-pr` and
+`$vaut-file-hosting` pointers. `council` and `takeover` are not used.
 
 Tracked upstream commit: `7de017b` (2026-10-24).
 
