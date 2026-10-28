@@ -102,7 +102,22 @@ the ledger (`fixed:` / `disagree:` / `declined:` + evidence), the same base
 diff, and the change since last round. Tell Sol: open ids and changed code only.
 Mark each old id `resolved` or `still open: <reason>`.
 
-## 5. Stop and ship
+## 5. Shape pass
+
+Once Sol approves, run the $shape-fix skill on the change. Judge it against the intent and
+out-of-scope from step 1. Sol reviews fixes round by round; shape-fix reads
+the end state as a whole.
+
+If shape-fix changed anything, run at least one more round on the shaped
+diff, even past the budget. Send the ledger, the shape-fix report, and the
+change since Sol's approval. Continue under step 4 until Sol approves the
+shaped diff, with at most two rounds past the budget. Do not run shape-fix
+again. If it changed nothing, go to step 6.
+
+If the loop ends stuck, show both sides as step 6 says, and run the shape
+pass once the user resolves it.
+
+## 6. Stop and ship
 
 Agreed: APPROVE on the current behavior diff, no blocker or should open,
 no concern of your own. Stuck: an item stays disputed after two replies,

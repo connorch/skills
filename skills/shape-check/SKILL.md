@@ -1,7 +1,7 @@
 ---
 name: shape-check
 description: >-
-  Trigger this if the user says 'shape check'.
+  Trigger this if the user says 'shape check', or when another skill calls for it.
 ---
 
 # Shape Check
