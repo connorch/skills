@@ -10,7 +10,8 @@ Progress and errors that do not end the run go to stderr.
 
 --until
   green       required checks passed on the current head (every CI check when
-              the base branch requires none)
+              the base branch requires none, or no check at all after
+              START_SECONDS when the repo runs no CI)
   ready       green, every review bot seen on the PR (Greptile, Macroscope,
               Codex, CodeRabbit) reviewed the current head, and no review
               thread is unresolved (default)
@@ -428,7 +429,10 @@ class Watcher:
                 link = checks[name]["link"]
                 fail_lines.append(f"{label} failed: {name} {link}")
                 self.emit(f"fail:{head}:{name}:{link}", fail_lines[-1])
-        gate_done = bool(gate) and all(bucket(n) != "pending" for n in gate)
+        # A repo with no CI never registers a check, so an empty gate passes once
+        # the head has gone START_SECONDS without one.
+        quiet = time.time() - self.head_seen[head] > START_SECONDS
+        gate_done = (bool(gate) or quiet) and all(bucket(n) != "pending" for n in gate)
         all_done = gate_done and all(c["bucket"] != "pending" for c in checks.values())
         # Checks appear a few seconds after a push. Two identical polls in a row
         # guard against calling a half-registered set of checks finished.
