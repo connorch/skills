@@ -5,7 +5,7 @@ import { existsSync, lstatSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
-import { shipMachine, type ShipMachineOptions } from "./ship-machine.ts";
+import { shipMachine, type ShipEvent, type ShipMachineOptions } from "./ship-machine.ts";
 import { ValidationError } from "./source.ts";
 
 const work = mkdtempSync(join(tmpdir(), "ship-test-"));
@@ -13,11 +13,11 @@ const home = join(work, "home");
 const root = join(work, "repo");
 const savedEnv = { HOME: process.env.HOME, XDG_STATE_HOME: process.env.XDG_STATE_HOME };
 
-function writeSkill(name: string, metadata = "") {
+function writeSkill(name: string, metadata = "", body = "") {
   mkdirSync(join(root, "skills", name), { recursive: true });
   writeFileSync(
     join(root, "skills", name, "SKILL.md"),
-    `---\nname: ${name}\ndescription: Test skill ${name}.\n${metadata}---\n# ${name}\n`,
+    `---\nname: ${name}\ndescription: Test skill ${name}.\n${metadata}---\n# ${name}\n${body}`,
   );
 }
 
@@ -105,5 +105,16 @@ describe("shipMachine", () => {
     expect(() => ship()).toThrow(/unknown agent "claud-code".*\n.*unknown Machine "studio"/);
     expect(existsSync(claude("epsilon")) || existsSync(shared("epsilon"))).toBe(false);
     rmSync(join(root, "skills/epsilon"), { recursive: true });
+  });
+
+  it("warns about references to skills this tree does not ship", () => {
+    writeSkill("zeta", "", "Use the $beta skill, then the $implement-and-review skill.\n");
+    const events: ShipEvent[] = [];
+    const report = ship({ dryRun: true, emit: (event) => events.push(event) });
+    expect(report.failures).toEqual([]);
+    expect(events.filter((event) => event.tag === "WARN")).toEqual([
+      { tag: "WARN", message: "skills/zeta: no Live Skill named $implement-and-review" },
+    ]);
+    rmSync(join(root, "skills/zeta"), { recursive: true });
   });
 });
