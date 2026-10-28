@@ -117,10 +117,9 @@ narrows code.
 A round is one push of review or CI fixes. After every third round, run the
 $shape-fix skill before the next push.
 
-Run at least one shape pass while babysitting. If none has run by the time the
-review bots and required checks are green on the latest commit, run the
-$shape-fix skill before you call the PR ready or merge it. If it changed
-anything, push and keep babysitting.
+Before you call the PR ready or merge it, run the $shape-fix skill if any fix
+commits landed since the last shape pass, including the $sol-loop skill's. If
+it changed anything, push and keep babysitting.
 
 List the follow-ups shape-fix reports in your final report.
 
@@ -134,8 +133,9 @@ If an overlapping PR makes this one obsolete, stop monitoring, report it to the
 user, and ask before closing the PR unless closure was explicitly authorized.
 
 If nothing has changed, stay quiet rather than posting filler comments. Stop
-when a shape pass has run and `pr-wait` exits 0, or in T3 Code when the merge
-gate passes on the latest head. Merge only when the user explicitly requested it;
+when no fix commits landed since the last shape pass and `pr-wait` exits 0, or
+in T3 Code when the merge gate passes on that head. Merge only when the user
+explicitly requested it;
 otherwise report that the PR is ready. Right before a merge, run `git fetch` and
 check the PR again. Never merge when it is BEHIND or DIRTY, or when base commits
 that landed after the last green run touch this PR's files. Rebase, push, and
