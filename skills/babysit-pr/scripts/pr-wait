@@ -11,15 +11,17 @@ Progress and errors that do not end the run go to stderr.
 --until
   green       required checks passed on the current head (every CI check when
               the base branch requires none)
-  ready      green, Greptile or Macroscope reviewed the current head, and no
-              review thread is unresolved (default)
+  ready       green, every review bot seen on the PR (Greptile, Macroscope,
+              Codex) reviewed the current head, and no review thread is
+              unresolved (default)
   any-change  stop after the first poll that prints an event
 
 Exit codes
   0  the --until condition is met, or the PR merged
   1  the condition cannot be met without action: a required check failed, the
      branch conflicts with its base, the PR closed, `ready` is blocked by
-     unresolved threads or a BEHIND branch, or GitHub stayed unreachable
+     unresolved threads or a BEHIND branch, Codex skipped the head, or GitHub
+     stayed unreachable
   2  bad arguments, unknown PR, or another pr-wait already watches this PR
 
 Events
@@ -27,13 +29,16 @@ Events
   - all checks finished on the head (one summary line)
   - a new comment, review, thread, or thread reply from someone other than the
     PR author or the gh user
-  - Greptile, Macroscope, or CodeRabbit finished on the head, or a Greptile or
-    Macroscope summary changed after that
+  - Greptile, Macroscope, Codex, or CodeRabbit finished on the head, or a
+    Greptile, Macroscope, or Codex summary changed after that
   - the base branch moved and the new commits touch files in this PR
   - merge state became BEHIND or DIRTY
   - the PR merged or closed
 
-CodeRabbit is advisory: pr-wait reports it but never waits for it. Comment
+CodeRabbit is advisory: pr-wait reports it but never waits for it. Codex can
+skip a head pushed while it reviews an older one; when it has not started on a
+green head after CODEX_GRACE_SECONDS, `ready` exits 1 so the agent can comment
+`@codex review`. Comment
 edits are never events, and top-level comments from CI and deploy bots
 (github-actions, Vercel) are skipped, because checks already carry that news.
 
@@ -59,10 +64,13 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, NoReturn
 
-GATING_BOTS = ("greptile", "macroscope")
+GATING_BOTS = ("greptile", "macroscope", "codex")
 ADVISORY_BOTS = ("coderabbit",)
 # CI and deploy bots report through checks. Their PR comments are status reports.
 STATUS_BOTS = ("github-actions", "vercel", "netlify", "railway", "cloudflare")
+# Codex's summary comment carries its latest code review as JSON in this marker.
+CODEX_STATE = re.compile(r"codex-review-state:v1 (\{.*?\}) -->")
+CODEX_GRACE_SECONDS = 5 * 60
 STATE_DIR = Path.home() / ".local" / "state" / "pr-wait"
 # A state file older than this describes an old session. Start a fresh baseline
 # instead of replaying hours of comments as new events.
@@ -171,6 +179,18 @@ def verdict(body: str) -> str:
     return ""
 
 
+def codex_review(body: str) -> tuple[str | None, str | None]:
+    """The commit and status of Codex's latest code review, from its summary comment."""
+    match = CODEX_STATE.search(body or "")
+    if not match:
+        return None, None
+    try:
+        review = json.loads(match.group(1)).get("code_review") or {}
+    except ValueError:
+        return None, None
+    return review.get("commit_sha"), review.get("status")
+
+
 def digest(body: str) -> str:
     return hashlib.sha1(re.sub(r"\s+", " ", plain(body)).encode()).hexdigest()[:12]
 
@@ -260,6 +280,7 @@ class Watcher:
         self.required: set[str] | None = None
         self.prev_snapshot: list[tuple[str, str]] | None = None
         self.pr_files: dict[str, set[str]] = {}
+        self.green_since: dict[str, float] = {}
 
     def load(self) -> Json | None:
         try:
@@ -414,9 +435,12 @@ class Watcher:
 
         # Review bots on the current head. A bot with checks is done when they
         # finish. Otherwise it is done once it reviews the head commit or its
-        # summary names the head.
+        # summary names the head. Codex is done once its summary marks a
+        # completed review of the head.
         bot_status: dict[str, str] = {}
         reviewed: list[str] = []
+        unreviewed: list[str] = []
+        codex_skipped: str | None = None
         for bot in GATING_BOTS + ADVISORY_BOTS:
             own_checks = {name: c for name, c in checks.items() if bot_name(name) == bot}
             summaries = [c for c in comments if bot_name(who(c)[0]) == bot]
@@ -424,9 +448,17 @@ class Watcher:
             on_head = any((r.get("commit") or {}).get("oid") == head for r in own_reviews)
             if own_checks:
                 done = all(c["bucket"] != "pending" for c in own_checks.values())
+            elif bot == "codex":
+                codex_states = [codex_review(s["body"]) for s in summaries]
+                done = on_head or (head, "completed") in codex_states
+                # A completed review of an older commit means Codex is idle, not on the head.
+                if not done:
+                    codex_skipped = next((sha for sha, status in codex_states if sha != head and status == "completed"), None)
             else:
                 done = on_head or any(short in s["body"] for s in summaries)
             seen = bool(own_checks or summaries or own_reviews)
+            if bot in GATING_BOTS and seen and not done:
+                unreviewed.append(bot)
             if bot in ADVISORY_BOTS and own_checks:
                 desc = next(iter(own_checks.values()))
                 bot_status[bot] = f"{bot} {desc['description'] or desc['bucket']} (advisory)"
@@ -486,7 +518,7 @@ class Watcher:
             if self.required
             else "",
             ", ".join(bot_status[b] for b in GATING_BOTS + ADVISORY_BOTS if b in bot_status)
-            or "no Greptile or Macroscope yet",
+            or "no Greptile, Macroscope, or Codex yet",
             f"{len(unresolved)} unresolved threads",
             f"merge state {merge_state}",
         ]
@@ -503,8 +535,15 @@ class Watcher:
             if green and self.until == "green":
                 self.reported.add(checks_key)
                 self.finish(0, [f"green on {short}: {summary}{self.behind(base, base_oid, head)}"])
-            # ready waits for Greptile or Macroscope, never for CodeRabbit.
-            if green and reviewed:
+            # ready waits for every gating bot seen on the PR, never for CodeRabbit.
+            if green:
+                self.green_since.setdefault(head, time.time())
+            if green and codex_skipped and time.time() - self.green_since[head] > CODEX_GRACE_SECONDS:
+                self.finish(1, [
+                    f"codex has not reviewed {short}; its last review was on {codex_skipped[:7]}. "
+                    "Comment `@codex review` on the PR, then run pr-wait again"
+                ])
+            if green and reviewed and not unreviewed:
                 if unresolved:
                     self.finish(1, [f"blocked by {len(unresolved)} unresolved threads on {short}: {' '.join(unresolved)}"])
                 if merge_state == "BEHIND":

@@ -30,6 +30,9 @@ branch conflicts.
   `watch_pull_request`. The parent owns the PR. Do not watch PRs you are not
   working on.
 - **A wake is news, not a merge decision.** Check the merge gate yourself.
+  Green required checks do not mean Codex reviewed the head: its summary
+  comment names the commit it last reviewed. If it skipped the head, comment
+  `@codex review`.
 - **Unwatch when you hand off.** A watched thread stays in Working and out of
   the user's inbox. When you stop (ready, blocked, or asking the user a question),
   call `unwatch_pull_request` first. A merge or close ends the watch on its
@@ -52,15 +55,19 @@ It prints one line per real event. It exits 0 when the `--until` condition is
 met or the PR merges, 1 when it needs you (a required check failed, conflicts,
 unresolved threads, PR closed), and 2 on bad input.
 
-- `ready` (default): required checks green, Greptile or Macroscope reviewed the
-  head, and no unresolved threads. Use this to babysit.
-- `green`: required checks only. Use it when the repo has no Greptile or
-  Macroscope.
+- `ready` (default): required checks green, every review bot seen on the PR
+  (Greptile, Macroscope, Codex) reviewed the head, and no unresolved threads.
+  Use this to babysit.
+- `green`: required checks only. Use it when the repo has none of those bots.
 - `any-change`: exit on the first event.
 
 In Claude Code, run it with the Monitor tool (`timeout_ms: 3600000`), so each
 line wakes you. Without a monitor, run it as one long command. It ends on its
 own.
+
+Codex can skip a head pushed while it reviews an older one. When it has not
+started on a green head after five minutes, `pr-wait` exits 1 and says so.
+Comment `@codex review` on the PR, then start it again.
 
 Start it again after you push, after you handle an exit 1, and after a resume.
 It remembers what it already reported, so nothing that arrived in between is
