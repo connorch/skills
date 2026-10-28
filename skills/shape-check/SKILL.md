@@ -1,45 +1,30 @@
 ---
-name: step-back
+name: shape-check
 description: >-
-  Step back from a branch that grew through iteration - review rounds, point
-  fixes, PR feedback - and judge the end state as a whole: are the big
-  architecture calls right, are abstractions drawn in the right places, is
-  logic shared when appropriate, and did the churn leave residue (dead code,
-  redundant guards, stale docs, duplicated machinery, untested hot paths)?
-  Produces a verdict-first assessment; fixes only when asked. Use when asked to
-  "take a step back", run a "step-back review", assess "the shape of the
-  changes", judge "optimal end state vs tech debt", do a "post-churn cleanup",
-  or after finishing a batch of sequential review fixes on one branch. Not a
-  bug hunt and not a style pass.
+  Trigger this if the user says 'shape check', or when another skill calls for it.
 ---
 
-# Step Back
+# Shape Check
 
 A branch has grown through iteration: an initial design plus rounds of review
 findings, bug reports, and point fixes, each applied and committed on its own.
 Every change was locally justified, but nobody has judged the result as a
-whole. Stepping back means reading the final state at full altitude and
-answering one question: **is this the end state a good engineer would have
-designed outright, or does it encode the path that produced it?**
+whole. Your goal is to read the final end state at full altitude and answer one question:
+**is this the end state a good engineer would have designed outright?**
 
 The unit under review is the **end state**, not the sequence of fixes. Two
 scope limits: this is **not a bug hunt** - pre-existing bugs unrelated to the
-branch belong in a code review - and **not a style pass** - naming and
+branch belong in a separate code review - and **not a style pass** - naming and
 formatting preferences are out of scope unless something is actively
 misleading. Note anything serious but out of scope in the report.
+
+This skill is read-only: deliver the report and change nothing. Fixing is the
+$shape-fix skill's job.
 
 **Order matters: form the architectural verdict first, sweep for mechanical
 residue second.** Checklist-first reviews sink into grep sweeps and produce a
 flat list of trivia while missing the shape. The highest-value findings are
 architectural; the sweeps exist to serve and then supplement that verdict.
-
-## Mode
-
-- **Assess** - the default, and always when the invocation is a question ("how
-  is the shape", "give me your assessment"). Deliver the report, change
-  nothing, offer the cleanup.
-- **Fix** - only when explicitly instructed to clean up. Produce the same
-  assessment first, then apply step 5.
 
 ## Workflow
 
@@ -57,7 +42,7 @@ architectural; the sweeps exist to serve and then supplement that verdict.
 - Read the branch's design doc or ADR if one exists, plus governing docs the
   branch touches (CONTEXT.md, module READMEs). These are the judging frame:
   the branch is held to its own stated invariants and goals, not to taste.
-- Read the *current contents* of every changed file fresh - whole files, not
+- Read the _current contents_ of every changed file fresh - whole files, not
   diff hunks - plus enough surrounding module context to know the existing
   boundaries: which directory owns core logic, which owns app or CLI concerns,
   which owns shared utilities.
@@ -101,8 +86,8 @@ to a pattern the codebase already has, and the cost of leaving it.>
 
 ## Residue
 
-- **C1. <file:line>** - <artifact>. Left behind by <which fix>. <What
-  changed, or the proposed fix in assess mode.>
+- **C1. <file:line>** - <artifact>. Left behind by <which fix>. <The
+  proposed fix.>
 - **C2. Examined and kept: <file:line>** - <what it looks like> but correct
   as-is: <one-line reason>.
 
@@ -115,10 +100,10 @@ Label every item in "What's shaped well", "What I'd change", and "Residue"
 with a letter-number ID - one letter per section, numbered from 1 - so the
 user can reply with "do B2, skip C4". A/B/C above is only an example: pick
 letters that no other labeled list in the thread already uses (an earlier
-step-back report, mocks, options) so every ID stays unambiguous.
+shape-check report, mocks, options) so every ID stays unambiguous.
 
 Writing rules: complete sentences, not fragment bullets. "What's shaped well"
-is mandatory and must carry the *why* - affirmation with reasons is what makes
+is mandatory and must carry the _why_ - affirmation with reasons is what makes
 the criticism credible; without it the report reads as a lint dump. Every
 proposed change names a concrete alternative, ideally one the codebase already
 uses elsewhere. Attribute debt honestly: "review-round accretion" and "wrong
@@ -126,22 +111,5 @@ initial call" have different fixes, so say which one produced each finding.
 "Examined and kept" is not optional; if it is empty, say so - that usually
 means the sweep was not skeptical enough.
 
-**5. Fix (fix mode only).** Apply the changes, run the repo's own verification
-commands (lint, typecheck, tests, format), and re-run any empirical check
-whose subject changed. Small related cleanups may share one commit, and the
-message must explain what churn produced each artifact:
-
-```
-Settle post-review churn on the launcher path
-
-- Drop resolveLegacyRoot; the retry fix in 3f2a1c9 rerouted its only caller
-- Move formatProbeArgs into probe/, which already owns arg construction
-- Add a 5s timeout to the startup health probe added by the hang fix
-- Correct "three guarded spots" in docs/probes.md; there are now two
-```
-
-If verification fails because of a step-back fix, fix it before reporting. If
-the failure predates the branch, report it and leave it. Architectural
-walk-backs from "What I'd change" are their own decision: propose them in the
-report and apply only the ones the user approved or the invocation clearly
-covered.
+End the report by offering the $shape-fix skill, for every finding or for the
+IDs the user picks.

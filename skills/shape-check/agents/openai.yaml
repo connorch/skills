@@ -1,0 +1,4 @@
+interface:
+  display_name: "Shape Check"
+  short_description: "Verdict-first shape check of a branch after iterative fixes"
+  default_prompt: "Use $shape-check on this branch: judge whether the big architecture calls are right, whether abstractions and shared logic sit in the right places, and whether the iteration left residue (dead code, redundant guards, stale docs, duplicated machinery, untested hot paths). Lead with the verdict and change nothing."

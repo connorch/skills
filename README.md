@@ -21,12 +21,17 @@ skills add connorch/skills --skill qa-ux-verify
 skills add connorch/skills --skill codex-review
 skills add connorch/skills --skill codex-implementation
 skills add connorch/skills --skill claude-code-subagent
-skills add connorch/skills --skill step-back
+skills add connorch/skills --skill shape-check
+skills add connorch/skills --skill shape-fix
 skills add connorch/skills --skill pull-upstream
 skills add connorch/skills --skill babysit-pr
 skills add connorch/skills --skill merge-risk
 skills add connorch/skills --skill file-pr
-skills add connorch/skills --skill implement-and-review
+skills add connorch/skills --skill leaving-pr-comments
+skills add connorch/skills --skill sol-loop
+skills add connorch/skills --skill full-send
+skills add connorch/skills --skill full-stop
+skills add connorch/skills --skill modernize
 skills add connorch/skills --skill handoff
 skills add connorch/skills --skill html-communication
 skills add connorch/skills --skill vaut-file-hosting
@@ -41,7 +46,7 @@ skills add connorch/skills --skill motion-explainer
 You can also install multiple specific skills in one command:
 
 ```sh
-skills add connorch/skills --skill qa-ux-plan qa-ux-verify codex-review codex-implementation claude-code-subagent step-back pull-upstream babysit-pr merge-risk file-pr implement-and-review handoff html-communication vaut-file-hosting fleet-exec jev mac-vm bambu-print t3-browser motion-explainer
+skills add connorch/skills --skill qa-ux-plan qa-ux-verify codex-review codex-implementation claude-code-subagent shape-check shape-fix pull-upstream babysit-pr merge-risk file-pr leaving-pr-comments sol-loop full-send full-stop modernize handoff html-communication vaut-file-hosting fleet-exec jev mac-vm bambu-print t3-browser motion-explainer
 ```
 
 ## Shipping to your machines
@@ -127,11 +132,17 @@ These skills help you plan, verify, write, refactor, and fix code.
 - **codex-review** — Ask Codex CLI for an independent review of uncommitted changes, branch diffs, commits, or specific implementations.
 - **codex-implementation** — Delegate bounded code changes to Codex CLI, then inspect the resulting diff and verification.
 - **claude-code-subagent** — For non-Claude agents (Codex, Hermes, etc.): delegate bounded implementation, review, or investigation to Claude Code CLI (`claude -p`) on the user's Claude subscription, then inspect the result and diff.
-- **step-back** — Step-back review of a branch after a batch of point fixes, finding and fixing the damage the iteration itself caused.
+- **shape-check** - Shape check of a branch after a batch of point fixes: is the end state what a good engineer would have designed outright? Read-only; reports the damage the iteration itself caused. Triggered by "shape check".
+- **shape-fix** - Run shape-check, then fix what it found: residue cleanup and in-scope changes, with walk-backs that would widen the PR listed as follow-ups. Triggered by "shape fix".
 - **pull-upstream** - Sync a fork with its upstream: inventory the fork's features, merge upstream in with upstream taking priority, re-apply the fork's work on top, and verify every feature survived - clean merges included.
-- **implement-and-review** - Take an approved plan through implementation, browser QA, PR filing, the review-bot loop with step-back every three Codex rounds, a final QA pass, a handoff writeup of unplanned decisions and deferred findings, and an explainer video in the PR description when merge-risk rates the PR Moderate or higher.
 - **handoff** - Compact the current conversation into a handoff document in the OS temp directory so a fresh agent can pick up the work. Invoked by the user only. Adapted from a skill by [Matt Pocock](https://github.com/mattpocock/skills).
-- **babysit-pr** — Monitor a pull request through review and CI, verifying bot findings, fixing real failures, and dismissing false positives with reasons. Adapted from a skill by [Theo Browne](https://youtu.be/e1snsuY4lTI).
+- **babysit-pr** - Monitor a pull request through review and CI with one watcher (T3 Code's `watch_pull_request`, or the bundled `pr-wait` script), verifying bot findings, fixing real failures, and dismissing false positives with reasons. From Theo Browne's [tstack](https://github.com/t3dotgg/tstack) (MIT, see `vendor/tstack/LICENSE`).
+- **file-pr** - File a concise PR whose title explains why the change matters and whose description leads with the problem. From Theo Browne's [tstack](https://github.com/t3dotgg/tstack) (MIT, see `vendor/tstack/LICENSE`).
+- **leaving-pr-comments** - Format every GitHub comment an agent posts on the user's behalf, with an attribution note and a direct reply. From Theo Browne's [tstack](https://github.com/t3dotgg/tstack) (MIT, see `vendor/tstack/LICENSE`).
+- **sol-loop** - Have OpenAI's GPT Sol review the change in a loop (3 rounds, up to 5 for high-risk findings) while keeping the diff minimal. Triggered by "sol loop". From Theo Browne's [tstack](https://github.com/t3dotgg/tstack) (MIT, see `vendor/tstack/LICENSE`).
+- **full-send** - Take work unattended from its current state to a merged PR: prove the change, sol-loop it, file, babysit, and merge once the merge gate passes. Triggered by "full send". From Theo Browne's [tstack](https://github.com/t3dotgg/tstack) (MIT, see `vendor/tstack/LICENSE`).
+- **full-stop** - The full-send workflow, stopping with the PR ready for the user to merge. Never merges. Triggered by "full stop". From Theo Browne's [tstack](https://github.com/t3dotgg/tstack) (MIT, see `vendor/tstack/LICENSE`).
+- **modernize** - Bring an old PR up to date: check whether its idea still belongs, then recommend MODERNIZE, REWORK, or CLOSE, rebasing only for MODERNIZE. From Theo Browne's [tstack](https://github.com/t3dotgg/tstack) (MIT, see `vendor/tstack/LICENSE`).
 - **merge-risk** - Rate a PR's merge risk on a Minimal-to-Critical scale in an independent subagent, verifying existing bot findings before they count toward the rating.
 - **html-communication** — Create self-contained HTML writeups (plans, specs, findings, UI mocks) and publish them privately to files.vaut.dev with the vaut CLI. Adapted from a skill by Theo Browne.
 - **vaut-file-hosting** - Upload any local file to files.vaut.dev and return a permanent URL (private by default, public on request), backed by the host and the `vaut` CLI in [connorch/vaut](https://github.com/connorch/vaut). Adapted from a skill by Theo Browne.
@@ -178,3 +189,4 @@ rename `SKILL.archived.md` to `SKILL.md`.
 - **sb-ingest** - Archived because it is no longer part of the live skill set.
 - **sb-ingest-superwhisper-meeting** - Archived because it is no longer part of the live skill set.
 - **qa-ux-fix-loop** - Archived because it is no longer part of the live skill set.
+- **implement-and-review** - Archived; replaced by full-send and full-stop, with shape-fix passes now in sol-loop and babysit-pr.
