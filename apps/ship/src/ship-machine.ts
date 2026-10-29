@@ -3,16 +3,17 @@
 // Clone). Validation covers the whole tree before anything changes.
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { existsSync, globSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { shipsTo, skillAgents, type MachineContext } from "./controls.ts";
 import { EMPTY_MANIFEST, Manifest, nextManifest, planSkills } from "./plan.ts";
 import { addSkills, readLockSources, removeSkills, supportedAgents } from "./skills-cli.ts";
-import { readSource, ValidationError } from "./source.ts";
+import { readSource, ValidationError, type LiveSkill } from "./source.ts";
 
-// Progress from inside an install: its plan, and each package it runs.
+// Progress from inside an install: its plan, each package it runs, and
+// problems worth a look that do not stop it.
 export interface ShipEvent {
-  tag: "PLAN" | "RUN";
+  tag: "PLAN" | "RUN" | "WARN";
   message: string;
 }
 
@@ -73,9 +74,30 @@ function checkNames(root: string, knownMachines: string[]) {
   return source;
 }
 
+// Skills point at each other as "the $file-pr skill".
+const SKILL_REFERENCE = /\$[a-z][a-z0-9-]*/g;
+
+// One line per Live Skill whose Markdown or agent YAML names a skill this tree
+// does not ship, such as one since archived or renamed. Warnings, not
+// failures: a skill may point at one installed from another repo.
+function danglingReferences(root: string, skills: LiveSkill[]): string[] {
+  const live = new Set(skills.map((skill) => skill.name));
+  return skills.flatMap((skill) => {
+    const dir = join(root, "skills", skill.name);
+    const dangling = new Set(
+      globSync(["**/*.md", "**/*.yaml"], { cwd: dir })
+        .flatMap((file) => readFileSync(join(dir, file), "utf8").match(SKILL_REFERENCE) ?? [])
+        .filter((reference) => !live.has(reference.slice(1))),
+    );
+    if (dangling.size === 0) return [];
+    return [`skills/${skill.name}: no Live Skill named ${[...dangling].join(", ")}`];
+  });
+}
+
 export function shipMachine(options: ShipMachineOptions): MachineReport {
   const { root, machine, dryRun, emit } = options;
   const source = checkNames(root, options.knownMachines);
+  for (const message of danglingReferences(root, source.skills)) emit({ tag: "WARN", message });
 
   const desired = new Map(
     source.skills
