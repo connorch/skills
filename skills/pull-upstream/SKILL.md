@@ -36,8 +36,10 @@ A clean textual merge is not a correct merge. Upstream may have renamed an API t
 
 - Run the repo's own checks (typecheck, lint, tests).
 - Walk the feature inventory and verify every feature against its verification note: the seams it hooks into still exist and its behavior is intact.
+- Do a full QA pass on every surface the merge touched (upstream's changes and your conflict resolutions), exercising each the way a user would: UI, CLI, API.
+- Keep QA sandboxed from Connor's installed copy of the app. If the app is installed on this machine (e.g. t3code via `install:desktop:local`), run the QA instance with its own data directory, profile, and ports so the installed app's data and running process stay untouched. If you can't confirm that isolation, ask first.
 - Fix what broke, keeping the upstream-first priority.
 
 ## 6. Report
 
-At the end, summarize what came in from upstream, each conflict and how it was resolved, each fork feature and its verification result, and any open questions that need Connor's call. Leave the result on the working branch; merging it into the fork's main branch is Connor's decision unless already authorized. Build the report with the $html-communication skill and give Connor the private URL.
+At the end, summarize what came in from upstream, each conflict and how it was resolved, each fork feature and its verification result, the QA results, and any open questions that need Connor's call. Leave the result on the working branch; merging it into the fork's main branch is Connor's decision unless already authorized. Build the report with the $html-communication skill and give Connor the private URL.
