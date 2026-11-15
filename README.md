@@ -41,12 +41,13 @@ skills add connorch/skills --skill mac-vm
 skills add connorch/skills --skill bambu-print
 skills add connorch/skills --skill t3-browser
 skills add connorch/skills --skill motion-explainer
+skills add connorch/skills --skill improve
 ```
 
 You can also install multiple specific skills in one command:
 
 ```sh
-skills add connorch/skills --skill qa-ux-plan qa-ux-verify codex-review codex-implementation claude-code-subagent shape-check shape-fix pull-upstream babysit-pr merge-risk file-pr leaving-pr-comments sol-loop full-send full-stop modernize handoff html-communication vaut-file-hosting fleet-exec jev mac-vm bambu-print t3-browser motion-explainer
+skills add connorch/skills --skill qa-ux-plan qa-ux-verify codex-review codex-implementation claude-code-subagent shape-check shape-fix pull-upstream babysit-pr merge-risk file-pr leaving-pr-comments sol-loop full-send full-stop modernize handoff html-communication vaut-file-hosting fleet-exec jev mac-vm bambu-print t3-browser motion-explainer improve
 ```
 
 ## Shipping to your machines
@@ -143,6 +144,7 @@ These skills help you plan, verify, write, refactor, and fix code.
 - **full-send** - Take work unattended from its current state to a merged PR: prove the change, sol-loop it, file, babysit, and merge once the merge gate passes. Triggered by "full send". From Theo Browne's [tstack](https://github.com/t3dotgg/tstack) (MIT, see `vendor/tstack/LICENSE`).
 - **full-stop** - The full-send workflow, stopping with the PR ready for the user to merge. Never merges. Triggered by "full stop". From Theo Browne's [tstack](https://github.com/t3dotgg/tstack) (MIT, see `vendor/tstack/LICENSE`).
 - **modernize** - Bring an old PR up to date: check whether its idea still belongs, then recommend MODERNIZE, REWORK, or CLOSE, rebasing only for MODERNIZE. From Theo Browne's [tstack](https://github.com/t3dotgg/tstack) (MIT, see `vendor/tstack/LICENSE`).
+- **improve** - Audit a codebase as a read-only advisor and write prioritized, self-contained implementation plans under `plans/` for other agents to execute. Adapted from [shadcn/improve](https://github.com/shadcn/improve) (MIT, see `skills/improve/LICENSE.md`).
 - **merge-risk** - Rate a PR's merge risk on a Minimal-to-Critical scale in an independent subagent, verifying existing bot findings before they count toward the rating.
 - **html-communication** — Create self-contained HTML writeups (plans, specs, findings, UI mocks) and publish them privately to files.vaut.dev with the vaut CLI. Adapted from a skill by Theo Browne.
 - **vaut-file-hosting** - Upload any local file to files.vaut.dev and return a permanent URL (private by default, public on request), backed by the host and the `vaut` CLI in [connorch/vaut](https://github.com/connorch/vaut). Adapted from a skill by Theo Browne.
