@@ -44,4 +44,5 @@ without the user. If someone else merged it, report that instead.
 
 In T3 Code, call `unwatch_pull_request` before the handoff or a question.
 Report the PR link, final head, verdict, proof, reviewer outcome, merge risk
-rating, whether the PR has an explainer video, and remaining risks. State whether the PR is still open and unmerged.
+rating, whether the PR has an explainer video, and remaining risks. State
+whether the PR is still open and unmerged.
